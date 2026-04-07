@@ -8,7 +8,8 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const result = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = result;
     if (!error) {
       // Check if user has selected a major
       const { data: { user } } = await supabase.auth.getUser();
@@ -25,6 +26,14 @@ export async function GET(request: Request) {
         }
       }
       return NextResponse.redirect(`${origin}${next}`);
+    }
+    // Debug: if exchange failed, include the error message in the redirect so it is visible in the browser
+    try {
+      const encoded = encodeURIComponent(error?.message || JSON.stringify(error));
+      return NextResponse.redirect(`${origin}/login?error=auth&detail=${encoded}`);
+    } catch (e) {
+      // Fallback to a simple redirect if encoding fails
+      return NextResponse.redirect(`${origin}/login?error=auth`);
     }
   }
 
