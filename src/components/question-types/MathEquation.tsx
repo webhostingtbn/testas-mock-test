@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import VirtualCalculator from './VirtualCalculator';
+// import VirtualCalculator from './VirtualCalculator';
+import VirtualKeyboard from './VirtualKeyboard';
 
 interface MathEquationProps {
   question: {
@@ -42,6 +43,7 @@ export default function MathEquation({
             return;
           }
           newValue = parseInt(str.slice(0, -1), 10);
+          onAnswer({ ...answers, [activeVariable]: newValue });
         }
         return;
       }
@@ -50,15 +52,15 @@ export default function MathEquation({
       if (isNaN(digit)) return;
 
       if (currentValue !== undefined) {
-        // Append digit (limit to 3 digits)
+        // Append digit (limit to 2 digits)
         const str = String(currentValue);
-        if (str.length >= 3) return;
+        if (str.length >= 2) return;
         newValue = parseInt(str + key, 10);
       } else {
         newValue = digit;
       }
 
-      onAnswer({ ...answers, [activeVariable]: newValue! });
+      onAnswer({ ...answers, [activeVariable]: newValue });
     },
     [activeVariable, answers, onAnswer]
   );
@@ -139,7 +141,7 @@ export default function MathEquation({
                     {variable}
                   </span>
                   <span className="text-gray-400">=</span>
-                  <div className={`flex-1 min-h-[28px] rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
+                  <div className={`flex-1 min-h-7 rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
                     isActive
                       ? 'bg-white border border-orange-300 text-gray-900'
                       : 'bg-white/50 text-gray-700'
@@ -160,7 +162,7 @@ export default function MathEquation({
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
             Scratchpad Calculator
           </h3>
-          <VirtualCalculator />
+          <VirtualKeyboard onKeyPress={handleKeyPress} />
         </div>
       </div>
     </div>
