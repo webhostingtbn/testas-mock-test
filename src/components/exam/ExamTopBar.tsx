@@ -32,7 +32,7 @@ export default function ExamTopBar({
   ];
 
   return (
-    <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200/50 flex-shrink-0">
+    <div className="bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200/50 shrink-0">
       {/* Main top bar row */}
       <div className="flex items-center px-4 py-3 gap-4">
         {/* Left: Timer */}

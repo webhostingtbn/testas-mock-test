@@ -39,13 +39,13 @@ export default function BreakScreen({ onSkip, onComplete }: BreakScreenProps) {
   const isLongBreak = breakDuration > 120;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 via-white to-gray-100">
       <div className="text-center max-w-md px-6">
         {/* Icon */}
         <div className={`w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-lg ${
           isLongBreak
-            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-200'
-            : 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-200'
+            ? 'bg-linear-to-br from-blue-500 to-indigo-600 shadow-blue-200'
+            : 'bg-linear-to-br from-green-500 to-emerald-600 shadow-green-200'
         }`}>
           <Coffee className="w-12 h-12 text-white" />
         </div>

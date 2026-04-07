@@ -108,7 +108,7 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50">
       {/* Background decoration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-orange-100/60 blur-3xl" />
@@ -224,7 +224,7 @@ export default function ResultsPage() {
                 {/* Progress bar */}
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-700 ease-out"
+                    className="h-full bg-linear-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${result.percentage}%` }}
                   />
                 </div>
@@ -247,7 +247,7 @@ export default function ResultsPage() {
           <Button
             onClick={() => { resetExam(); router.push('/dashboard'); }}
             size="lg"
-            className="h-12 px-8 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-200"
+            className="h-12 px-8 bg-linear-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-200"
           >
             <Home className="w-4 h-4 mr-2" />
             Back to Dashboard
