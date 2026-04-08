@@ -8,7 +8,7 @@ interface CircularTimerProps {
   size?: number;
 }
 
-export default function CircularTimer({ onTimeUp, size = 64 }: CircularTimerProps) {
+export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProps) {
   const { getRemainingTime, sectionDuration } = useExamStore();
   const [remaining, setRemaining] = useState(getRemainingTime());
   const hasCalledTimeUp = useRef(false);
@@ -56,44 +56,44 @@ export default function CircularTimer({ onTimeUp, size = 64 }: CircularTimerProp
     : 'white';
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        className={`transform -rotate-90 ${isCritical ? 'animate-pulse' : ''}`}
-      >
-        {/* Background circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="rgba(255, 255, 255, 0.2)"
-          strokeWidth={strokeWidth}
-        />
-        {/* Progress circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={ringColor}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-1000 ease-linear"
-        />
-      </svg>
-      {/* Time text */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span
-          className="text-xs font-bold tabular-nums"
-          style={{ color: textColor }}
+    <div className="flex items-center gap-3 bg-black/20 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg
+          width={size}
+          height={size}
+          className={`transform -rotate-90 ${isCritical ? 'animate-pulse' : ''}`}
         >
-          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-        </span>
+          {/* Background circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.2)"
+            strokeWidth={strokeWidth}
+          />
+          {/* Progress circle */}
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={ringColor}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            className="transition-all duration-1000 ease-linear"
+          />
+        </svg>
       </div>
+      {/* Time text */}
+      <span
+        className="text-lg font-bold tabular-nums tracking-wider pr-1"
+        style={{ color: textColor }}
+      >
+        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+      </span>
     </div>
   );
 }

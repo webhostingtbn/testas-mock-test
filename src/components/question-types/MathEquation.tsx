@@ -21,8 +21,9 @@ export default function MathEquation({
   currentAnswer,
   onAnswer,
 }: MathEquationProps) {
-  const { equations, variables } = question.content;
-  const [activeVariable, setActiveVariable] = useState<string | null>(variables[0] || null);
+  const equations = question?.content?.equations || [];
+  const variables = question?.content?.variables || [];
+  const [activeVariable, setActiveVariable] = useState<string | null>(() => variables[0] || null);
   const answers = currentAnswer || {};
 
   const handleKeyPress = useCallback(

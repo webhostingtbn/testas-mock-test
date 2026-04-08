@@ -343,7 +343,7 @@ export default function DashboardClient() {
       </header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-4xl mx-auto px-6 py-10">
+      <main className="relative z-10 max-w-4xl mx-auto px-6 pt-4">
         {/* Welcome Section */}
         <div className="mb-4 flex items-center justify-between gap-6">
           <div>
@@ -507,7 +507,7 @@ export default function DashboardClient() {
         </Card>
 
         {/* Test History */}
-        <Card className="border-0 bg-white/70 backdrop-blur-sm shadow-lg mb-4 overflow-hidden">
+        {/* <Card className="border-0 bg-white/70 backdrop-blur-sm shadow-lg mb-4 overflow-hidden">
           <CardContent className="p-0">
             <button 
               onClick={() => setIsHistoryOpen(!isHistoryOpen)}
@@ -566,7 +566,7 @@ export default function DashboardClient() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card> */}
 
 
       </main>

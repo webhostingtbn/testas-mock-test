@@ -33,14 +33,14 @@ export default function ExamBottomBar({
 
   return (
     <>
-      <div className="bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] flex-shrink-0">
+      <div className="bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] shrink-0">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
           {/* Back button */}
           <Button
             onClick={onBack}
             disabled={isFirstQuestion}
             variant="outline"
-            className="h-11 px-6 text-sm font-medium border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-all duration-150"
+            className="h-11 pr-12 text-sm font-medium border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-all duration-150"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
@@ -60,7 +60,7 @@ export default function ExamBottomBar({
           <Button
             onClick={onNext}
             disabled={isLastQuestion}
-            className="h-11 px-8 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 disabled:opacity-40 transition-all duration-150"
+            className="h-11 pl-12 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 disabled:opacity-40 transition-all duration-150"
           >
             Next
             <ChevronRight className="w-4 h-4 ml-1" />

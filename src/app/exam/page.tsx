@@ -333,7 +333,7 @@ export default function ExamPage() {
     .filter((i) => i >= 0);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50" style={{ fontSize: `${fontSize}px` }}>
+    <div className="h-screen w-screen flex flex-col bg-gray-50" style={{ fontSize: `${fontSize}px` }}>
       <ExamTopBar
         sectionTitle={section.title}
         totalQuestions={sectionQuestions.length}

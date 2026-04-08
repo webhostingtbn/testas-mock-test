@@ -38,6 +38,37 @@ function prepareLatex(text: string) {
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
+function ZoomableImage({ src, alt = 'Graphic' }: { src: string; alt?: string }) {
+  const [imageScale, setImageScale] = useState(100);
+
+  return (
+    <div className="flex flex-col relative items-center justify-start gap-1 bg-gray-50/50 rounded-xl border border-gray-100 w-full overflow-hidden">
+      <div className="w-full overflow-auto flex justify-center border border-gray-200 rounded-lg bg-white min-h-37.5">
+        <img
+          src={src}
+          alt={alt}
+          style={{ width: `${imageScale}%`, maxWidth: 'none' }}
+          className="rounded object-contain transition-all duration-75 m-0! mb-10!"
+        />
+      </div>
+      <div className="w-full absolute bottom-2 max-w-sm flex items-center gap-3 px-4 py-1 bg-white rounded-full border border-gray-200 shadow-sm mt-2">
+        <span className="text-xs text-gray-500 font-medium">Zoom</span>
+        <input
+          type="range"
+          min="10"
+          max="300"
+          value={imageScale}
+          onChange={(e) => setImageScale(Number(e.target.value))}
+          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
+        />
+        <span className="text-xs text-gray-500 font-medium w-10 text-right">
+          {imageScale}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function ModuleMCQ({
   passage,
   selectedAnswers,
@@ -48,46 +79,20 @@ export default function ModuleMCQ({
     passage.questions && passage.questions.length > 0 ? passage.questions[0].id : null
   );
 
-  // State to track passage image scale for the zoom slider
-  const [imageScale, setImageScale] = useState(100);
-
   const toggleQuestion = (questionId: string) => {
     setOpenQuestionId((prev) => (prev === questionId ? null : questionId));
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full items-stretch">
+    <div className="flex flex-col lg:flex-row gap-6 items-stretch">
       {/* Left side: Passage */}
-      <div className="w-full lg:w-1/2 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden max-h-[85vh]">
+      <div className="w-full lg:w-1/2 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden h-[calc(100vh-180px)] box-border ">
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
           <h2 className="text-xl font-bold text-gray-900">{passage.title}</h2>
         </div>
         <div className="p-6 overflow-y-auto">
           {passage.resolved_image_url && (
-            <div className="mb-6 flex flex-col items-center gap-3 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-              <div className="w-full overflow-auto flex justify-center border border-gray-200 rounded-lg bg-white p-2 min-h-[150px]">
-                <img
-                  src={passage.resolved_image_url}
-                  alt="Passage graphic"
-                  style={{ width: `${imageScale}%`, maxWidth: 'none' }}
-                  className="rounded object-contain transition-all duration-75"
-                />
-              </div>
-              <div className="w-full max-w-sm flex items-center gap-3 px-4 py-2 bg-white rounded-full border border-gray-200 shadow-sm mt-2">
-                <span className="text-xs text-gray-500 font-medium">Zoom</span>
-                <input
-                  type="range"
-                  min="10"
-                  max="200"
-                  value={imageScale}
-                  onChange={(e) => setImageScale(Number(e.target.value))}
-                  className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                />
-                <span className="text-xs text-gray-500 font-medium w-8 text-right">
-                  {imageScale}%
-                </span>
-              </div>
-            </div>
+            <ZoomableImage src={passage.resolved_image_url} alt="Passage graphic" />
           )}
           <div className="prose prose-orange max-w-none text-gray-800 prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl">
             <ReactMarkdown
@@ -101,7 +106,7 @@ export default function ModuleMCQ({
       </div>
 
       {/* Right side: Questions */}
-      <div className="w-full lg:w-1/2 flex flex-col gap-4 max-h-[85vh] overflow-y-auto pr-2">
+      <div className="w-full lg:w-1/2 flex flex-col gap-1 h-[calc(100vh-180px)] overflow-y-auto pr-2 box-border ">
         <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Questions ({(passage.questions || []).length})
         </div>
@@ -114,7 +119,7 @@ export default function ModuleMCQ({
           return (
             <div
               key={question.id}
-              className={`bg-white rounded-2xl border transition-all duration-200 ${
+              className={`bg-white rounded-xl border transition-all duration-200 ${
                 isOpen
                   ? 'border-orange-300 shadow-md ring-1 ring-orange-100'
                   : 'border-gray-200 shadow-sm hover:border-orange-200'
@@ -123,7 +128,7 @@ export default function ModuleMCQ({
               {/* Accordion Header */}
               <button
                 onClick={() => toggleQuestion(question.id)}
-                className="w-full flex items-center justify-between px-5 py-3 text-left focus:outline-none"
+                className="w-full flex items-center justify-between px-5 py-2 text-left focus:outline-none"
               >
                 <div className="flex items-center gap-3">
                   <div
@@ -155,17 +160,11 @@ export default function ModuleMCQ({
 
               {/* Accordion Body */}
               {isOpen && (
-                <div className="px-5 pb-5 pt-2 border-t border-gray-100/50">
-                  <div className="prose prose-sm prose-orange max-w-none text-gray-800 mb-5 prose-p:leading-relaxed">
+                <div className="px-5 pb-5 border-t border-gray-100/50">
+                  <div className="prose prose-sm prose-orange max-w-none text-gray-800 mb-2 prose-p:leading-relaxed">
                     {/* Optional child question image */}
                     {(question.content as any).resolved_image_url && (
-                      <div className="mb-4">
-                        <img 
-                          src={(question.content as any).resolved_image_url} 
-                          alt="Question graphic"
-                          className="max-w-full rounded-lg border border-gray-200 shadow-sm"
-                        />
-                      </div>
+                      <ZoomableImage src={(question.content as any).resolved_image_url} alt="Question graphic" />
                     )}
                     <ReactMarkdown
                       remarkPlugins={[remarkMath, remarkGfm]}
@@ -185,7 +184,7 @@ export default function ModuleMCQ({
                             key={letter}
                             onClick={() => onAnswer(question.id, letter)}
                             className={`
-                              flex items-start gap-3 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all duration-200
+                              flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all duration-200
                               ${
                                 isSelected
                                   ? 'border-orange-500 bg-orange-50/50 ring-2 ring-orange-200'
@@ -195,7 +194,7 @@ export default function ModuleMCQ({
                           >
                             <div
                               className={`
-                                flex mt-[2px] shrink-0 items-center justify-center w-5 h-5 rounded-full border-2 transition-colors
+                                flex mt-0.5 shrink-0 items-center justify-center w-5 h-5 rounded-full border-2 transition-colors
                                 ${
                                   isSelected
                                     ? 'border-orange-500 bg-orange-500 text-white'
@@ -211,8 +210,8 @@ export default function ModuleMCQ({
                                 ✓
                               </span>
                             </div>
-                            <div className="flex-1 flex items-start gap-3 w-full text-gray-700">
-                              <span className="font-bold text-gray-900 mt-[1px] w-4 shrink-0">
+                            <div className="flex-1 flex items-center gap-3 w-full text-gray-700">
+                              <span className="font-bold text-gray-900 mt-px w-4 shrink-0">
                                 {letter}
                               </span>
                               <div className="prose prose-sm prose-orange max-w-none flex-1 prose-p:my-0">
