@@ -49,7 +49,7 @@ export default function AdminPage() {
           .select('role')
           .eq('id', user.id)
           .single();
-        console.log("me: ", profile);
+        // console.log("me: ", profile);
 
         if (profile?.role !== 'admin') {
           setIsAdmin(false);
@@ -118,6 +118,8 @@ export default function AdminPage() {
       </div>
     );
   }
+
+  console.log("Users with exams:", users);
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -292,13 +294,15 @@ export default function AdminPage() {
                                               const cAns = ans.correct_answer;
                                               
                                               if (uAns !== null && uAns !== undefined) {
-                                                if (typeof uAns === 'object') displayAns = Object.entries(uAns).map(([k, v]) => `${k}:${v}`).join(', ');
+                                                if (Array.isArray(uAns)) displayAns = `[${uAns.join(', ')}]`;
+                                                else if (typeof uAns === 'object') displayAns = Object.entries(uAns).map(([k, v]) => `${k}:${v}`).join(', ');
                                                 else displayAns = String(uAns);
                                               }
                                               
                                               if (cAns !== undefined) {
                                                 let cAnsStr = String(cAns);
-                                                if (cAns && typeof cAns === 'object') {
+                                                if (Array.isArray(cAns)) cAnsStr = `[${cAns.join(', ')}]`;
+                                                else if (cAns && typeof cAns === 'object') {
                                                   cAnsStr = Object.entries(cAns).map(([k, v]) => `${k}:${v}`).join(', ');
                                                 }
                                                 titleStr = `Correct answer: ${cAnsStr}`;
@@ -310,7 +314,8 @@ export default function AdminPage() {
                                             } else {
                                               // Legacy fallback
                                               if (ans !== null && ans !== undefined) {
-                                                if (typeof ans === 'object') displayAns = Object.entries(ans).map(([k, v]) => `${k}:${v}`).join(', ');
+                                                if (Array.isArray(ans)) displayAns = `[${ans.join(', ')}]`;
+                                                else if (typeof ans === 'object') displayAns = Object.entries(ans).map(([k, v]) => `${k}:${v}`).join(', ');
                                                 else displayAns = String(ans);
                                               }
                                             }

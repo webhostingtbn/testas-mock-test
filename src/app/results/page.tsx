@@ -65,29 +65,38 @@ export default function ResultsPage() {
       return a === b;
     };
 
+    const formatAns = (a: any) => {
+      if (a && typeof a === 'object') {
+        if ('image1' in a && 'image2' in a) return [a.image1, a.image2];
+        if ('A' in a && 'B' in a) return [a.A, a.B];
+      }
+      return a !== undefined ? a : null;
+    };
+
+    // Only process if sections are loaded
+    if (sections.length === 0) return;
+
     const processResults = async () => {
       try {
-        // Collect all possible question IDs to fetch correct answers
-        const questionIds: string[] = [];
-        sections.forEach((sec) => {
-          if (sec.questionIds) {
-            questionIds.push(...sec.questionIds);
-          }
-        });
+        // Collect all possible section IDs to fetch correct questions
+        const sectionIds = sections.map((s) => s.id);
 
-        // 1. Fetch correct answers from DB
+        // 1. Fetch true questions from DB (instead of querying by passage IDs which failed for Module tests)
         const { data: questionsData, error } = await supabase
           .from("questions")
-          .select("id, correct_answer")
-          .in("id", questionIds);
+          .select("id, section_id, correct_answer")
+          .in("section_id", sectionIds);
 
         if (error) throw error;
-        
+
         // 2. Build map of correct answers
-        const correctAnswersMap = (questionsData || []).reduce((acc: Record<string, any>, q) => {
-          acc[q.id] = q.correct_answer;
-          return acc;
-        }, {});
+        const correctAnswersMap = (questionsData || []).reduce(
+          (acc: Record<string, any>, q) => {
+            acc[q.id] = q.correct_answer;
+            return acc;
+          },
+          {}
+        );
 
         // 3. Process section by section
         const calculatedResults = sections.map((section) => {
@@ -95,28 +104,45 @@ export default function ResultsPage() {
           let correctCount = 0;
           let answeredCount = 0;
 
-          // Check each question in the section
-          Object.entries(sectionAnswers).forEach(([qId, ans]) => {
-             answeredCount++;
-             const correctAns = correctAnswersMap[qId];
-             
-             if (ans !== null && ans !== undefined && correctAns !== undefined) {
-               // Complex equality for objects like {A: 7, B: 4} OR strict equality for "C"
-               if (isDeepEqual(ans, correctAns)) {
-                 correctCount++;
-               }
-             }
+          // Instead of evaluating passage keys or store array, evaluate actual child question keys!
+          const actualQuestionIds = (questionsData || [])
+            .filter((q) => q.section_id === section.id)
+            .map((q) => q.id);
+
+          const actualTotalQuestions = actualQuestionIds.length;
+
+          // Check each real question in the section
+          actualQuestionIds.forEach((qId) => {
+            const ans = sectionAnswers[qId];
+            const correctAns = correctAnswersMap[qId];
+
+            if (ans !== null && ans !== undefined) {
+              answeredCount++;
+            }
+
+            if (
+              ans !== null &&
+              ans !== undefined &&
+              correctAns !== undefined
+            ) {
+              // Format answers first to handle nested array checks consistently
+              if (isDeepEqual(formatAns(ans), formatAns(correctAns))) {
+                correctCount++;
+              }
+            }
           });
 
-          const percentage = section.questionCount > 0 
-            ? Math.round((correctCount / section.questionCount) * 100) 
-            : 0;
+          const percentage =
+            actualTotalQuestions > 0
+              ? Math.round((correctCount / actualTotalQuestions) * 100)
+              : 0;
 
           return {
             id: section.id,
             title: section.title,
             type: section.questionType,
-            totalQuestions: section.questionCount,
+            totalQuestions: actualTotalQuestions,
+            actualQuestionIds: actualQuestionIds, // carry over for format Answers
             answeredCount,
             correctCount,
             percentage,
@@ -124,10 +150,20 @@ export default function ResultsPage() {
         });
 
         // 4. Calculate globals
-        const totalC = calculatedResults.reduce((sum, s) => sum + s.correctCount, 0);
-        const totalQ = calculatedResults.reduce((sum, s) => sum + s.totalQuestions, 0);
-        const totalA = calculatedResults.reduce((sum, s) => sum + s.answeredCount, 0);
-        const overallPct = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+        const totalC = calculatedResults.reduce(
+          (sum, s) => sum + s.correctCount,
+          0
+        );
+        const totalQ = calculatedResults.reduce(
+          (sum, s) => sum + s.totalQuestions,
+          0
+        );
+        const totalA = calculatedResults.reduce(
+          (sum, s) => sum + s.answeredCount,
+          0
+        );
+        const overallPct =
+          totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
 
         setSectionResults(calculatedResults);
         setTotalCorrect(totalC);
@@ -138,35 +174,32 @@ export default function ResultsPage() {
 
         // 5. Format detailed answers for jsonb
         const detailedAnswersByTitle = calculatedResults.reduce((acc, result) => {
-          const section = sections.find((s) => s.id === result.id);
-          if (!section) return acc;
+          const sectionAnswers = answers[result.id] || {};
 
-          const sectionAnswers = answers[section.id] || {};
-          
-          const formatAns = (a: any) => {
-            if (a && typeof a === 'object') {
-              if ('image1' in a && 'image2' in a) return [a.image1, a.image2];
-              if ('A' in a && 'B' in a) return [a.A, a.B];
+          const formattedAnswers = result.actualQuestionIds.map(
+            (qId: string) => {
+              const ans = sectionAnswers[qId];
+              const correctAns = correctAnswersMap[qId];
+              const formattedUserAns = formatAns(ans);
+              const formattedCorrectAns = formatAns(correctAns);
+              const isCorrect =
+                ans !== null &&
+                ans !== undefined &&
+                correctAns !== undefined &&
+                isDeepEqual(formattedUserAns, formattedCorrectAns);
+
+              return {
+                user_answer: formattedUserAns,
+                correct_answer: formattedCorrectAns,
+                is_correct: isCorrect,
+              };
             }
-            return a !== undefined ? a : null;
-          };
+          );
 
-          const formattedAnswers = section.questionIds.map((qId) => {
-            const ans = sectionAnswers[qId];
-            const correctAns = correctAnswersMap[qId];
-            const isCorrect = ans !== null && ans !== undefined && correctAns !== undefined && isDeepEqual(ans, correctAns);
-
-            return {
-              user_answer: formatAns(ans),
-              correct_answer: formatAns(correctAns),
-              is_correct: isCorrect
-            };
-          });
-          
           acc[result.title] = {
             score: result.correctCount,
             max_score: result.totalQuestions,
-            answers: formattedAnswers
+            answers: formattedAnswers,
           };
           return acc;
         }, {} as Record<string, unknown>);
