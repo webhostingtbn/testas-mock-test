@@ -23,6 +23,15 @@ import {
 export default function ResultsPage() {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
+  const [isCalculated, setIsCalculated] = useState(false);
+  
+  // State for calculated stats
+  const [sectionResults, setSectionResults] = useState<any[]>([]);
+  const [totalCorrect, setTotalCorrect] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [totalAnswered, setTotalAnswered] = useState(0);
+  const [overallPercentage, setOverallPercentage] = useState(0);
+
   const { sections, answers, currentExamId, userExamId, resetExam } =
     useExamStore();
   const supabase = createClient();
@@ -38,100 +47,159 @@ export default function ResultsPage() {
     }
   }, [hydrated, currentExamId, router]);
 
-  // Calculate scores per section
-  const sectionResults = sections.map((section) => {
-    const sectionAnswers = answers[section.id] || {};
-    const answeredCount = Object.keys(sectionAnswers).length;
-    // In a real app, we'd compare against correct_answer from the DB
-    // For mock, we'll simulate a random score
-    const correctCount = Math.floor(
-      answeredCount * 0.6 + Math.random() * answeredCount * 0.3,
-    );
-
-    return {
-      id: section.id,
-      title: section.title,
-      type: section.questionType,
-      totalQuestions: section.questionCount,
-      answeredCount,
-      correctCount: Math.min(correctCount, answeredCount),
-      percentage:
-        answeredCount > 0
-          ? Math.round(
-              (Math.min(correctCount, answeredCount) / section.questionCount) *
-                100,
-            )
-          : 0,
-    };
-  });
-
-  const totalCorrect = sectionResults.reduce(
-    (sum, s) => sum + s.correctCount,
-    0,
-  );
-  const totalQuestions = sectionResults.reduce(
-    (sum, s) => sum + s.totalQuestions,
-    0,
-  );
-  const totalAnswered = sectionResults.reduce(
-    (sum, s) => sum + s.answeredCount,
-    0,
-  );
-  const overallPercentage =
-    totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
-
-  const getGrade = (pct: number) => {
-    if (pct >= 90)
-      return { label: "Excellent", color: "text-green-600", bg: "bg-green-50" };
-    if (pct >= 75)
-      return { label: "Good", color: "text-blue-600", bg: "bg-blue-50" };
-    if (pct >= 60)
-      return {
-        label: "Satisfactory",
-        color: "text-amber-600",
-        bg: "bg-amber-50",
-      };
-    return {
-      label: "Needs Improvement",
-      color: "text-red-600",
-      bg: "bg-red-50",
-    };
-  };
-
-  const grade = getGrade(overallPercentage);
-
-  // Auto-save the results to Supabase when we land on this page
+  // Auto-calculate and save results to Supabase when we land on this page
   useEffect(() => {
-    if (!hydrated || !userExamId || totalQuestions === 0) return;
+    if (!hydrated || !userExamId || !currentExamId) return;
 
-    // Map answers using section titles instead of section IDs for better readability in the DB
-    const detailedAnswersByTitle = sections.reduce((acc, section) => {
-      const sectionAnswers = answers[section.id] || {};
-      // Convert the question mapping directly into an array of just the recorded answers
-      acc[section.title] = Object.values(sectionAnswers);
-      return acc;
-    }, {} as Record<string, unknown[]>);
+    // Helper for deep equality
+    const isDeepEqual = (a: any, b: any): boolean => {
+      if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+        const keys1 = Object.keys(a);
+        const keys2 = Object.keys(b);
+        if (keys1.length !== keys2.length) return false;
+        for (const key of keys1) {
+            if (a[key] !== b[key]) return false;
+        }
+        return true;
+      }
+      return a === b;
+    };
 
-    // We only trigger this once. If they refresh, this still safely updates
-    const saveResults = async () => {
+    const processResults = async () => {
       try {
+        // Collect all possible question IDs to fetch correct answers
+        const questionIds: string[] = [];
+        sections.forEach((sec) => {
+          if (sec.questionIds) {
+            questionIds.push(...sec.questionIds);
+          }
+        });
+
+        // 1. Fetch correct answers from DB
+        const { data: questionsData, error } = await supabase
+          .from("questions")
+          .select("id, correct_answer")
+          .in("id", questionIds);
+
+        if (error) throw error;
+        
+        // 2. Build map of correct answers
+        const correctAnswersMap = (questionsData || []).reduce((acc: Record<string, any>, q) => {
+          acc[q.id] = q.correct_answer;
+          return acc;
+        }, {});
+
+        // 3. Process section by section
+        const calculatedResults = sections.map((section) => {
+          const sectionAnswers = answers[section.id] || {};
+          let correctCount = 0;
+          let answeredCount = 0;
+
+          // Check each question in the section
+          Object.entries(sectionAnswers).forEach(([qId, ans]) => {
+             answeredCount++;
+             const correctAns = correctAnswersMap[qId];
+             
+             if (ans !== null && ans !== undefined && correctAns !== undefined) {
+               // Complex equality for objects like {A: 7, B: 4} OR strict equality for "C"
+               if (isDeepEqual(ans, correctAns)) {
+                 correctCount++;
+               }
+             }
+          });
+
+          const percentage = section.questionCount > 0 
+            ? Math.round((correctCount / section.questionCount) * 100) 
+            : 0;
+
+          return {
+            id: section.id,
+            title: section.title,
+            type: section.questionType,
+            totalQuestions: section.questionCount,
+            answeredCount,
+            correctCount,
+            percentage,
+          };
+        });
+
+        // 4. Calculate globals
+        const totalC = calculatedResults.reduce((sum, s) => sum + s.correctCount, 0);
+        const totalQ = calculatedResults.reduce((sum, s) => sum + s.totalQuestions, 0);
+        const totalA = calculatedResults.reduce((sum, s) => sum + s.answeredCount, 0);
+        const overallPct = totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+
+        setSectionResults(calculatedResults);
+        setTotalCorrect(totalC);
+        setTotalQuestions(totalQ);
+        setTotalAnswered(totalA);
+        setOverallPercentage(overallPct);
+        setIsCalculated(true);
+
+        // 5. Format detailed answers for jsonb
+        const detailedAnswersByTitle = calculatedResults.reduce((acc, result) => {
+          const section = sections.find((s) => s.id === result.id);
+          if (!section) return acc;
+
+          const sectionAnswers = answers[section.id] || {};
+          
+          const formatAns = (a: any) => {
+            if (a && typeof a === 'object') {
+              if ('image1' in a && 'image2' in a) return [a.image1, a.image2];
+              if ('A' in a && 'B' in a) return [a.A, a.B];
+            }
+            return a !== undefined ? a : null;
+          };
+
+          const formattedAnswers = section.questionIds.map((qId) => {
+            const ans = sectionAnswers[qId];
+            const correctAns = correctAnswersMap[qId];
+            const isCorrect = ans !== null && ans !== undefined && correctAns !== undefined && isDeepEqual(ans, correctAns);
+
+            return {
+              user_answer: formatAns(ans),
+              correct_answer: formatAns(correctAns),
+              is_correct: isCorrect
+            };
+          });
+          
+          acc[result.title] = {
+            score: result.correctCount,
+            max_score: result.totalQuestions,
+            answers: formattedAnswers
+          };
+          return acc;
+        }, {} as Record<string, unknown>);
+
+        // 6. Save results
         await supabase
           .from("user_exams")
           .update({
             status: "completed",
-            total_score: totalCorrect,
-            max_score: totalQuestions,
+            total_score: totalC,
+            max_score: totalQ,
             detailed_results: detailedAnswersByTitle,
           })
           .eq("id", userExamId);
+
       } catch (err) {
-        console.error("Failed to save exam history", err);
+        console.error("Failed to process and save exam history", err);
       }
     };
-    saveResults();
-  }, [hydrated, userExamId, totalCorrect, totalQuestions, supabase]);
+    
+    processResults();
+  }, [hydrated, userExamId, currentExamId, supabase]);
 
-  if (!hydrated || !currentExamId) {
+  const getGrade = (pct: number) => {
+    if (pct >= 90) return { label: "Excellent", color: "text-green-600", bg: "bg-green-50" };
+    if (pct >= 75) return { label: "Good", color: "text-blue-600", bg: "bg-blue-50" };
+    if (pct >= 60) return { label: "Satisfactory", color: "text-amber-600", bg: "bg-amber-50" };
+    return { label: "Needs Improvement", color: "text-red-600", bg: "bg-red-50" };
+  };
+
+  const grade = getGrade(overallPercentage);
+
+  if (!hydrated || !currentExamId || !isCalculated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />

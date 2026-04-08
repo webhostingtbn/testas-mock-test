@@ -262,18 +262,70 @@ export default function AdminPage() {
                               <p className="text-xs font-bold text-gray-500 uppercase mb-2">Detailed Results Map:</p>
                               {exam.detailed_results && Object.keys(exam.detailed_results).length > 0 ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {Object.entries(exam.detailed_results).map(([sectionTitle, answers]) => (
+                                  {Object.entries(exam.detailed_results).map(([sectionTitle, sectionData]) => {
+                                    const isLegacy = Array.isArray(sectionData);
+                                    const answers: any[] = isLegacy ? sectionData : (sectionData as any).answers || [];
+                                    const scoreStr = isLegacy ? null : `${(sectionData as any).score} / ${(sectionData as any).max_score}`;
+                                    
+                                    return (
                                     <div key={sectionTitle} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
-                                      <p className="text-xs font-bold text-gray-700 mb-2 border-b border-gray-200 pb-1">
-                                        {sectionTitle}
-                                      </p>
+                                      <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
+                                        <p className="text-xs font-bold text-gray-700">
+                                          {sectionTitle}
+                                        </p>
+                                        {scoreStr && (
+                                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-orange-100 text-orange-800">
+                                            Score: {scoreStr}
+                                          </span>
+                                        )}
+                                      </div>
                                       {Array.isArray(answers) ? (
-                                        <div className="flex flex-wrap gap-1.5">
-                                          {answers.length > 0 ? answers.map((ans, idx) => (
-                                            <span key={idx} className="inline-flex items-center justify-center min-w-5 px-1.5 h-5 bg-white border border-gray-200 text-xs font-mono font-bold text-gray-600 rounded">
-                                              {ans === null || ans === undefined ? '-' : String(ans)}
-                                            </span>
-                                          )) : (
+                                        <div className="flex flex-wrap gap-2">
+                                          {answers.length > 0 ? answers.map((ans, idx) => {
+                                            let displayAns = '-';
+                                            let bgClass = 'bg-white border-gray-200 text-gray-700';
+                                            let titleStr = undefined;
+
+                                            // Check if it's the new verbose object format
+                                            if (ans && typeof ans === 'object' && 'user_answer' in ans) {
+                                              const uAns = ans.user_answer;
+                                              const cAns = ans.correct_answer;
+                                              
+                                              if (uAns !== null && uAns !== undefined) {
+                                                if (typeof uAns === 'object') displayAns = Object.entries(uAns).map(([k, v]) => `${k}:${v}`).join(', ');
+                                                else displayAns = String(uAns);
+                                              }
+                                              
+                                              if (cAns !== undefined) {
+                                                let cAnsStr = String(cAns);
+                                                if (cAns && typeof cAns === 'object') {
+                                                  cAnsStr = Object.entries(cAns).map(([k, v]) => `${k}:${v}`).join(', ');
+                                                }
+                                                titleStr = `Correct answer: ${cAnsStr}`;
+                                              }
+
+                                              bgClass = ans.is_correct 
+                                                ? 'bg-green-50 border-green-200 text-green-700' 
+                                                : 'bg-red-50 border-red-200 text-red-700';
+                                            } else {
+                                              // Legacy fallback
+                                              if (ans !== null && ans !== undefined) {
+                                                if (typeof ans === 'object') displayAns = Object.entries(ans).map(([k, v]) => `${k}:${v}`).join(', ');
+                                                else displayAns = String(ans);
+                                              }
+                                            }
+
+                                            return (
+                                              <span 
+                                                key={idx} 
+                                                title={titleStr}
+                                                className={`inline-flex items-center justify-center px-2 py-1 min-h-6 border text-xs font-mono rounded whitespace-nowrap shadow-sm ${bgClass}`}
+                                              >
+                                                <span className="opacity-50 mr-1.5 font-normal">Q{idx + 1}.</span> 
+                                                <span className="font-bold">{displayAns}</span>
+                                              </span>
+                                            );
+                                          }) : (
                                             <span className="text-xs text-gray-400 italic">Skipped</span>
                                           )}
                                         </div>
@@ -283,7 +335,7 @@ export default function AdminPage() {
                                         </pre>
                                       )}
                                     </div>
-                                  ))}
+                                  )})}
                                 </div>
                               ) : (
                                 <p className="text-xs text-gray-400 italic">No detailed records found for this attempt.</p>

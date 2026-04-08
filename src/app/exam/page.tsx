@@ -364,8 +364,8 @@ export default function ExamPage() {
       </div>
 
       {/* Question content area */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-full mx-auto px-6 py-6">
+      <main className="flex-1 min-h-0 flex overflow-hidden">
+        <div className="flex-1 overflow-y-auto w-full px-6 py-4">
           {renderQuestion()}
         </div>
       </main>
