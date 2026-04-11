@@ -2,9 +2,19 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams, origin } = requestUrl;
   const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/select-module';
+
+  // Prevent open redirects
+  const safeNext = next.startsWith('/') ? next : '/select-module';
+
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https';
+  const baseUrl = forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : origin;
 
   if (code) {
     const supabase = await createClient();
@@ -22,21 +32,21 @@ export async function GET(request: Request) {
 
         if (!profile?.module_test) {
           // Redirect to select module before dashboard
-          return NextResponse.redirect(`${origin}/select-module`);
+          return NextResponse.redirect(`${baseUrl}/select-module`);
         }
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${baseUrl}${safeNext}`);
     }
     // Debug: if exchange failed, include the error message in the redirect so it is visible in the browser
     try {
       const encoded = encodeURIComponent(error?.message || JSON.stringify(error));
-      return NextResponse.redirect(`${origin}/login?error=auth&detail=${encoded}`);
+      return NextResponse.redirect(`${baseUrl}/login?error=auth&detail=${encoded}`);
     } catch (e) {
       // Fallback to a simple redirect if encoding fails
-      return NextResponse.redirect(`${origin}/login?error=auth`);
+      return NextResponse.redirect(`${baseUrl}/login?error=auth`);
     }
   }
 
   // Return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/login?error=auth`);
+  return NextResponse.redirect(`${baseUrl}/login?error=auth`);
 }
