@@ -1,6 +1,6 @@
 'use client';
 
-import { signIn } from '@auth/nextjs/react';
+import { signIn } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 
 export function LoginButton() {

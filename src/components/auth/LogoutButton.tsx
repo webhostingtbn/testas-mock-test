@@ -1,6 +1,6 @@
 'use client';
 
-import { signOut } from '@auth/nextjs/react';
+import { signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 
 export function LogoutButton() {

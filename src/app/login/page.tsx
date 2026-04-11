@@ -28,26 +28,22 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {step === 'login' ? (
-          <Card className="border-0 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-sm">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-xl">Welcome</CardTitle>
-              <CardDescription>
-                Sign in with your Google account to get started
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <LoginButton />
+        <Card className="border-0 shadow-xl shadow-gray-200/50 bg-white/80 backdrop-blur-sm">
+          <CardHeader className="text-center pb-2">
+            <CardTitle className="text-xl">Welcome</CardTitle>
+            <CardDescription>
+              Sign in with your Google account to get started
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <LoginButton />
 
-              <div className="mt-6 flex items-center gap-3 text-xs text-gray-400">
-                <BookOpen className="w-4 h-4 shrink-0" />
-                <p>By signing in, you agree to take the mock test under exam conditions.</p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <div>Major selection would go here (optional)</div>
-        )}
+            <div className="mt-6 flex items-center gap-3 text-xs text-gray-400">
+              <BookOpen className="w-4 h-4 shrink-0" />
+              <p>By signing in, you agree to take the mock test under exam conditions.</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

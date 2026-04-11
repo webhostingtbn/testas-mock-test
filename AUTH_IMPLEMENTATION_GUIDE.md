@@ -12,17 +12,22 @@ This guide walks you through implementing Google OAuth with Auth.js v5, replacin
 ### 1. Install Required Packages
 
 ```bash
-npm install @auth/nextjs @auth/core @supabase/supabase-js
+npm install next-auth
 ```
 
 Or with yarn:
 ```bash
-yarn add @auth/nextjs @auth/core @supabase/supabase-js
+yarn add next-auth
 ```
 
 Or with pnpm:
 ```bash
-pnpm add @auth/nextjs @auth/core @supabase/supabase-js
+pnpm add next-auth
+```
+
+The `@supabase/supabase-js` package should already be installed. If not:
+```bash
+npm install @supabase/supabase-js
 ```
 
 ### 2. Set Up Environment Variables
@@ -238,7 +243,7 @@ Users are stored in `public.users`:
 ## Troubleshooting
 
 ### "Cannot find module 'next-auth'"
-- Run `npm install next-auth@5 @auth/core @auth/google`
+- Run `npm install next-auth`
 - Restart dev server: `npm run dev`
 
 ### "OAuth configuration is incomplete"

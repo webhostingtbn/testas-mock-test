@@ -1,9 +1,9 @@
-import NextAuth from '@auth/nextjs';
-import Google from '@auth/core/providers/google';
+import NextAuth from 'next-auth';
+import Google from 'next-auth/providers/google';
 import { createClient as createServerClient } from '@supabase/supabase-js';
-import type { DefaultSession } from '@auth/core/types';
+import type { DefaultSession } from 'next-auth';
 
-declare module '@auth/core/types' {
+declare module 'next-auth' {
   interface Session {
     user: {
       id: string;

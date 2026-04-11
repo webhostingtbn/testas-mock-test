@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MAJOR_LABELS, MODULE_TEST_LABELS, SECTION_DURATIONS, BREAK_DURATIONS } from '@/lib/constants';
 import type { Profile, ModuleTestType } from '@/lib/types';
+import type { Session } from 'next-auth';
 import { 
   GraduationCap, Play, ChevronRight, Clock, FileText, Layers, Timer, LogOut,
   ChevronDown, ChevronUp, History
 } from 'lucide-react';
 
-export default function DashboardClient() {
+export default function DashboardClient({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
