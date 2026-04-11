@@ -12,7 +12,17 @@ This guide walks you through implementing Google OAuth with Auth.js v5, replacin
 ### 1. Install Required Packages
 
 ```bash
-npm install next-auth@5 @auth/core @auth/google @supabase/supabase-js
+npm install @auth/nextjs @auth/core @supabase/supabase-js
+```
+
+Or with yarn:
+```bash
+yarn add @auth/nextjs @auth/core @supabase/supabase-js
+```
+
+Or with pnpm:
+```bash
+pnpm add @auth/nextjs @auth/core @supabase/supabase-js
 ```
 
 ### 2. Set Up Environment Variables
@@ -269,6 +279,7 @@ If you want to completely remove Supabase Auth code:
 ## References
 
 - [Auth.js Documentation](https://authjs.dev)
+- [Auth.js Next.js Integration](https://authjs.dev/docs/integrations/nextjs)
 - [Auth.js Google Provider](https://authjs.dev/docs/providers/google)
 - [Next.js Middleware](https://nextjs.org/docs/app/building-your-application/routing/middleware)
 - [Supabase JS Client](https://supabase.com/docs/reference/javascript/introduction)

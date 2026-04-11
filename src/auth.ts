@@ -1,6 +1,15 @@
-import NextAuth from 'next-auth';
+import NextAuth from '@auth/nextjs';
 import Google from '@auth/core/providers/google';
 import { createClient as createServerClient } from '@supabase/supabase-js';
+import type { DefaultSession } from '@auth/core/types';
+
+declare module '@auth/core/types' {
+  interface Session {
+    user: {
+      id: string;
+    } & DefaultSession['user'];
+  }
+}
 
 /**
  * Sync user to Supabase database after successful OAuth login
