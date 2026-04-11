@@ -43,7 +43,7 @@ export default function LoginPage() {
     try {
       const appUrl = process.env.NODE_ENV === 'development' 
         ? 'http://localhost:3000' 
-        : 'https://testas-mock-test.vercel.app';
+        : window.location.origin;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
