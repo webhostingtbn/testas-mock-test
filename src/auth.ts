@@ -21,29 +21,46 @@ async function syncUserToSupabase(user: {
   image: string | null;
 }) {
   try {
-    // Initialize Supabase with service role key (only for server operations)
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Upsert user into Supabase users table
-    const { error } = await supabase.from('users').upsert(
-      {
-        email: user.email,
-        name: user.name || null,
-        avatar_url: user.image || null,
-        last_login: new Date().toISOString(),
-      },
-      {
-        onConflict: 'email',
-      }
-    );
+    // Look for an existing profile by email first
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', user.email)
+      .maybeSingle();
 
-    if (error) {
-      console.error('Error syncing user to Supabase:', error);
+    if (existingProfile) {
+      // Update existing profile (e.g. for last_login/updated_at if we had those columns or just name/avatar)
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: user.name || null,
+          avatar_url: user.image || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingProfile.id);
+      
+      console.log('User synced to existing Supabase profile:', user.email);
     } else {
-      console.log('User synced to Supabase:', user.email);
+      // Create new profile with a generated UUID 
+      // Note: Assumes `id` is a serial UUID default or we generate one.
+      const newId = crypto.randomUUID();
+      
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: newId,
+          email: user.email,
+          full_name: user.name || null,
+          avatar_url: user.image || null,
+        });
+
+      if (error) console.error('Error creating new Supabase profile:', error);
+      else console.log('Created new Supabase profile for:', user.email);
     }
   } catch (err) {
     console.error('Supabase sync error:', err);
@@ -77,9 +94,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     async session({ session, token }) {
-      // Attach user ID from token to session
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
+      // Attach actual uuid from profiles instead of token.sub
+      try {
+        const supabase = createServerClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+        const { data } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('email', session.user.email)
+          .maybeSingle();
+
+        if (data) {
+          session.user.id = data.id;
+        }
+      } catch (err) {
+        console.error('Failed to get user id for session', err);
       }
       return session;
     },

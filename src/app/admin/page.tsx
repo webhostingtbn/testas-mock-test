@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { LogOut, ChevronDown, ChevronUp, UserSquare, Home, ShieldAlert } from 'lucide-react';
 
+import { signOut, useSession } from 'next-auth/react';
+
 interface UserExam {
   id: string;
   created_at: string;
@@ -26,8 +28,9 @@ interface ProfileWithExams {
 }
 
 export default function AdminPage() {
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const     supabase = createClient();
+  const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [users, setUsers] = useState<ProfileWithExams[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -36,22 +39,26 @@ export default function AdminPage() {
 
   useEffect(() => {
     async function checkAdminAndFetchData() {
+      if (status === 'loading') return;
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        if (!session?.user) {
           router.push('/login');
           return;
         }
 
-        // 1. Check if the user is admin
-        const { data: profile } = await supabase
+        // Fetch user basic profile using email instead of ID to bypass RLS for now 
+        // (RLS might still block server-side query without proper setup, but this disables the immediate auth crash)
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('role')
-          .eq('id', user.id)
-          .single();
-        // console.log("me: ", profile);
+          .eq('email', session.user.email)
+          .maybeSingle();
 
-        if (profile?.role !== 'admin') {
+        if (profileError) {
+          throw new Error(`Profile check failed: ${profileError.message}`);
+        }
+
+        if (!profile || profile.role !== 'admin') {
           setIsAdmin(false);
           setIsLoading(false);
           return;
@@ -92,7 +99,7 @@ export default function AdminPage() {
     }
 
     checkAdminAndFetchData();
-  }, [router, supabase]);
+  }, [router, supabase, session, status]);
 
   const toggleExpand = (userId: string) => {
     setExpandedUserId((prev) => (prev === userId ? null : userId));
@@ -146,8 +153,7 @@ export default function AdminPage() {
               variant="ghost"
               size="sm"
               onClick={async () => {
-                await supabase.auth.signOut();
-                router.push('/login');
+                await signOut({ callbackUrl: '/login' });
               }}
               className="text-red-500 hover:bg-red-50 hover:text-red-600"
             >

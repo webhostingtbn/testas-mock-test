@@ -1,19 +1,26 @@
-import { type NextRequest } from 'next/server';
-import { updateSession } from '@/lib/supabase/middleware';
+import { auth } from '@/auth';
+import { NextResponse } from 'next/server';
 
-export async function proxy(request: NextRequest) {
-  return await updateSession(request);
-}
+export const proxy = auth((req) => {
+  const isLoggedIn = !!req.auth;
+  const isOnLoginPage = req.nextUrl.pathname.startsWith('/login');
+
+  if (isOnLoginPage) {
+    if (isLoggedIn) {
+      return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
+    }
+    return NextResponse.next();
+  }
+
+  if (!isLoggedIn) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl));
+  }
+
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder files
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

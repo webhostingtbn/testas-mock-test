@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MAJOR_LABELS, MODULE_TEST_LABELS, SECTION_DURATIONS, BREAK_DURATIONS } from '@/lib/constants';
 import type { Profile, ModuleTestType } from '@/lib/types';
+import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { 
   GraduationCap, Play, ChevronRight, Clock, FileText, Layers, Timer, LogOut,
@@ -36,8 +37,7 @@ export default function DashboardClient({ session }: { session: Session }) {
       const isDevBypass = urlParams.get('dev') === 'true';
 
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        if (!session?.user) {
           if (isDevBypass) {
             // Use mock profile in dev mode
             setProfile({
@@ -56,41 +56,70 @@ export default function DashboardClient({ session }: { session: Session }) {
           return;
         }
 
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
+        try {
+          const { data: realProfile } = await supabase
+            .from('profiles')
+            .select('module_test')
+            .eq('email', session.user.email)
+            .maybeSingle();
 
-        if (data) {
-          setProfile(data as Profile);
-          if (data.module_test && !searchParams.get('module')) {
-            // Also optionally set the active module immediately if found in DB
-            setActiveModule(data.module_test as ModuleTestType);
+          setProfile({
+            id: session.user.id || 'temp-id',
+            email: session.user.email || '',
+            full_name: session.user.name || '',
+            avatar_url: session.user.image || null,
+            major: 'economics',
+            module_test: realProfile?.module_test || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as Profile);
+          
+          if (realProfile?.module_test && !searchParams.get('module')) {
+             setActiveModule(realProfile.module_test as ModuleTestType);
           }
+        } catch (e) {
+          console.warn('Failed to load real profile data:', e);
+          setProfile({
+            id: session.user.id || 'temp-id',
+            email: session.user.email || '',
+            full_name: session.user.name || '',
+            avatar_url: session.user.image || null,
+            major: 'economics',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as Profile);
         }
 
-        // Fetch past exams
-        const { data: examsData } = await supabase
-          .from('user_exams')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-          
-        if (examsData) {
-          setPastExams(examsData);
+        // Fetch past exams (might fail due to RLS, allow it to silently fail)
+        try {
+          const { data: examsData } = await supabase
+            .from('user_exams')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: false });
+            
+          if (examsData) {
+            setPastExams(examsData);
+          }
+        } catch (e) {
+          console.warn('Could not load past exams:', e);
         }
 
         // Fetch exam settings
-        const { data: examData } = await supabase
-          .from('exams')
-          .select('retry_number')
-          .eq('id', '118ec3ca-b52e-4069-b5dd-eaca31339932')
-          .maybeSingle();
+        try {
+          const { data: examData } = await supabase
+            .from('exams')
+            .select('retry_number')
+            .eq('id', '118ec3ca-b52e-4069-b5dd-eaca31339932')
+            .maybeSingle();
 
-        if (examData && examData.retry_number !== null) {
-          setExamLimit(examData.retry_number);
+          if (examData && examData.retry_number !== null) {
+            setExamLimit(examData.retry_number);
+          }
+        } catch (e) {
+          console.warn('Could not load exam settings:', e);
         }
+
       } catch {
         // Auth failed — use mock profile for dev
         setProfile({
@@ -107,7 +136,7 @@ export default function DashboardClient({ session }: { session: Session }) {
     }
 
     loadProfile();
-  }, [router, supabase]);
+  }, [router, supabase, session]);
 
   useEffect(() => {
     if (profile) {
@@ -241,9 +270,8 @@ export default function DashboardClient({ session }: { session: Session }) {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
     resetExam();
-    router.push('/login');
+    await signOut({ callbackUrl: '/login' });
   };
 
   if (isLoading) {

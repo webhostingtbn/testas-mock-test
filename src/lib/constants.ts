@@ -35,7 +35,7 @@ export const MAJOR_LABELS: Record<string, string> = {
 export const MODULE_TEST_LABELS: Record<string, string> = {
   economics: 'Economics',
   engineering: 'Engineering',
-  math_computer_natural_science: 'Natural Science and Computer Science',
+  natural_computer_science: 'Natural Science and Computer Science',
 } as const;
 
 /** Module test options for the selection page */
@@ -53,7 +53,7 @@ export const MODULE_TEST_OPTIONS = [
     description: 'Technical comprehension, spatial visualization, and applied physics',
   },
   {
-    value: 'math_computer_natural_science' as const,
+    value: 'natural_computer_science' as const,
     label: 'Natural Science and Computer Science',
     icon: '🔬',
     description: 'Abstract reasoning, formal logic, and scientific data analysis',

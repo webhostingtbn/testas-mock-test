@@ -4,7 +4,7 @@
 
 export type MajorType = 'economics' | 'engineering' | 'natural_computer_science';
 
-export type ModuleTestType = 'economics' | 'engineering' | 'math_computer_natural_science';
+export type ModuleTestType = 'economics' | 'engineering' | 'natural_computer_science';
 
 export type QuestionType = 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq';
 
