@@ -14,7 +14,8 @@ export default function ErrorMessage() {
       <p>
         {error === 'OAuthCallback' && 'There was a problem signing in with Google. Please try again.'}
         {error === 'AccessDenied' && 'Access was denied. Please make sure you have the right permissions.'}
-        {error !== 'OAuthCallback' && error !== 'AccessDenied' && `Authentication error: ${error}`}
+        {error === 'Configuration' && 'Authentication server is misconfigured. Please check AUTH_SECRET, AUTH_GOOGLE_ID, and AUTH_GOOGLE_SECRET in production environment variables.'}
+        {error !== 'OAuthCallback' && error !== 'AccessDenied' && error !== 'Configuration' && `Authentication error: ${error}`}
       </p>
     </div>
   );

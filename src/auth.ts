@@ -3,6 +3,18 @@ import Google from 'next-auth/providers/google';
 import { createClient as createServerClient } from '@supabase/supabase-js';
 import type { DefaultSession } from 'next-auth';
 
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+const googleClientId = process.env.AUTH_GOOGLE_ID;
+const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
+
+if (!authSecret) {
+  console.error('[Auth] Missing AUTH_SECRET (or NEXTAUTH_SECRET) in environment.');
+}
+
+if (!googleClientId || !googleClientSecret) {
+  console.error('[Auth] Missing AUTH_GOOGLE_ID and/or AUTH_GOOGLE_SECRET in environment.');
+}
+
 declare module 'next-auth' {
   interface Session {
     user: {
@@ -68,11 +80,12 @@ async function syncUserToSupabase(user: {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: authSecret,
   trustHost: true,
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      clientId: googleClientId ?? '',
+      clientSecret: googleClientSecret ?? '',
     }),
   ],
   pages: {
