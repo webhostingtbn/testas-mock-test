@@ -5,6 +5,8 @@ export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const isOnLoginPage = req.nextUrl.pathname.startsWith('/login');
 
+  console.log(`Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${!!req.cookies.get('authjs.session-token')}`);
+
   if (isOnLoginPage) {
     if (isLoggedIn) {
       return NextResponse.redirect(new URL('/dashboard', req.nextUrl));
