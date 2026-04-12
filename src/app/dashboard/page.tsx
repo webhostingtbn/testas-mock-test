@@ -7,7 +7,15 @@ import DashboardClient from './DashboardClient';
 export default async function DashboardPage() {
   const session = await auth();
 
-  if (!session?.user) {
+  console.log('[DashboardPage] Session check:', {
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    userEmail: session?.user?.email || 'N/A',
+    userId: session?.user?.id || 'N/A',
+  });
+
+  if (!session?.user?.email) {
+    console.warn('[DashboardPage] Redirecting to login - no valid session');
     redirect('/login');
   }
 

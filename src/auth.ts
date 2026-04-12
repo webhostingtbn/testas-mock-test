@@ -105,24 +105,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       return true;
     },
-    async session({ session, token }) {
-      // Attach actual uuid from profiles instead of token.sub
-      try {
-        const supabase = createServerClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-        const { data } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', session.user.email)
-          .maybeSingle();
+    async jwt({ token, user }) {
+      if (user) {
+        token.email = user.email;
+        token.name = user.name;
+        token.image = user.image;
+        
+        // Try to get user id from Supabase, but don't fail if it doesn't work
+        try {
+          const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          );
+          const { data } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', user.email)
+            .maybeSingle();
 
-        if (data) {
-          session.user.id = data.id;
+          if (data?.id) {
+            token.sub = data.id;
+          }
+        } catch (err) {
+          console.warn('Failed to get user id from Supabase in JWT callback:', err);
+          // Continue with the default token.sub
         }
-      } catch (err) {
-        console.error('Failed to get user id for session', err);
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Attach user data from token
+      if (session.user) {
+        session.user.id = token.sub || '';
+        session.user.email = (token.email as string) || '';
+        session.user.name = (token.name as string) || '';
+        session.user.image = (token.image as string | null) || null;
       }
       return session;
     },

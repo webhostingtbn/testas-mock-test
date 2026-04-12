@@ -37,7 +37,8 @@ export default function DashboardClient({ session }: { session: Session }) {
       const isDevBypass = urlParams.get('dev') === 'true';
 
       try {
-        if (!session?.user) {
+        if (!session?.user?.email) {
+          console.warn('[DashboardClient] No session or user email found', { session, user: session?.user });
           if (isDevBypass) {
             // Use mock profile in dev mode
             setProfile({
@@ -52,8 +53,12 @@ export default function DashboardClient({ session }: { session: Session }) {
             setIsLoading(false);
             return;
           }
-          router.push('/login');
-          return;
+          // Only redirect after a small delay to ensure session is fully loaded
+          const timer = setTimeout(() => {
+            console.warn('[DashboardClient] Redirecting to login due to missing session');
+            router.push('/login');
+          }, 500);
+          return () => clearTimeout(timer);
         }
 
         try {
