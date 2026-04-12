@@ -4,8 +4,19 @@ import { NextResponse } from 'next/server';
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
   const isOnLoginPage = req.nextUrl.pathname.startsWith('/login');
+  const isOnAuthPage = req.nextUrl.pathname.startsWith('/api/auth');
+  
+  // Check for both possible cookie names (dev and production)
+  const sessionTokenDev = req.cookies.get('authjs.session-token');
+  const sessionTokenProd = req.cookies.get('__Secure-authjs.session-token');
+  const cookiePresent = !!(sessionTokenDev || sessionTokenProd);
+  
+  console.log(`[Middleware] Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${cookiePresent}, Auth: ${!!req.auth?.user}`);
 
-  console.log(`Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${!!req.cookies.get('authjs.session-token')}`);
+  // Always allow auth API routes
+  if (isOnAuthPage) {
+    return NextResponse.next();
+  }
 
   if (isOnLoginPage) {
     if (isLoggedIn) {
