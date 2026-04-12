@@ -15,17 +15,27 @@ export default function SelectModulePage() {
   const [selectedModule, setSelectedModule] = useState<ModuleTestType | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const { data: session, status } = useSession();
   const router = useRouter();
   const supabase = createClient();
 
+  // Prevent hydration mismatch - ensure component is mounted before auth checks
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   useEffect(() => {
     async function checkProfile() {
-      if (status === 'loading') return;
+      // Wait for session to load AND component to mount
+      if (!isMounted || status === 'loading') return;
       
+      console.log('[SelectModulePage] Session status:', { status, email: session?.user?.email });
+
       if (status === 'unauthenticated') {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('dev') !== 'true') {
+          console.warn('[SelectModulePage] User is unauthenticated, redirecting to login');
           router.push('/login');
           return;
         }
@@ -50,7 +60,25 @@ export default function SelectModulePage() {
       setIsCheckingProfile(false);
     }
     checkProfile();
-  }, [router, supabase, session, status]);
+  }, [isMounted, router, supabase, session?.user?.email, status]);
+
+  // Wait for hydration to complete before rendering
+  if (!isMounted || status === 'loading' || isCheckingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50">
+        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // If unauthenticated, component will redirect above but show loading in case redirect hasn't happened yet
+  if (status === 'unauthenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50">
+        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const handleContinue = async () => {
     if (!selectedModule) return;
@@ -75,14 +103,6 @@ export default function SelectModulePage() {
     // Navigate to dashboard with the selected module as a query param
     router.push(`/dashboard?module=${selectedModule}`);
   };
-
-  if (isCheckingProfile || status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50 p-4">
