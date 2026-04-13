@@ -27,12 +27,22 @@ interface ProfileWithExams {
   user_exams: UserExam[];
 }
 
+interface ExamConfig {
+  id: string;
+  title: string;
+  is_active: boolean;
+  retry_number: number | null;
+  created_at: string;
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [users, setUsers] = useState<ProfileWithExams[]>([]);
+  const [exams, setExams] = useState<ExamConfig[]>([]);
+  const [isUpdatingExamId, setIsUpdatingExamId] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +100,18 @@ export default function AdminPage() {
         }));
 
         setUsers(formattedUsers as ProfileWithExams[]);
+
+        // 3. Fetch exam configs for activation control
+        const { data: examsData, error: examsError } = await supabase
+          .from('exams')
+          .select('id, title, is_active, retry_number, created_at')
+          .order('created_at', { ascending: false });
+
+        if (examsError) {
+          throw examsError;
+        }
+
+        setExams((examsData || []) as ExamConfig[]);
       } catch (err: any) {
         console.error('Admin fetch error:', err);
         setError(err.message || 'An error occurred fetching data.');
@@ -103,6 +125,51 @@ export default function AdminPage() {
 
   const toggleExpand = (userId: string) => {
     setExpandedUserId((prev) => (prev === userId ? null : userId));
+  };
+
+  const toggleExamActive = async (examId: string, shouldActivate: boolean) => {
+    setIsUpdatingExamId(examId);
+
+    try {
+      if (shouldActivate) {
+        const { error: clearError } = await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('is_active', true);
+
+        if (clearError) {
+          throw clearError;
+        }
+
+        const { error: activateError } = await supabase
+          .from('exams')
+          .update({ is_active: true })
+          .eq('id', examId);
+
+        if (activateError) {
+          throw activateError;
+        }
+
+        setExams((prev) => prev.map((exam) => ({ ...exam, is_active: exam.id === examId })));
+      } else {
+        const { error: deactivateError } = await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('id', examId);
+
+        if (deactivateError) {
+          throw deactivateError;
+        }
+
+        setExams((prev) => prev.map((exam) => (
+          exam.id === examId ? { ...exam, is_active: false } : exam
+        )));
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to update exam activation.');
+    } finally {
+      setIsUpdatingExamId(null);
+    }
   };
 
   if (isLoading) {
@@ -164,6 +231,59 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8">
+        <Card className="mb-6 border-gray-200 shadow-sm">
+          <CardHeader>
+            <CardTitle>Exam Activation</CardTitle>
+            <CardDescription>Only one exam should be active at a time for students.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {exams.length === 0 ? (
+                <p className="text-sm text-gray-500">No exams found in the database.</p>
+              ) : (
+                exams.map((exam) => {
+                  const disabled = isUpdatingExamId === exam.id;
+
+                  return (
+                    <div
+                      key={exam.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4"
+                    >
+                      <div>
+                        <p className="font-semibold text-gray-900">{exam.title}</p>
+                        <p className="text-xs text-gray-500">ID: {exam.id}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Retry limit: {exam.retry_number ?? 'No limit'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`text-xs font-semibold px-2 py-1 rounded-full border ${
+                            exam.is_active
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : 'bg-gray-50 text-gray-600 border-gray-200'
+                          }`}
+                        >
+                          {exam.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                        <Button
+                          size="sm"
+                          disabled={disabled}
+                          variant={exam.is_active ? 'outline' : 'default'}
+                          onClick={() => toggleExamActive(exam.id, !exam.is_active)}
+                        >
+                          {disabled ? 'Updating...' : exam.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="mb-6 flex justify-between items-end">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Platform Users</h2>

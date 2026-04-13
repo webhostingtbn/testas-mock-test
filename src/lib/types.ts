@@ -23,7 +23,7 @@ export interface Profile {
   module_test?: ModuleTestType | null;
   created_at: string;
   updated_at: string;
-  role ?: 'user' | 'admin';
+  role?: 'user' | 'admin';
 }
 
 export interface Exam {

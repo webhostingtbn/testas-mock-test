@@ -39,6 +39,7 @@ export default function ExamPage() {
     nextQuestion,
     prevQuestion,
     goToQuestion,
+    resetExam,
   } = useExamStore();
 
   // Wait for zustand hydration
@@ -52,6 +53,36 @@ export default function ExamPage() {
       router.push('/dashboard');
     }
   }, [hydrated, currentExamId, router]);
+
+  // Guard against direct URL access when no active exam exists or ids mismatch
+  useEffect(() => {
+    if (!hydrated || !currentExamId) return;
+
+    let isCancelled = false;
+
+    const validateActiveExam = async () => {
+      const { data: activeExam, error } = await supabase
+        .from('exams')
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (isCancelled) return;
+
+      if (error || !activeExam || activeExam.id !== currentExamId) {
+        resetExam();
+        router.push('/dashboard');
+      }
+    };
+
+    void validateActiveExam();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [hydrated, currentExamId, supabase, router, resetExam]);
 
   // Auto-start the first flow step
   useEffect(() => {

@@ -19,6 +19,7 @@ export default function DashboardClient({ session }: { session: Session }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
+  const [activeExamId, setActiveExamId] = useState<string | null>(null);
   const [pastExams, setPastExams] = useState<any[]>([]);
   const [isStructureOpen, setIsStructureOpen] = useState(true);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
@@ -60,7 +61,7 @@ export default function DashboardClient({ session }: { session: Session }) {
             module_test: realProfile?.module_test || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            role: realProfile?.role || 'user'
+            role: (realProfile?.role || 'user') as 'user' | 'admin'
           } as Profile);
           
           if (realProfile?.module_test && !searchParams.get('module')) {
@@ -95,19 +96,27 @@ export default function DashboardClient({ session }: { session: Session }) {
           console.warn('Could not load past exams:', e);
         }
 
-        // Fetch exam settings
+        // Fetch the first active exam (only one should be active)
         try {
           const { data: examData } = await supabase
             .from('exams')
-            .select('retry_number')
-            .eq('id', '118ec3ca-b52e-4069-b5dd-eaca31339932')
+            .select('id, retry_number')
+            .eq('is_active', true)
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
-          if (examData && examData.retry_number !== null) {
-            setExamLimit(examData.retry_number);
+          if (examData) {
+            setActiveExamId(examData.id);
+            setExamLimit(examData.retry_number ?? null);
+          } else {
+            setActiveExamId(null);
+            setExamLimit(null);
           }
         } catch (e) {
           console.warn('Could not load exam settings:', e);
+          setActiveExamId(null);
+          setExamLimit(null);
         }
 
       } catch {
@@ -143,10 +152,14 @@ export default function DashboardClient({ session }: { session: Session }) {
   }, [isLoading, activeModule, profile, router]);
 
   const handleStartExam = async () => {
+    if (!activeExamId) {
+      return;
+    }
+
     setIsStarting(true);
 
     try {
-      const EXAM_ID = '118ec3ca-b52e-4069-b5dd-eaca31339932';
+      const EXAM_ID = activeExamId;
 
       // Fetch real sections from Supabase, ordered by sort_order
       const { data: dbSections, error: sectionsError } = await supabase
@@ -316,6 +329,7 @@ export default function DashboardClient({ session }: { session: Session }) {
 
   const totalTime = '~4 hours';
   const isAdmin = profile?.role === 'admin';
+  const hasActiveExam = !!activeExamId;
 
   return (
     <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50">
@@ -393,7 +407,15 @@ export default function DashboardClient({ session }: { session: Session }) {
             </p>
           </div>
 
-          {examLimit !== null && pastExams.length >= examLimit && !isAdmin ? (
+          {!hasActiveExam ? (
+            <Button
+              disabled
+              size="lg"
+              className="shrink-0 h-14 px-10 text-base font-semibold bg-gray-200 text-gray-400 cursor-not-allowed"
+            >
+              No Active Exam
+            </Button>
+          ) : examLimit !== null && pastExams.length >= examLimit && !isAdmin ? (
             <Button
               disabled
               size="lg"
@@ -404,7 +426,7 @@ export default function DashboardClient({ session }: { session: Session }) {
           ) : (
             <Button
               onClick={handleStartExam}
-              disabled={isStarting}
+              disabled={isStarting || !hasActiveExam}
               size="lg"
               className="shrink-0 h-14 px-10 text-base font-semibold bg-linear-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-200 transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
             >
