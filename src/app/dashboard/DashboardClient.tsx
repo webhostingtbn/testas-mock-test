@@ -12,7 +12,8 @@ import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { 
   GraduationCap, Play, ChevronRight, Clock, FileText, Layers, Timer, LogOut,
-  ChevronDown, ChevronUp, History
+  ChevronDown, ChevronUp, History,
+  ArrowRight
 } from 'lucide-react';
 
 export default function DashboardClient({ session }: { session: Session }) {
@@ -415,7 +416,9 @@ export default function DashboardClient({ session }: { session: Session }) {
             >
               No Active Exam
             </Button>
-          ) : examLimit !== null && pastExams.length >= examLimit && !isAdmin ? (
+          ) : examLimit !== null &&
+            pastExams.length >= examLimit &&
+            !isAdmin ? (
             <Button
               disabled
               size="lg"
@@ -446,6 +449,17 @@ export default function DashboardClient({ session }: { session: Session }) {
         </div>
 
         {/* Instructions */}
+        {isAdmin && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => router.push("/admin")}
+            className="text-white bg-orange-500 hover:bg-orange-600  hidden sm:flex my-2"
+          >
+            Go To Admin Panel 
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        )}
         <Card className="border-0 bg-amber-50/80 backdrop-blur-sm shadow-md mb-4 border-l-4 border-l-orange-400">
           <CardContent className="">
             <h3 className="font-bold text-orange-800 mb-3">
