@@ -32,27 +32,10 @@ export default function DashboardClient({ session }: { session: Session }) {
 
   useEffect(() => {
     async function loadProfile() {
-      // Check if in dev bypass mode
-      const urlParams = new URLSearchParams(window.location.search);
-      const isDevBypass = urlParams.get('dev') === 'true';
-
       try {
         if (!session?.user?.email) {
           console.warn('[DashboardClient] No session or user email found', { session, user: session?.user });
-          if (isDevBypass) {
-            // Use mock profile in dev mode
-            setProfile({
-              id: 'dev-user',
-              email: 'dev@example.com',
-              full_name: 'Dev Student',
-              avatar_url: null,
-              major: 'economics',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-            setIsLoading(false);
-            return;
-          }
+
           // Only redirect after a small delay to ensure session is fully loaded
           const timer = setTimeout(() => {
             console.warn('[DashboardClient] Redirecting to login due to missing session');
@@ -64,7 +47,7 @@ export default function DashboardClient({ session }: { session: Session }) {
         try {
           const { data: realProfile } = await supabase
             .from('profiles')
-            .select('module_test')
+            .select('module_test, role')
             .eq('email', session.user.email)
             .maybeSingle();
 
@@ -77,6 +60,7 @@ export default function DashboardClient({ session }: { session: Session }) {
             module_test: realProfile?.module_test || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
+            role: realProfile?.role || 'user'
           } as Profile);
           
           if (realProfile?.module_test && !searchParams.get('module')) {
@@ -92,6 +76,7 @@ export default function DashboardClient({ session }: { session: Session }) {
             major: 'economics',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
+            role: 'user'
           } as Profile);
         }
 
@@ -330,6 +315,7 @@ export default function DashboardClient({ session }: { session: Session }) {
   ];
 
   const totalTime = '~4 hours';
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50">
@@ -352,10 +338,23 @@ export default function DashboardClient({ session }: { session: Session }) {
 
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{profile?.full_name || profile?.email}</p>
-              <p className="text-xs text-orange-600 font-medium">
-                {MODULE_TEST_LABELS[activeModule || ''] || 'No module selected'}
+              <p className="text-sm font-medium text-gray-900">
+                {profile?.full_name || profile?.email}
               </p>
+              <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <div title="Administrator" className="flex items-center">
+                    <span className="inline-flex items-center gap-2 px-2 py-0 rounded-full bg-red-100 text-amber-800 text-xs font-semibold border border-red-200">
+                      Admin
+                    </span>
+                  </div>
+                )}
+
+                <p className="text-xs text-orange-600 font-medium">
+                  {MODULE_TEST_LABELS[activeModule || ""] ||
+                    "No module selected"}
+                </p>
+              </div>
             </div>
             {profile?.avatar_url && (
               <img
@@ -393,8 +392,8 @@ export default function DashboardClient({ session }: { session: Session }) {
               )}
             </p>
           </div>
-          
-          {examLimit !== null && pastExams.length >= examLimit ? (
+
+          {examLimit !== null && pastExams.length >= examLimit && !isAdmin ? (
             <Button
               disabled
               size="lg"
@@ -427,27 +426,44 @@ export default function DashboardClient({ session }: { session: Session }) {
         {/* Instructions */}
         <Card className="border-0 bg-amber-50/80 backdrop-blur-sm shadow-md mb-4 border-l-4 border-l-orange-400">
           <CardContent className="">
-            <h3 className="font-bold text-orange-800 mb-3">📋 Important Instructions</h3>
+            <h3 className="font-bold text-orange-800 mb-3">
+              📋 Important Instructions
+            </h3>
             <ul className="space-y-2 text-sm text-orange-900/80">
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-orange-500" />
-                <span>Once started, the timer <strong>cannot be paused</strong>. Closing the browser will not stop it.</span>
+                <span>
+                  Once started, the timer <strong>cannot be paused</strong>.
+                  Closing the browser will not stop it.
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-orange-500" />
-                <span>Navigate freely between questions within each section using the number bar.</span>
+                <span>
+                  Navigate freely between questions within each section using
+                  the number bar.
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-orange-500" />
-                <span>You <strong>cannot go back</strong> to a previous section after submitting or when time expires.</span>
+                <span>
+                  You <strong>cannot go back</strong> to a previous section
+                  after submitting or when time expires.
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-orange-500" />
-                <span>Answers are saved automatically — don&apos;t worry about losing progress.</span>
+                <span>
+                  Answers are saved automatically — don&apos;t worry about
+                  losing progress.
+                </span>
               </li>
               <li className="flex items-start gap-2">
                 <ChevronRight className="w-4 h-4 mt-0.5 shrink-0 text-orange-500" />
-                <span>Results will only be shown after completing <strong>all sections</strong>.</span>
+                <span>
+                  Results will only be shown after completing{" "}
+                  <strong>all sections</strong>.
+                </span>
               </li>
             </ul>
           </CardContent>
@@ -487,7 +503,7 @@ export default function DashboardClient({ session }: { session: Session }) {
         {/* Exam Structure Timeline */}
         <Card className="border-0 bg-white/70 backdrop-blur-sm shadow-lg mb-4 overflow-hidden">
           <CardContent className="p-0">
-            <button 
+            <button
               onClick={() => setIsStructureOpen(!isStructureOpen)}
               className="w-full flex items-center justify-between px-6 bg-white/50 hover:bg-white/80 transition-colors"
             >
@@ -501,26 +517,33 @@ export default function DashboardClient({ session }: { session: Session }) {
                 <ChevronDown className="w-5 h-5 text-gray-400" />
               )}
             </button>
-            
+
             {isStructureOpen && (
               <div className="space-y-1 px-6 pb-6 pt-2">
                 {examSections.map((section, idx) => (
-                  <div key={idx} className={`flex items-center gap-4 py-3 px-4 rounded-lg border transition-all ${
-                    section.isBreak
-                      ? 'bg-gray-50/80 border-dashed border-gray-200'
-                      : 'bg-white border-gray-100 hover:border-orange-100'
-                  }`}>
-                    {/* Step indicator */}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 shadow-sm ${
+                  <div
+                    key={idx}
+                    className={`flex items-center gap-4 py-3 px-4 rounded-lg border transition-all ${
                       section.isBreak
-                        ? 'bg-gray-200 text-gray-500'
-                        : 'bg-orange-100 text-orange-600'
-                    }`}>
-                      {section.isBreak ? '☕' : section.icon}
+                        ? "bg-gray-50/80 border-dashed border-gray-200"
+                        : "bg-white border-gray-100 hover:border-orange-100"
+                    }`}
+                  >
+                    {/* Step indicator */}
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0 shadow-sm ${
+                        section.isBreak
+                          ? "bg-gray-200 text-gray-500"
+                          : "bg-orange-100 text-orange-600"
+                      }`}
+                    >
+                      {section.isBreak ? "☕" : section.icon}
                     </div>
 
                     <div className="flex-1">
-                      <p className={`font-medium ${section.isBreak ? 'text-gray-400 text-sm' : 'text-gray-800'}`}>
+                      <p
+                        className={`font-medium ${section.isBreak ? "text-gray-400 text-sm" : "text-gray-800"}`}
+                      >
                         {section.title}
                       </p>
                     </div>
@@ -531,7 +554,9 @@ export default function DashboardClient({ session }: { session: Session }) {
                           {section.questions} Qs
                         </span>
                       )}
-                      <span className="font-semibold text-gray-600 w-16 text-right">{section.duration}</span>
+                      <span className="font-semibold text-gray-600 w-16 text-right">
+                        {section.duration}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -601,8 +626,6 @@ export default function DashboardClient({ session }: { session: Session }) {
             )}
           </CardContent>
         </Card> */}
-
-
       </main>
     </div>
   );
