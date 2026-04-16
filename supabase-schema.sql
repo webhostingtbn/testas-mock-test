@@ -40,6 +40,7 @@ CREATE TABLE public.profiles (
   full_name TEXT,
   avatar_url TEXT,
   major major_type,
+  role TEXT DEFAULT 'user', -- 'user' or 'admin'
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

@@ -5,60 +5,46 @@ import { useRouter } from "next/navigation";
 import { useExamStore } from "@/lib/store/exam-store";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { SECTION_TYPE_LABELS } from "@/lib/constants";
-import {
-  GraduationCap,
-  Trophy,
-  BarChart3,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  RotateCcw,
-  Home,
-  Mail,
-  Info,
-} from "lucide-react";
+import { CheckCircle2, Home, Mail, Phone, ExternalLink } from "lucide-react";
+import { useSession } from "next-auth/react";
 
 export default function ResultsPage() {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
-  
-  // State for calculated stats
-  const [sectionResults, setSectionResults] = useState<any[]>([]);
-  const [totalCorrect, setTotalCorrect] = useState(0);
-  const [totalQuestions, setTotalQuestions] = useState(0);
-  const [totalAnswered, setTotalAnswered] = useState(0);
-  const [overallPercentage, setOverallPercentage] = useState(0);
 
   const { sections, answers, currentExamId, userExamId, resetExam } =
     useExamStore();
   const supabase = createClient();
+  const { data: session } = useSession();
+
+  // Phone number state
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
     setHydrated(true);
   }, []);
 
-  // Safe redirect hook
   useEffect(() => {
     if (hydrated && !currentExamId) {
       router.push("/dashboard");
     }
   }, [hydrated, currentExamId, router]);
 
-  // Auto-calculate and save results to Supabase when we land on this page
+  // Auto-calculate and save results to Supabase
   useEffect(() => {
     if (!hydrated || !userExamId || !currentExamId) return;
 
-    // Helper for deep equality
     const isDeepEqual = (a: any, b: any): boolean => {
-      if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+      if (typeof a === "object" && a !== null && typeof b === "object" && b !== null) {
         const keys1 = Object.keys(a);
         const keys2 = Object.keys(b);
         if (keys1.length !== keys2.length) return false;
         for (const key of keys1) {
-            if (a[key] !== b[key]) return false;
+          if (a[key] !== b[key]) return false;
         }
         return true;
       }
@@ -66,22 +52,19 @@ export default function ResultsPage() {
     };
 
     const formatAns = (a: any) => {
-      if (a && typeof a === 'object') {
-        if ('image1' in a && 'image2' in a) return [a.image1, a.image2];
-        if ('A' in a && 'B' in a) return [a.A, a.B];
+      if (a && typeof a === "object") {
+        if ("image1" in a && "image2" in a) return [a.image1, a.image2];
+        if ("A" in a && "B" in a) return [a.A, a.B];
       }
       return a !== undefined ? a : null;
     };
 
-    // Only process if sections are loaded
     if (sections.length === 0) return;
 
     const processResults = async () => {
       try {
-        // Collect all possible section IDs to fetch correct questions
         const sectionIds = sections.map((s) => s.id);
 
-        // 1. Fetch true questions from DB (instead of querying by passage IDs which failed for Module tests)
         const { data: questionsData, error } = await supabase
           .from("questions")
           .select("id, section_id, correct_answer")
@@ -89,7 +72,6 @@ export default function ResultsPage() {
 
         if (error) throw error;
 
-        // 2. Build map of correct answers
         const correctAnswersMap = (questionsData || []).reduce(
           (acc: Record<string, any>, q) => {
             acc[q.id] = q.correct_answer;
@@ -98,113 +80,63 @@ export default function ResultsPage() {
           {}
         );
 
-        // 3. Process section by section
         const calculatedResults = sections.map((section) => {
           const sectionAnswers = answers[section.id] || {};
           let correctCount = 0;
           let answeredCount = 0;
 
-          // Instead of evaluating passage keys or store array, evaluate actual child question keys!
           const actualQuestionIds = (questionsData || [])
             .filter((q) => q.section_id === section.id)
             .map((q) => q.id);
 
-          const actualTotalQuestions = actualQuestionIds.length;
-
-          // Check each real question in the section
           actualQuestionIds.forEach((qId) => {
             const ans = sectionAnswers[qId];
             const correctAns = correctAnswersMap[qId];
-
-            if (ans !== null && ans !== undefined) {
-              answeredCount++;
-            }
-
-            if (
-              ans !== null &&
-              ans !== undefined &&
-              correctAns !== undefined
-            ) {
-              // Format answers first to handle nested array checks consistently
-              if (isDeepEqual(formatAns(ans), formatAns(correctAns))) {
-                correctCount++;
-              }
+            if (ans !== null && ans !== undefined) answeredCount++;
+            if (ans !== null && ans !== undefined && correctAns !== undefined) {
+              if (isDeepEqual(formatAns(ans), formatAns(correctAns))) correctCount++;
             }
           });
 
           const percentage =
-            actualTotalQuestions > 0
-              ? Math.round((correctCount / actualTotalQuestions) * 100)
+            actualQuestionIds.length > 0
+              ? Math.round((correctCount / actualQuestionIds.length) * 100)
               : 0;
 
           return {
             id: section.id,
             title: section.title,
-            type: section.questionType,
-            totalQuestions: actualTotalQuestions,
-            actualQuestionIds: actualQuestionIds, // carry over for format Answers
+            totalQuestions: actualQuestionIds.length,
+            actualQuestionIds,
             answeredCount,
             correctCount,
             percentage,
           };
         });
 
-        // 4. Calculate globals
-        const totalC = calculatedResults.reduce(
-          (sum, s) => sum + s.correctCount,
-          0
-        );
-        const totalQ = calculatedResults.reduce(
-          (sum, s) => sum + s.totalQuestions,
-          0
-        );
-        const totalA = calculatedResults.reduce(
-          (sum, s) => sum + s.answeredCount,
-          0
-        );
-        const overallPct =
-          totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+        const totalC = calculatedResults.reduce((sum, s) => sum + s.correctCount, 0);
+        const totalQ = calculatedResults.reduce((sum, s) => sum + s.totalQuestions, 0);
 
-        setSectionResults(calculatedResults);
-        setTotalCorrect(totalC);
-        setTotalQuestions(totalQ);
-        setTotalAnswered(totalA);
-        setOverallPercentage(overallPct);
         setIsCalculated(true);
 
-        // 5. Format detailed answers for jsonb
         const detailedAnswersByTitle = calculatedResults.reduce((acc, result) => {
           const sectionAnswers = answers[result.id] || {};
-
-          const formattedAnswers = result.actualQuestionIds.map(
-            (qId: string) => {
-              const ans = sectionAnswers[qId];
-              const correctAns = correctAnswersMap[qId];
-              const formattedUserAns = formatAns(ans);
-              const formattedCorrectAns = formatAns(correctAns);
-              const isCorrect =
-                ans !== null &&
-                ans !== undefined &&
-                correctAns !== undefined &&
-                isDeepEqual(formattedUserAns, formattedCorrectAns);
-
-              return {
-                user_answer: formattedUserAns,
-                correct_answer: formattedCorrectAns,
-                is_correct: isCorrect,
-              };
-            }
-          );
-
-          acc[result.title] = {
-            score: result.correctCount,
-            max_score: result.totalQuestions,
-            answers: formattedAnswers,
-          };
+          const formattedAnswers = result.actualQuestionIds.map((qId: string) => {
+            const ans = sectionAnswers[qId];
+            const correctAns = correctAnswersMap[qId];
+            const formattedUserAns = formatAns(ans);
+            const formattedCorrectAns = formatAns(correctAns);
+            const isCorrect =
+              ans !== null &&
+              ans !== undefined &&
+              correctAns !== undefined &&
+              isDeepEqual(formattedUserAns, formattedCorrectAns);
+            return { user_answer: formattedUserAns, correct_answer: formattedCorrectAns, is_correct: isCorrect };
+          });
+          acc[result.title] = { score: result.correctCount, max_score: result.totalQuestions, answers: formattedAnswers };
           return acc;
         }, {} as Record<string, unknown>);
 
-        // 6. Save results
         await supabase
           .from("user_exams")
           .update({
@@ -214,260 +146,193 @@ export default function ResultsPage() {
             detailed_results: detailedAnswersByTitle,
           })
           .eq("id", userExamId);
-
       } catch (err) {
         console.error("Failed to process and save exam history", err);
       }
     };
-    
+
     processResults();
   }, [hydrated, userExamId, currentExamId, supabase]);
 
-  const getGrade = (pct: number) => {
-    if (pct >= 90) return { label: "Excellent", color: "text-green-600", bg: "bg-green-50" };
-    if (pct >= 75) return { label: "Good", color: "text-blue-600", bg: "bg-blue-50" };
-    if (pct >= 60) return { label: "Satisfactory", color: "text-amber-600", bg: "bg-amber-50" };
-    return { label: "Needs Improvement", color: "text-red-600", bg: "bg-red-50" };
-  };
+  const handleSubmitPhone = async () => {
+    if (!phoneNumber.trim()) return;
+    if (!session?.user?.id) {
+      setSubmitError("Not signed in — please refresh and try again.");
+      return;
+    }
 
-  const grade = getGrade(overallPercentage);
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ phonenumber: phoneNumber.trim() })
+        .eq("id", session.user.id);
+
+      if (error) throw error;
+      setSubmitted(true);
+    } catch (err) {
+      console.error("Failed to save phone number:", err);
+      setSubmitError("Failed to save. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!hydrated || !currentExamId || !isCalculated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#faf9f7]">
+        <div className="w-8 h-8 border-[3px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  const handleRetake = () => {
-    resetExam();
-    router.push("/dashboard");
-  };
-
   return (
-    <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50">
-      {/* Background decoration */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-orange-100/60 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-amber-100/60 blur-3xl" />
-      </div>
-
+    <div className="min-h-screen bg-[#f5f4f0] flex flex-col">
       {/* Header */}
-      <header className="relative z-10 border-b border-gray-100 bg-white/60 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
-          <img src="/logo.avif" alt="TestAS Logo" className="w-12 h-auto" />
+      <header className="bg-white border-b border-gray-100">
+        <div className="max-w-lg mx-auto px-5 py-3.5 flex items-center gap-3">
+          <img src="/logo.avif" alt="TestAS Logo" className="w-10 h-auto" />
           <div>
-            <h1 className="font-bold text-gray-900">TestAS Mock Test</h1>
-            <p className="text-xs text-gray-500">Exam Results</p>
+            <h1 className="font-bold text-gray-900 text-sm leading-tight">TestAS Mock Test</h1>
+            <p className="text-xs text-gray-400">Exam Results</p>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 max-w-6xl mx-auto px-6 py-10">
-        {/* Overall Score */}
-        {/* <div className="text-center mb-10">
-          <Trophy className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Exam Complete!</h2>
-          <p className="text-gray-500">Here&apos;s your performance summary</p>
-        </div> */}
+      <main className="flex-1 max-w-lg mx-auto w-full px-4 py-6 flex flex-col gap-3">
 
-        <div className="relative">
-          {/* Blurred Overlay for Results */}
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-start pt-16 p-6 text-center bg-white/30 rounded-2xl">
-            <div className="bg-white p-8 rounded-2xl shadow-2xl max-w-2xl w-full border border-orange-100">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Thanks for taking the test!
-              </h3>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Your answers have been securely recorded. We will review your
-                test and email your detailed results and score analysis within{" "}
-                <strong>1 day</strong>.
-              </p>
+        {/* Main card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
-              <div className="bg-orange-50 rounded-xl p-4 text-left shadow-sm border border-orange-100/50">
-                <p className="text-xs font-bold text-orange-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <Info className="w-4 h-4" /> Contact Information
-                </p>
-                <a
-                  href="mailto:nhat@kni.vn"
-                  className="flex items-center gap-2 text-sm text-orange-700 hover:text-orange-900 transition-colors"
-                >
-                  <Mail className="w-4 h-4 shrink-0" /> nhat@kni.vn
-                </a>
-                <div className="mt-3 space-y-2">
-                  <a
-                    href="tel:+84918391099"
-                    className="flex items-center gap-2 text-sm text-orange-700 hover:text-orange-900 transition-colors"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-4 h-4 shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.09 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72c.12.9.38 1.76.75 2.58a2 2 0 0 1-.45 2.11L8.91 9.91a16 16 0 0 0 6 6l1.5-1.5a2 2 0 0 1 2.11-.45c.82.37 1.68.63 2.58.75A2 2 0 0 1 22 16.92z" />
-                    </svg>
-                    0918391099
-                  </a>
-
-                  <a
-                    href="https://kni.vn"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-orange-700 hover:text-orange-900 transition-colors"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-4 h-4 shrink-0"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M10 14L21 3" />
-                      <path d="M21 10v-7h-7" />
-                      <path d="M21 21H3V3h7" />
-                    </svg>
-                    kni.vn
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex pt-4 items-center justify-center gap-4">
-                {/* <Button
-            onClick={handleRetake}
-            variant="outline"
-            size="lg"
-            className="h-12 px-8 border-2 border-orange-300 text-orange-600 hover:bg-orange-50"
-          >
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Retake Exam
-          </Button> */}
-                <Button
-                  onClick={() => {
-                    resetExam();
-                    router.push("/dashboard");
-                  }}
-                  size="lg"
-                  className="h-12 px-8 bg-linear-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-200"
-                >
-                  <Home className="w-4 h-4 mr-2" />
-                  Back to Dashboard
-                </Button>
-              </div>
+          {/* Top section: check + title + description */}
+          <div className="px-7 pt-8 pb-6 text-center">
+            <div className="w-14 h-14 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5">
+              <CheckCircle2 className="w-7 h-7 text-green-500" strokeWidth={2} />
             </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3 leading-tight">
+              Thanks for taking the test!
+            </h2>
+            <p className="text-gray-500 text-[15px] leading-relaxed">
+              Your answers have been securely recorded. We&apos;ll review your test and send
+              your detailed results within <strong className="text-gray-700">1 day</strong>.
+            </p>
           </div>
 
-          {/* <div className="select-none opacity-30 blur-[6px] pointer-events-none transition-all duration-500 pb-4">
-            <Card className="border-0 bg-white/80 backdrop-blur-sm shadow-xl mb-8">
-              <CardContent className="pt-8 pb-8">
-                <div className="flex flex-col items-center">
-                  <div className="relative w-44 h-44 mb-6">
-                    <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-                      <circle
-                        cx="60" cy="60" r="52"
-                        fill="none"
-                        stroke="#f3f4f6"
-                        strokeWidth="10"
-                      />
-                      <circle
-                        cx="60" cy="60" r="52"
-                        fill="none"
-                        stroke="url(#scoreGradient)"
-                        strokeWidth="10"
-                        strokeLinecap="round"
-                        strokeDasharray={`${2 * Math.PI * 52}`}
-                        strokeDashoffset={`${2 * Math.PI * 52 * (1 - overallPercentage / 100)}`}
-                        className="transition-all duration-1000 ease-out"
-                      />
-                      <defs>
-                        <linearGradient id="scoreGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#F97316" />
-                          <stop offset="100%" stopColor="#F59E0B" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-4xl font-bold text-gray-900">{overallPercentage}%</span>
-                      <span className={`text-sm font-medium ${grade.color}`}>{grade.label}</span>
-                    </div>
-                  </div>
+          {/* Divider */}
+          <div className="h-px bg-gray-100 mx-0" />
 
-                  <div className="flex items-center gap-8 text-center">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-green-600 mb-1">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span className="text-2xl font-bold">{totalCorrect}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Correct</span>
-                    </div>
-                    <div className="w-px h-10 bg-gray-200" />
-                    <div>
-                      <div className="flex items-center gap-1.5 text-red-500 mb-1">
-                        <XCircle className="w-4 h-4" />
-                        <span className="text-2xl font-bold">{totalAnswered - totalCorrect}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Incorrect</span>
-                    </div>
-                    <div className="w-px h-10 bg-gray-200" />
-                    <div>
-                      <div className="flex items-center gap-1.5 text-gray-400 mb-1">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-2xl font-bold">{totalQuestions - totalAnswered}</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Skipped</span>
-                    </div>
-                  </div>
+          {/* Phone input section */}
+          <div className="px-7 py-6">
+            {!submitted ? (
+              <>
+                <p className="font-semibold text-gray-900 text-[15px] mb-1">
+                  Want to get your test results?
+                </p>
+                <p className="text-gray-400 text-sm mb-4">
+                  Submit your Zalo phone number and we&apos;ll send results directly to you.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    placeholder="e.g. 0912 345 678"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && phoneNumber.trim()) handleSubmitPhone();
+                    }}
+                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 bg-gray-50 text-gray-900 text-[15px] placeholder:text-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
+                  />
+                  <button
+                    onClick={handleSubmitPhone}
+                    disabled={isSubmitting || !phoneNumber.trim()}
+                    className="h-12 px-6 rounded-xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-[15px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Saving
+                      </span>
+                    ) : (
+                      "Submit"
+                    )}
+                  </button>
                 </div>
-              </CardContent>
-            </Card>
-
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-orange-500" />
-              Section Breakdown
-            </h3>
-
-            <div className="space-y-3 mb-10">
-              {sectionResults.map((result) => (
-                <Card key={result.id} className="border-0 bg-white/70 backdrop-blur-sm shadow-md">
-                  <CardContent className="py-4 px-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="font-semibold text-gray-900 text-sm">{result.title}</p>
-                        <p className="text-xs text-gray-500">
-                          {result.correctCount}/{result.totalQuestions} correct · {result.answeredCount} answered
-                        </p>
-                      </div>
-                      <div className={`px-3 py-1 rounded-full text-sm font-bold ${getGrade(result.percentage).bg} ${getGrade(result.percentage).color}`}>
-                        {result.percentage}%
-                      </div>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-linear-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${result.percentage}%` }}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div> */}
+                {submitError && (
+                  <p className="text-red-500 text-xs mt-2">{submitError}</p>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-3 py-1">
+                <div className="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 text-[15px]">Phone number saved!</p>
+                  <p className="text-gray-400 text-sm">
+                    We&apos;ll contact you at <span className="font-medium text-gray-600">{phoneNumber}</span> on Zalo.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Contact card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-7 py-5">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
+            Contact
+          </p>
+          <div className="space-y-3">
+            <a
+              href="mailto:nhat@kni.vn"
+              className="flex items-center gap-3 group"
+            >
+              <span className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
+                <Mail className="w-4 h-4 text-orange-500" />
+              </span>
+              <span className="text-gray-700 text-[15px] group-hover:text-orange-600 transition-colors">
+                nhat@kni.vn
+              </span>
+            </a>
+            <a
+              href="tel:+84918391099"
+              className="flex items-center gap-3 group"
+            >
+              <span className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
+                <Phone className="w-4 h-4 text-orange-500" />
+              </span>
+              <span className="text-gray-700 text-[15px] group-hover:text-orange-600 transition-colors">
+                0918391099
+              </span>
+            </a>
+            <a
+              href="https://kni.vn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 group"
+            >
+              <span className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center shrink-0 group-hover:bg-orange-100 transition-colors">
+                <ExternalLink className="w-4 h-4 text-orange-500" />
+              </span>
+              <span className="text-gray-700 text-[15px] group-hover:text-orange-600 transition-colors">
+                kni.vn
+              </span>
+            </a>
+          </div>
+        </div>
+
+        {/* Back to Dashboard — full width outside cards */}
+        <button
+          onClick={() => {
+            resetExam();
+            router.push("/dashboard");
+          }}
+          className="w-full h-14 rounded-2xl bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-semibold text-[16px] flex items-center justify-center gap-2.5 transition-colors shadow-md shadow-orange-200"
+        >
+          <Home className="w-5 h-5" />
+          Back to Dashboard
+        </button>
       </main>
     </div>
   );
