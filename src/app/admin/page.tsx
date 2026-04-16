@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { LogOut, ChevronDown, ChevronUp, UserSquare, Home, ShieldAlert } from 'lucide-react';
 
 import { signOut, useSession } from 'next-auth/react';
@@ -25,6 +26,7 @@ interface ProfileWithExams {
   role: string | null;
   created_at: string;
   user_exams: UserExam[];
+  phonenumber : string;
 }
 
 interface ExamConfig {
@@ -80,7 +82,7 @@ export default function AdminPage() {
         const { data: allUsers, error: fetchError } = await supabase
           .from('profiles')
           .select(`
-            id, email, full_name, role, created_at,
+            id, email, full_name, role, created_at, phonenumber,
             user_exams (
               id, created_at, status, total_score, max_score, detailed_results
             )
@@ -194,6 +196,7 @@ export default function AdminPage() {
   }
 
   console.log("Users with exams:", users);
+  const non_admin_users = users.filter((user) => user.role !== 'admin');
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -305,7 +308,7 @@ export default function AdminPage() {
         )}
 
         <div className="space-y-4">
-          {users.map((user) => {
+          {non_admin_users.map((user) => {
             const isExpanded = expandedUserId === user.id;
             const completedExams = user.user_exams.filter(e => e.status === 'completed');
 
@@ -326,7 +329,11 @@ export default function AdminPage() {
                           <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold uppercase">Admin</span>
                         )}
                       </p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+                      <p className="text-sm text-gray-500">
+                        {user.email}                        
+                        <Badge variant="outline" className="ml-2 bg-blue-50 text-blue-700 border-blue-100 font-medium">
+                            {user.phonenumber || 'N/A'}
+                        </Badge></p>
                     </div>
                   </div>
                   
