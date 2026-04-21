@@ -111,7 +111,16 @@ function exportUserReport(user: ProfileWithExams) {
 }
 
 function exportAllUsersCSV(users: ProfileWithExams[]) {
-  const headers = ['Name', 'Phone', 'Email', 'Date Joined', 'Latest Score'];
+  const moduleNamesSet = new Set<string>();
+  users.forEach(user => {
+    const latestExam = user.user_exams[0];
+    if (latestExam?.detailed_results) {
+      Object.keys(latestExam.detailed_results).forEach(key => moduleNamesSet.add(key));
+    }
+  });
+  const modules = Array.from(moduleNamesSet);
+  const headers = ['Name', 'Phone', 'Email', 'Date Joined', 'Latest Score', ...modules];
+
   const rows = users.map(user => {
     const name = `"${(user.full_name || '').replace(/"/g, '""')}"`;
     const phone = `"${(user.phonenumber || '').replace(/"/g, '""')}"`;
@@ -122,7 +131,18 @@ function exportAllUsersCSV(users: ProfileWithExams[]) {
       ? `${latestExam.total_score}/${latestExam.max_score}` 
       : 'N/A';
     const score = `"${latestScoreStr}"`;
-    return [name, phone, email, dateJoined, score].join(',');
+
+    const moduleScores = modules.map(mod => {
+      let modScoreStr = 'N/A';
+      if (latestExam?.detailed_results?.[mod]) {
+        const sectionData = latestExam.detailed_results[mod];
+        const isLegacy = Array.isArray(sectionData);
+        modScoreStr = isLegacy ? 'N/A' : `${(sectionData as any).score}/${(sectionData as any).max_score}`;
+      }
+      return `"${modScoreStr}"`;
+    });
+
+    return [name, phone, email, dateJoined, score, ...moduleScores].join(',');
   });
 
   const csvContent = [headers.join(','), ...rows].join('\n');
