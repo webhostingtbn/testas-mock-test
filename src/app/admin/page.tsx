@@ -110,6 +110,31 @@ function exportUserReport(user: ProfileWithExams) {
   URL.revokeObjectURL(url);
 }
 
+function exportAllUsersCSV(users: ProfileWithExams[]) {
+  const headers = ['Name', 'Phone', 'Email', 'Date Joined', 'Latest Score'];
+  const rows = users.map(user => {
+    const name = `"${(user.full_name || '').replace(/"/g, '""')}"`;
+    const phone = `"${(user.phonenumber || '').replace(/"/g, '""')}"`;
+    const email = `"${(user.email || '').replace(/"/g, '""')}"`;
+    const dateJoined = `"${new Date(user.created_at).toLocaleDateString()}"`;
+    const latestExam = user.user_exams[0];
+    const latestScoreStr = latestExam && latestExam.total_score !== null 
+      ? `${latestExam.total_score}/${latestExam.max_score}` 
+      : 'N/A';
+    const score = `"${latestScoreStr}"`;
+    return [name, phone, email, dateJoined, score].join(',');
+  });
+
+  const csvContent = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `all_users_export_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── ExpandedRow ──────────────────────────────────────────────────────────────
 
 function ExpandedRow({ user, colSpan }: { user: ProfileWithExams; colSpan: number }) {
@@ -467,16 +492,27 @@ export default function AdminPage() {
                 Showing {filteredUsers.length} of {non_admin_users.length} users
               </p>
             </div>
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search name, email, phone…"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 h-9 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
-              />
+            {/* Actions & Search */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search name, email, phone…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 h-9 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
+                />
+              </div>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto h-9 text-gray-600 hover:text-orange-600 hover:border-orange-300 flex items-center justify-center gap-2"
+                onClick={() => exportAllUsersCSV(filteredUsers)}
+                title="Export filtered users as CSV"
+              >
+                <Download className="w-4 h-4" />
+                <span className="text-sm">Export CSV</span>
+              </Button>
             </div>
           </div>
 
