@@ -30,6 +30,7 @@ interface ProfileWithExams {
   created_at: string;
   user_exams: UserExam[];
   phonenumber: string;
+  allow_test_limit: number;
 }
 
 interface ExamConfig {
@@ -281,6 +282,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isUpdatingLimit, setIsUpdatingLimit] = useState(false);
 
   useEffect(() => {
     async function checkAdminAndFetchData() {
@@ -298,7 +300,7 @@ export default function AdminPage() {
 
         const { data: allUsers, error: fetchError } = await supabase
           .from('profiles')
-          .select(`id, email, full_name, role, created_at, phonenumber,
+          .select(`id, email, full_name, role, created_at, phonenumber, allow_test_limit,
             user_exams ( id, created_at, status, total_score, max_score, detailed_results )`)
           .order('created_at', { ascending: false });
 
@@ -346,6 +348,49 @@ export default function AdminPage() {
       setError(err?.message || 'Failed to update exam activation.');
     } finally {
       setIsUpdatingExamId(null);
+    }
+  };
+
+  const updateUserLimit = async (userId: string, currentLimit: number) => {
+    const newVal = window.prompt('Enter new test limit for this user:', (currentLimit ?? 1).toString());
+    if (newVal === null) return;
+    const limit = parseInt(newVal, 10);
+    if (isNaN(limit) || limit < 1) {
+      alert('Invalid limit. Must be a number >= 1.');
+      return;
+    }
+    
+    setIsUpdatingLimit(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ allow_test_limit: limit }).eq('id', userId);
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, allow_test_limit: limit } : u));
+    } catch (err: any) {
+      setError(err.message || 'Failed to update limit');
+    } finally {
+      setIsUpdatingLimit(false);
+    }
+  };
+
+  const updateAllUsersLimit = async () => {
+    const newVal = window.prompt('Enter new test limit for ALL users:', '1');
+    if (newVal === null) return;
+    const limit = parseInt(newVal, 10);
+    if (isNaN(limit) || limit < 1) {
+      alert('Invalid limit. Must be a number >= 1.');
+      return;
+    }
+
+    setIsUpdatingLimit(true);
+    try {
+      const { error } = await supabase.from('profiles').update({ allow_test_limit: limit }).neq('role', 'admin');
+      if (error) throw error;
+      setUsers(prev => prev.map(u => u.role === 'admin' ? u : { ...u, allow_test_limit: limit }));
+      alert(`Successfully updated test limit to ${limit} for all normal users.`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update limits');
+    } finally {
+      setIsUpdatingLimit(false);
     }
   };
 
@@ -526,6 +571,16 @@ export default function AdminPage() {
               </div>
               <Button
                 variant="outline"
+                className="w-full sm:w-auto h-9 text-gray-600 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center gap-2"
+                onClick={updateAllUsersLimit}
+                disabled={isUpdatingLimit}
+                title="Change test limit for all users"
+              >
+                <Users className="w-4 h-4" />
+                <span className="text-sm">Set All Limits</span>
+              </Button>
+              <Button
+                variant="outline"
                 className="w-full sm:w-auto h-9 text-gray-600 hover:text-orange-600 hover:border-orange-300 flex items-center justify-center gap-2"
                 onClick={() => exportAllUsersCSV(filteredUsers)}
                 title="Export filtered users as CSV"
@@ -544,6 +599,7 @@ export default function AdminPage() {
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">User</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap hidden md:table-cell">Phone</th>
                     <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap hidden sm:table-cell">Joined</th>
+                    <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Limit</th>
                     <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Exams</th>
                     <th className="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Actions</th>
                   </tr>
@@ -551,7 +607,7 @@ export default function AdminPage() {
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-12 text-gray-400 text-sm italic">
+                      <td colSpan={6} className="text-center py-12 text-gray-400 text-sm italic">
                         {searchQuery ? 'No users match your search.' : 'No users found.'}
                       </td>
                     </tr>
@@ -597,6 +653,18 @@ export default function AdminPage() {
                               </span>
                             </td>
 
+                            {/* Limit */}
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); updateUserLimit(user.id, user.allow_test_limit); }}
+                                disabled={isUpdatingLimit}
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                title="Click to change limit"
+                              >
+                                {user.allow_test_limit ?? 1}
+                              </button>
+                            </td>
+
                             {/* Exams */}
                             <td className="px-4 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">
@@ -638,7 +706,7 @@ export default function AdminPage() {
 
                           {/* Expanded detail row */}
                           {isExpanded && (
-                            <ExpandedRow key={`${user.id}-expanded`} user={user} colSpan={5} />
+                            <ExpandedRow key={`${user.id}-expanded`} user={user} colSpan={6} />
                           )}
                         </Fragment>
                       );

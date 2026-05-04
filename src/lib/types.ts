@@ -24,6 +24,7 @@ export interface Profile {
   created_at: string;
   updated_at: string;
   role?: 'user' | 'admin';
+  allow_test_limit?: number;
 }
 
 export interface Exam {

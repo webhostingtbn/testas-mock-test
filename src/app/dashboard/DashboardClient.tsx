@@ -46,12 +46,18 @@ export default function DashboardClient({ session }: { session: Session }) {
           return () => clearTimeout(timer);
         }
 
+        let fetchedRole = 'user';
+        let fetchedLimit = 1;
+
         try {
           const { data: realProfile } = await supabase
             .from('profiles')
-            .select('module_test, role')
+            .select('module_test, role, allow_test_limit')
             .eq('email', session.user.email)
             .maybeSingle();
+
+          fetchedRole = realProfile?.role || 'user';
+          fetchedLimit = realProfile?.allow_test_limit ?? 1;
 
           setProfile({
             id: session.user.id || 'temp-id',
@@ -62,7 +68,8 @@ export default function DashboardClient({ session }: { session: Session }) {
             module_test: realProfile?.module_test || null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            role: (realProfile?.role || 'user') as 'user' | 'admin'
+            role: fetchedRole as 'user' | 'admin',
+            allow_test_limit: fetchedLimit
           } as Profile);
           
           if (realProfile?.module_test && !searchParams.get('module')) {
@@ -76,9 +83,9 @@ export default function DashboardClient({ session }: { session: Session }) {
             full_name: session.user.name || '',
             avatar_url: session.user.image || null,
             major: 'economics',
-            created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            role: 'user'
+            role: 'user',
+            allow_test_limit: 1
           } as Profile);
         }
 
@@ -109,7 +116,7 @@ export default function DashboardClient({ session }: { session: Session }) {
 
           if (examData) {
             setActiveExamId(examData.id);
-            setExamLimit(examData.retry_number ?? null);
+            setExamLimit(fetchedRole === 'admin' ? null : fetchedLimit);
           } else {
             setActiveExamId(null);
             setExamLimit(null);
