@@ -69,6 +69,7 @@ async function syncUserToSupabase(user: {
           email: user.email,
           full_name: user.name || null,
           avatar_url: user.image || null,
+          module_test: null,
         });
 
       if (error) console.error('Error creating new Supabase profile:', error);

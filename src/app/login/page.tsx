@@ -6,8 +6,16 @@ import { BookOpen } from 'lucide-react';
 import { Suspense } from 'react';
 import ErrorMessage from './ErrorMessage';
 import Image from 'next/image';
+import { useEffect } from 'react';
 
 export default function LoginPage() {
+  useEffect(() => {
+    if (window.location.hostname === '0.0.0.0' || window.location.hostname === '127.0.0.1') {
+      const canonicalUrl = new URL(window.location.href);
+      canonicalUrl.hostname = 'localhost';
+      window.location.replace(canonicalUrl);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50 p-4">

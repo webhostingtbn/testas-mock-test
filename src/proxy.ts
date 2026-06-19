@@ -5,7 +5,10 @@ export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth?.user?.email;
   const isOnLoginPage = req.nextUrl.pathname.startsWith('/login');
   const isOnAuthPage = req.nextUrl.pathname.startsWith('/api/auth');
-  
+  const isDevelopmentPreview =
+    process.env.NODE_ENV === 'development' &&
+    req.nextUrl.pathname.startsWith('/kni-preview');
+
   // Check for both possible cookie names (dev and production)
   const sessionTokenDev = req.cookies.get('authjs.session-token');
   const sessionTokenProd = req.cookies.get('__Secure-authjs.session-token');
@@ -21,12 +24,16 @@ export const proxy = auth((req) => {
     response.headers.set('x-auth-debug-cookie', String(cookiePresent));
     return response;
   };
-  
+
   console.log(`[Middleware] Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${cookiePresent}, Auth: ${!!req.auth?.user}`);
 
   // Always allow auth API routes
   if (isOnAuthPage) {
     return addDebugHeaders(NextResponse.next(), 'allow-auth-api');
+  }
+
+  if (isDevelopmentPreview) {
+    return addDebugHeaders(NextResponse.next(), 'allow-development-preview');
   }
 
   if (isOnLoginPage) {
