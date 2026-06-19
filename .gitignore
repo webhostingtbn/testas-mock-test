@@ -42,3 +42,7 @@ next-env.d.ts
 
 # test folder
 /testpdf
+
+# agent tools & configs
+.agents/
+skills-lock.json
