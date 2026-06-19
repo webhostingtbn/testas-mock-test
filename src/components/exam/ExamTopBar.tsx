@@ -13,6 +13,7 @@ interface ExamTopBarProps {
   answeredQuestions: number[];
   onQuestionClick: (index: number) => void;
   onTimeUp: () => void;
+  isCurrentQuestionRated?: boolean;
 }
 
 export default function ExamTopBar({
@@ -22,6 +23,7 @@ export default function ExamTopBar({
   answeredQuestions,
   onQuestionClick,
   onTimeUp,
+  isCurrentQuestionRated = false,
 }: ExamTopBarProps) {
   const { fontSize, setFontSize } = useExamStore();
 
@@ -32,12 +34,12 @@ export default function ExamTopBar({
   ];
 
   return (
-    <div className="bg-linear-to-r from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-200/50 shrink-0 w-full relative z-10">
+    <div className="bg-white border-b border-slate-200 text-slate-800 backdrop-blur-xl shrink-0 w-full relative z-10 shadow-sm shadow-slate-100/40">
       <div className="flex flex-wrap items-center justify-between px-4 py-3 gap-y-4 gap-x-4">
         {/* Left: Timer */}
         <div className="flex items-center gap-3 shrink-0">
           <CircularTimer onTimeUp={onTimeUp} />
-          <h2 className="text-sm font-black uppercase tracking-wider text-orange-100 flex items-center">
+          <h2 className="text-sm font-black uppercase tracking-wider text-slate-700 flex items-center">
             {sectionTitle}
           </h2>
         </div>
@@ -49,20 +51,21 @@ export default function ExamTopBar({
             currentIndex={currentQuestionIndex}
             answeredIndices={answeredQuestions}
             onQuestionClick={onQuestionClick}
+            isCurrentQuestionRated={isCurrentQuestionRated}
           />
         </div>
 
         {/* Right: Font size toggle */}
         <div className="flex items-center gap-1 shrink-0">
-          <Type className="w-4 h-4 text-orange-200 mr-1" />
+          <Type className="w-4 h-4 text-orange-500 mr-1" />
           {fontSizeOptions.map(({ size, label }, idx) => (
             <button
               key={size}
               onClick={() => setFontSize(size)}
               className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-150 ${
                 fontSize === size
-                  ? "bg-white/25 text-white font-bold shadow-inner"
-                  : "text-orange-200 hover:bg-white/10"
+                  ? "bg-orange-100 text-orange-700 font-bold shadow-inner border border-orange-200"
+                  : "text-slate-500 hover:bg-slate-100"
               }`}
               style={{ fontSize: `${12 + idx * 3}px` }}
               title={`Font size ${label}`}

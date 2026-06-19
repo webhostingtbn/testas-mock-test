@@ -1,7 +1,9 @@
 'use client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useExamStore } from '@/lib/store/exam-store';
 import { createClient } from '@/lib/supabase/client';
 import ExamTopBar from '@/components/exam/ExamTopBar';
@@ -12,11 +14,13 @@ import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
 import { getMockQuestions } from '@/lib/mock-data';
+import RatingWidget from '@/components/exam/RatingWidget';
 
 const STORAGE_BUCKET = 'ExamDataset';
 
 export default function ExamPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const supabase = createClient();
   const [hydrated, setHydrated] = useState(false);
   const [sectionQuestions, setSectionQuestions] = useState<any[]>([]);
@@ -39,8 +43,35 @@ export default function ExamPage() {
     nextQuestion,
     prevQuestion,
     goToQuestion,
-    resetExam,
+    getRating,
+    setRating,
   } = useExamStore();
+
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function resolveUserId() {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+        return;
+      }
+      if (session?.user?.email) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', session.user.email)
+            .maybeSingle();
+          if (data?.id) {
+            setUserId(data.id);
+          }
+        } catch (err) {
+          console.error('Failed to resolve user ID by email:', err);
+        }
+      }
+    }
+    resolveUserId();
+  }, [session, supabase]);
 
   // Wait for zustand hydration
   useEffect(() => {
@@ -53,36 +84,6 @@ export default function ExamPage() {
       router.push('/dashboard');
     }
   }, [hydrated, currentExamId, router]);
-
-  // Guard against direct URL access when no active exam exists or ids mismatch
-  useEffect(() => {
-    if (!hydrated || !currentExamId) return;
-
-    let isCancelled = false;
-
-    const validateActiveExam = async () => {
-      const { data: activeExam, error } = await supabase
-        .from('exams')
-        .select('id')
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-
-      if (isCancelled) return;
-
-      if (error || !activeExam || activeExam.id !== currentExamId) {
-        resetExam();
-        router.push('/dashboard');
-      }
-    };
-
-    void validateActiveExam();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [hydrated, currentExamId, supabase, router, resetExam]);
 
   // Auto-start the first flow step
   useEffect(() => {
@@ -288,9 +289,48 @@ export default function ExamPage() {
   if (!currentQuestion) return null;
 
   const currentAnswer = getAnswer(section.id, currentQuestion.id);
+  
+  const currentRating = currentQuestion.isPassage && currentQuestion.questions && currentQuestion.questions.length > 0
+    ? getRating(section.id, currentQuestion.questions[0].id)
+    : getRating(section.id, currentQuestion.id);
+
+  const isCurrentQuestionRated = currentRating !== null && currentRating !== undefined;
 
   const handleAnswer = (answer: unknown) => {
     setAnswer(section.id, currentQuestion.id, answer);
+  };
+
+  const handleRatingChange = async (difficulty: 'easy' | 'medium' | 'hard') => {
+    if (currentQuestion.isPassage && currentQuestion.questions) {
+      currentQuestion.questions.forEach((childQ: any) => {
+        setRating(section.id, childQ.id, difficulty);
+      });
+    } else {
+      setRating(section.id, currentQuestion.id, difficulty);
+    }
+    
+    if (userId) {
+      try {
+        const questionIdsToSync = currentQuestion.isPassage && currentQuestion.questions
+          ? currentQuestion.questions.map((childQ: any) => childQ.id)
+          : [currentQuestion.id];
+
+        const upsertData = questionIdsToSync.map((qId: string) => ({
+          user_id: userId,
+          question_id: qId,
+          difficulty: difficulty,
+          updated_at: new Date().toISOString()
+        }));
+
+        const { error } = await supabase
+          .from('user_question_practices')
+          .upsert(upsertData, { onConflict: 'user_id,question_id' });
+
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to sync difficulty rating to database:', err);
+      }
+    }
   };
 
   const handleTimeUp = () => {
@@ -364,7 +404,7 @@ export default function ExamPage() {
     .filter((i) => i >= 0);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-50" style={{ fontSize: `${fontSize}px` }}>
+    <div className="h-screen w-screen flex flex-col bg-slate-50 text-slate-800 overflow-hidden" style={{ fontSize: `${fontSize}px` }}>
       <ExamTopBar
         sectionTitle={section.title}
         totalQuestions={sectionQuestions.length}
@@ -372,6 +412,7 @@ export default function ExamPage() {
         answeredQuestions={answeredIndices}
         onQuestionClick={goToQuestion}
         onTimeUp={handleTimeUp}
+        isCurrentQuestionRated={isCurrentQuestionRated}
       />
 
       {/* Preload all images for the section so switching questions is instantaneous */}
@@ -394,10 +435,11 @@ export default function ExamPage() {
         })}
       </div>
 
-      {/* Question content area */}
-      <main className="flex-1 min-h-0 flex overflow-hidden">
-        <div className="flex-1 overflow-y-auto w-full px-6 py-4">
-          {renderQuestion()}
+      <main className="flex-1 min-h-0 flex overflow-hidden bg-slate-50">
+        <div className="flex-1 overflow-y-auto w-full px-6 py-4 text-slate-800 pb-24">
+          <div className="mx-auto">
+            {renderQuestion()}
+          </div>
         </div>
       </main>
 
@@ -408,6 +450,9 @@ export default function ExamPage() {
         isFirstQuestion={currentQuestionIndex === 0}
         isLastQuestion={currentQuestionIndex === sectionQuestions.length - 1}
         sectionTitle={section.title}
+        isCurrentQuestionRated={isCurrentQuestionRated}
+        currentRating={currentRating}
+        onRatingChange={handleRatingChange}
       />
     </div>
   );

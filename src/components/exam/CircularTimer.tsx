@@ -49,14 +49,14 @@ export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProp
     ? '#EF4444'
     : isWarning
     ? '#F59E0B'
-    : 'rgba(255, 255, 255, 0.9)';
+    : '#EA580C'; // orange-600
 
   const textColor = isCritical
-    ? '#FEE2E2'
-    : 'white';
+    ? '#EF4444'
+    : '#334155'; // slate-700
 
   return (
-    <div className="flex items-center gap-3 bg-black/20 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-sm">
+    <div className="flex items-center gap-3 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 backdrop-blur-sm">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg
           width={size}
@@ -69,7 +69,7 @@ export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProp
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="rgba(255, 255, 255, 0.2)"
+            stroke="rgba(0, 0, 0, 0.1)"
             strokeWidth={strokeWidth}
           />
           {/* Progress circle */}

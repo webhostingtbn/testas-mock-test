@@ -4,7 +4,7 @@
 
 export type MajorType = 'economics' | 'engineering' | 'natural_computer_science';
 
-export type ModuleTestType = 'economics' | 'engineering' | 'natural_computer_science';
+export type ModuleTestType = 'economics' | 'engineering' | 'natural_computer_science' | 'math_computer_natural_science' | 'CS' | 'Economics' | 'Engineering';
 
 export type QuestionType = 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq';
 
@@ -19,12 +19,14 @@ export interface Profile {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
-  major: MajorType | null;
   module_test?: ModuleTestType | null;
+  role?: string | null;
+  status?: string | null;
+  format?: string | null;
+  allow_test_limit?: number | null;
+  phonenumber?: string | null;
   created_at: string;
   updated_at: string;
-  role?: 'user' | 'admin';
-  allow_test_limit?: number;
 }
 
 export interface Exam {
@@ -33,7 +35,16 @@ export interface Exam {
   description: string | null;
   major: MajorType | null;
   is_active: boolean;
+  retry_number?: number | null;
   created_at: string;
+}
+
+export interface UserQuestionPractice {
+  id: string;
+  user_id: string;
+  question_id: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  updated_at: string;
 }
 
 export interface Section {

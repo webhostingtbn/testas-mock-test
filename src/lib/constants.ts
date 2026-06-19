@@ -34,8 +34,12 @@ export const MAJOR_LABELS: Record<string, string> = {
 /** Module test display labels */
 export const MODULE_TEST_LABELS: Record<string, string> = {
   economics: 'Economics',
+  Economics: 'Economics',
   engineering: 'Engineering',
+  Engineering: 'Engineering',
   natural_computer_science: 'Natural Science and Computer Science',
+  math_computer_natural_science: 'Natural Science and Computer Science',
+  CS: 'Natural Science and Computer Science',
 } as const;
 
 /** Module test options for the selection page */

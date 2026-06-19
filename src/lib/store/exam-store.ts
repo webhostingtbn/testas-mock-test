@@ -33,6 +33,8 @@ interface ExamState {
   currentQuestionIndex: number;
   answers: Record<string, Record<string, unknown>>;
   // answers[sectionId][questionId] = answer value
+  ratings: Record<string, Record<string, 'easy' | 'medium' | 'hard'>>;
+  // ratings[sectionId][questionId] = rating value
 
   // ---- Timer ----
   sectionStartTime: number | null; // Unix timestamp (ms)
@@ -56,6 +58,9 @@ interface ExamState {
 
   setAnswer: (sectionId: string, questionId: string, answer: unknown) => void;
   getAnswer: (sectionId: string, questionId: string) => unknown;
+
+  setRating: (sectionId: string, questionId: string, difficulty: 'easy' | 'medium' | 'hard') => void;
+  getRating: (sectionId: string, questionId: string) => 'easy' | 'medium' | 'hard' | null;
 
   nextQuestion: () => void;
   prevQuestion: () => void;
@@ -84,6 +89,7 @@ const initialState = {
   currentSectionIndex: 0,
   currentQuestionIndex: 0,
   answers: {},
+  ratings: {},
   sectionStartTime: null,
   sectionDuration: 0,
   breakStartTime: null,
@@ -107,6 +113,7 @@ export const useExamStore = create<ExamState>()(
           currentSectionIndex: 0,
           currentQuestionIndex: 0,
           answers: {},
+          ratings: {},
           sectionStartTime: null,
           breakStartTime: null,
         });
@@ -151,6 +158,23 @@ export const useExamStore = create<ExamState>()(
       getAnswer: (sectionId, questionId) => {
         const { answers } = get();
         return answers[sectionId]?.[questionId] ?? null;
+      },
+
+      setRating: (sectionId, questionId, difficulty) => {
+        set((state) => ({
+          ratings: {
+            ...state.ratings,
+            [sectionId]: {
+              ...state.ratings[sectionId],
+              [questionId]: difficulty,
+            },
+          },
+        }));
+      },
+
+      getRating: (sectionId, questionId) => {
+        const { ratings } = get();
+        return ratings[sectionId]?.[questionId] ?? null;
       },
 
       // ---- Navigation ----
@@ -248,6 +272,7 @@ export const useExamStore = create<ExamState>()(
         currentSectionIndex: state.currentSectionIndex,
         currentQuestionIndex: state.currentQuestionIndex,
         answers: state.answers,
+        ratings: state.ratings,
         sectionStartTime: state.sectionStartTime,
         sectionDuration: state.sectionDuration,
         breakStartTime: state.breakStartTime,

@@ -5,6 +5,7 @@ interface QuestionPaginationProps {
   currentIndex: number;
   answeredIndices: number[];
   onQuestionClick: (index: number) => void;
+  isCurrentQuestionRated?: boolean;
 }
 
 export default function QuestionPagination({
@@ -12,6 +13,7 @@ export default function QuestionPagination({
   currentIndex,
   answeredIndices,
   onQuestionClick,
+  isCurrentQuestionRated = false,
 }: QuestionPaginationProps) {
   const answeredSet = new Set(answeredIndices);
 
@@ -20,23 +22,30 @@ export default function QuestionPagination({
       {Array.from({ length: totalQuestions }, (_, i) => {
         const isCurrent = i === currentIndex;
         const isAnswered = answeredSet.has(i);
+        const isDisabled = !isCurrentQuestionRated && !isCurrent;
 
         return (
           <button
             key={i}
             onClick={() => onQuestionClick(i)}
+            disabled={isDisabled}
             className={`
               w-8 h-8 rounded-lg text-xs font-bold
               transition-all duration-150 
               ${
                 isCurrent
-                  ? 'bg-white text-orange-600 shadow-md scale-110 ring-2 ring-white/50'
+                  ? 'bg-orange-600 text-white shadow-md scale-110 ring-2 ring-orange-500/50'
                   : isAnswered
-                  ? 'bg-white/30 text-white hover:bg-white/40'
-                  : 'bg-transparent text-orange-200 border border-orange-300/40 hover:bg-white/10'
+                  ? 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100/80 hover:shadow-xs'
+                  : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200/80'
               }
+              ${isDisabled ? 'opacity-30 cursor-not-allowed' : ''}
             `}
-            title={`Question ${i + 1}${isAnswered ? ' (answered)' : ''}`}
+            title={
+              isDisabled 
+                ? "Rate the current question first to navigate" 
+                : `Question ${i + 1}${isAnswered ? ' (answered)' : ''}`
+            }
           >
             {i + 1}
           </button>
