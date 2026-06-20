@@ -409,7 +409,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
     return (
       <PracticeSession
-        subtestType={selectedSubtest}
+        subtestType={selectedSubtest as any}
         subtestTitle={subtestTitles[selectedSubtest]}
         folderId={selectedFolder}
         questions={practiceQuestions}
