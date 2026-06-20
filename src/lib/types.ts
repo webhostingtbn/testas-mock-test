@@ -6,7 +6,17 @@ export type MajorType = 'economics' | 'engineering' | 'natural_computer_science'
 
 export type ModuleTestType = 'economics' | 'engineering' | 'natural_computer_science' | 'math_computer_natural_science' | 'CS' | 'Economics' | 'Engineering';
 
-export type QuestionType = 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq';
+export type QuestionType =
+  | 'figure_sequence'
+  | 'math_equation'
+  | 'latin_square'
+  | 'module_mcq'
+  | 'solving_quantitative'
+  | 'inferring_relationships'
+  | 'numerical_series'
+  | 'interpreting_texts'
+  | 'representation_systems'
+  | 'linguistic_structures';
 
 export type ExamStatus = 'not_started' | 'in_progress' | 'completed';
 

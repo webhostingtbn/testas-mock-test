@@ -42,6 +42,8 @@ next-env.d.ts
 
 # test folder
 /testpdf
+/pdf
+/pdf/
 
 # agent tools & configs
 .agents/

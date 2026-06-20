@@ -1,19 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, CheckCircle2, AlertCircle, Smile, Meh, Frown } from 'lucide-react';
-import { KniButton, KniCard } from '@/components/KniPrimitives';
+import { KniButton, KniCard, KniBadge } from '@/components/KniPrimitives';
 import FigureSequence from '@/components/question-types/FigureSequence';
 import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
+import ModuleQuestion from '@/components/question-types/ModuleQuestion';
+import NumericalSeries from '@/components/question-types/NumericalSeries';
+import SecurityOverlay from '@/components/exam/SecurityOverlay';
+import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 
 interface PracticeSessionProps {
-  subtestType: 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq';
+  subtestType: string;
   subtestTitle: string;
   folderId: 'easy' | 'medium' | 'hard' | 'unclassified';
   questions: any[];
   userId: string;
+  userEmail: string;
+  userFullName?: string | null;
   supabase: any;
   onExit: () => void;
   onQuestionRated: () => void; // Trigger list reload on ratings change
@@ -25,6 +31,8 @@ export default function PracticeSession({
   folderId,
   questions,
   userId,
+  userEmail,
+  userFullName,
   supabase,
   onExit,
   onQuestionRated,
@@ -36,6 +44,9 @@ export default function PracticeSession({
   // Stopwatch per question
   const [seconds, setSeconds] = useState(0);
 
+  const switcherContainerRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
   useEffect(() => {
     setSeconds(0);
     const interval = setInterval(() => {
@@ -43,6 +54,30 @@ export default function PracticeSession({
     }, 1000);
     return () => clearInterval(interval);
   }, [currentIndex]);
+
+  useEffect(() => {
+    buttonRefs.current = buttonRefs.current.slice(0, questions.length);
+  }, [questions]);
+
+  useEffect(() => {
+    if (buttonRefs.current[currentIndex]) {
+      buttonRefs.current[currentIndex]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [currentIndex]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (switcherContainerRef.current) {
+      const scrollAmount = 200;
+      switcherContainerRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
 
   if (questions.length === 0) {
     return (
@@ -104,6 +139,14 @@ export default function PracticeSession({
       });
     }
 
+    const type = currentQuestion.question_type || subtestType;
+    if (type === 'numerical_series') {
+      const getDistinctCharsSorted = (str: string) => {
+        return Array.from(new Set(String(str).replace(/\s+/g, '').split(''))).sort().join('');
+      };
+      return getDistinctCharsSorted(currentAnswer) === getDistinctCharsSorted(currentQuestion.correct_answer);
+    }
+
     return isDeepEqual(formatAns(currentAnswer), formatAns(currentQuestion.correct_answer));
   };
 
@@ -160,7 +203,20 @@ export default function PracticeSession({
 
   const renderQuestion = () => {
     const q = currentQuestion;
-    switch (subtestType) {
+
+    if (q.isPassage) {
+      return (
+        <ModuleMCQ
+          passage={q}
+          selectedAnswers={answers}
+          onAnswer={handleChildAnswerChange}
+        />
+      );
+    }
+
+    const type = q.question_type || subtestType;
+
+    switch (type) {
       case 'figure_sequence':
         return (
           <FigureSequence
@@ -185,16 +241,24 @@ export default function PracticeSession({
             onAnswer={handleAnswerChange}
           />
         );
-      case 'module_mcq':
+      case 'numerical_series':
         return (
-          <ModuleMCQ
-            passage={q}
-            selectedAnswers={answers}
-            onAnswer={handleChildAnswerChange}
+          <NumericalSeries
+            question={q}
+            selectedAnswer={currentAnswer}
+            onAnswer={handleAnswerChange}
           />
         );
+      case 'solving_quantitative':
+      case 'inferring_relationships':
       default:
-        return <div className="text-center py-10">Unknown question type</div>;
+        return (
+          <ModuleQuestion
+            question={q}
+            selectedAnswer={currentAnswer}
+            onAnswer={handleAnswerChange}
+          />
+        );
     }
   };
 
@@ -208,31 +272,105 @@ export default function PracticeSession({
 
   return (
     <div className="max-w-7xl mx-auto flex flex-col h-full pb-24">
-      {/* Practice Header Bar */}
-      <div className="flex items-center justify-between border-b border-orange-100 bg-white/70 px-4 py-3 backdrop-blur-md rounded-2xl mb-2 shadow-sm">
-        <div className="flex items-center gap-3">
-          <KniButton
-            variant="ghost"
-            onClick={onExit}
-            className="h-9 px-3 text-slate-500 hover:text-slate-800"
-          >
-            <X className="size-4 mr-1.5" />
-            Exit Practice
-          </KniButton>
-          <div className="h-4 w-px bg-orange-100" />
-          <h2 className="text-sm font-bold text-slate-800">
-            {subtestTitle} — <span className="capitalize text-orange-700">{folderId} Bin</span>
-          </h2>
+      <SecurityOverlay />
+      <WatermarkOverlay email={userEmail} fullName={userFullName} />
+      {/* Practice Header Card */}
+      <div className="bg-white/80 border border-orange-100/60 rounded-2xl mb-6 shadow-sm p-4 backdrop-blur-md">
+        {/* Top Row: Exit & Subtest Title (Left) + Progress & Timer (Right) */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3 border-b border-slate-100">
+          {/* Left section: Exit Button & Title badge */}
+          <div className="flex flex-wrap items-center gap-3">
+            <KniButton
+              variant="ghost"
+              onClick={onExit}
+              className="h-9 px-3 text-slate-500 hover:text-slate-800 transition-colors"
+            >
+              <X className="size-4 mr-1.5" />
+              Exit Practice
+            </KniButton>
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-sm font-bold text-slate-800">
+                {subtestTitle}
+              </span>
+              <KniBadge 
+                status={folderId === 'easy' ? 'Easy' : folderId === 'medium' ? 'Medium' : folderId === 'hard' ? 'Hard' : 'Unclassified'} 
+                className="capitalize" 
+              />
+            </div>
+          </div>
+
+          {/* Right section: Progress Indicator & Timer */}
+          <div className="flex items-center justify-between sm:justify-end gap-4">
+            {/* Progress Badge */}
+            <div className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
+              Question <span className="font-bold text-slate-800">{currentIndex + 1}</span> of <span className="font-bold text-slate-800">{questions.length}</span>
+            </div>
+
+            {/* Timer Badge */}
+            <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-slate-700 bg-slate-100 border border-slate-100/50 px-3 py-1.5 rounded-lg shrink-0">
+              <Clock className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+              {formatTime(seconds)}
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-semibold text-slate-500">
-            Question {currentIndex + 1} of {questions.length}
-          </span>
-          <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-slate-700 bg-slate-100 px-3 py-1.5 rounded-lg">
-            <Clock className="w-3.5 h-3.5 text-orange-500" />
-            {formatTime(seconds)}
+        {/* Bottom Row: Question Switcher Grid */}
+        <div className="pt-3 flex items-center justify-between gap-3">
+          {/* Scroll Left Button */}
+          <button
+            type="button"
+            onClick={() => handleScroll('left')}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors hidden sm:flex items-center justify-center shrink-0 cursor-pointer"
+            title="Scroll Left"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {/* Scrollable Switcher Container */}
+          <div 
+            ref={switcherContainerRef}
+            className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-orange-200 py-1.5 scroll-smooth"
+          >
+            <div className="flex gap-2 w-fit mx-auto px-4">
+              {questions.map((q, idx) => {
+                const isActive = currentIndex === idx;
+                const isAnswered = answers[q.id] !== undefined && answers[q.id] !== null;
+                const isRated = ratings[q.id] !== undefined;
+
+                let btnClass = "bg-white border-slate-200 text-slate-650 hover:bg-slate-50 hover:text-slate-900";
+                if (isActive) {
+                  btnClass = "bg-orange-500 border-orange-500 text-white font-extrabold shadow-sm scale-110 ring-2 ring-orange-200 ring-offset-1";
+                } else if (isAnswered || isRated) {
+                  btnClass = "bg-orange-100/60 border-orange-200 text-orange-850 hover:bg-orange-100";
+                }
+
+                return (
+                  <button
+                    key={q.id}
+                    ref={(el) => {
+                      buttonRefs.current[idx] = el;
+                    }}
+                    type="button"
+                    onClick={() => setCurrentIndex(idx)}
+                    className={`w-9 h-9 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer ${btnClass}`}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Scroll Right Button */}
+          <button
+            type="button"
+            onClick={() => handleScroll('right')}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-800 transition-colors hidden sm:flex items-center justify-center shrink-0 cursor-pointer"
+            title="Scroll Right"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

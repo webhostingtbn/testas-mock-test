@@ -65,7 +65,7 @@ export default function PracticeFolderView({
   ];
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full">
       <button
         onClick={onBack}
         className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-semibold mb-6 cursor-pointer transition"

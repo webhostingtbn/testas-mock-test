@@ -20,8 +20,68 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   const [questions, setQuestions] = useState<any[]>([]);
   const [userRatings, setUserRatings] = useState<Record<string, 'easy' | 'medium' | 'hard'>>({});
 
+  type SubtestType = 
+    | 'figure_sequence' 
+    | 'math_equation' 
+    | 'latin_square' 
+    | 'solving_quantitative' 
+    | 'inferring_relationships' 
+    | 'numerical_series' 
+    | 'interpreting_texts'
+    | 'representation_systems'
+    | 'linguistic_structures'
+    | 'sc_1'
+    | 'sc_2'
+    | 'econ_1'
+    | 'econ_2'
+    | 'eng_1'
+    | 'eng_2'
+    | 'eng_3'
+    | 'module_mcq';
+
+  const SUBTEST_KEYWORDS: Record<string, string[]> = {
+    sc_1: ['scientific relationships', 'scientific interrelationships', 'quantitative problems'],
+    sc_2: ['formal depictions', 'text completion'],
+    econ_1: ['economic relationships', 'economic interrelationships'],
+    econ_2: ['processes', 'economic processes'],
+    eng_1: ['formalising technical', 'formalizing technical'],
+    eng_2: ['visualising solids', 'visualizing solids', 'solids'],
+    eng_3: ['analysing technical', 'analyzing technical'],
+  };
+
+  const getMatchedSections = useCallback((subtest: SubtestType) => {
+    const keywords = SUBTEST_KEYWORDS[subtest];
+    if (keywords) {
+      return sections.filter((s) =>
+        keywords.some((kw) => s.title.toLowerCase().includes(kw))
+      );
+    }
+    
+    if (
+      subtest === 'interpreting_texts' ||
+      subtest === 'representation_systems' ||
+      subtest === 'linguistic_structures'
+    ) {
+      return sections.filter((s) => s.question_type === subtest);
+    }
+    
+    if (subtest === 'module_mcq') {
+      const moduleTitle = getModuleTitle(activeModule);
+      return sections.filter(
+        (s) =>
+          (s.question_type === 'module_mcq' ||
+            s.question_type === 'interpreting_texts' ||
+            s.question_type === 'representation_systems' ||
+            s.question_type === 'linguistic_structures') &&
+          s.title === moduleTitle
+      );
+    }
+    
+    return sections.filter((s) => s.question_type === subtest);
+  }, [sections, activeModule]);
+
   // Navigation State inside SPA
-  const [selectedSubtest, setSelectedSubtest] = useState<'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq' | null>(null);
+  const [selectedSubtest, setSelectedSubtest] = useState<SubtestType | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<'easy' | 'medium' | 'hard' | 'unclassified' | null>(null);
   const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -75,13 +135,21 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     loadPracticeData();
   }, [loadPracticeData]);
 
-  // Compute question counts for a specific subtest type
-  const getSubtestCounts = (subtest: 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq') => {
+  const getSubtestCounts = (subtest: SubtestType) => {
     // Filter questions belonging to this subtest
     let subtestQuestions = [];
-    if (subtest === 'module_mcq') {
-      const moduleTitle = getModuleTitle(activeModule);
-      const matchedSections = sections.filter(s => s.question_type === 'module_mcq' && s.title === moduleTitle);
+    const isSubjectSubtest = [
+      'module_mcq',
+      'interpreting_texts',
+      'representation_systems',
+      'linguistic_structures',
+      'sc_1', 'sc_2',
+      'econ_1', 'econ_2',
+      'eng_1', 'eng_2', 'eng_3'
+    ].includes(subtest);
+
+    if (isSubjectSubtest) {
+      const matchedSections = getMatchedSections(subtest);
       const matchedSectionIds = new Set(matchedSections.map(s => s.id));
       subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
     } else {
@@ -106,11 +174,20 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     return { easy, medium, hard, unclassified, total };
   };
 
-  const getQuestionIdsForFolder = (subtest: string, folder: string) => {
+  const getQuestionIdsForFolder = (subtest: SubtestType, folder: string) => {
     let subtestQuestions = [];
-    if (subtest === 'module_mcq') {
-      const moduleTitle = getModuleTitle(activeModule);
-      const matchedSections = sections.filter(s => s.question_type === 'module_mcq' && s.title === moduleTitle);
+    const isSubjectSubtest = [
+      'module_mcq',
+      'interpreting_texts',
+      'representation_systems',
+      'linguistic_structures',
+      'sc_1', 'sc_2',
+      'econ_1', 'econ_2',
+      'eng_1', 'eng_2', 'eng_3'
+    ].includes(subtest);
+
+    if (isSubjectSubtest) {
+      const matchedSections = getMatchedSections(subtest);
       const matchedSectionIds = new Set(matchedSections.map(s => s.id));
       subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
     } else {
@@ -126,27 +203,37 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       .map((q) => q.id);
   };
 
-  const startPracticeSession = async (subtest: 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq', folder: 'easy' | 'medium' | 'hard' | 'unclassified') => {
+  const startPracticeSession = async (subtest: SubtestType, folder: 'easy' | 'medium' | 'hard' | 'unclassified') => {
     setIsLoadingSession(true);
     setSelectedFolder(folder);
     try {
       const targetIds = getQuestionIdsForFolder(subtest, folder);
 
-      if (subtest === 'module_mcq') {
-        const moduleTitle = getModuleTitle(activeModule);
-        const section = sections.find(s => s.question_type === 'module_mcq' && s.title === moduleTitle);
-        if (!section) throw new Error('No section found for this module');
+      const isSubjectSubtest = [
+        'module_mcq',
+        'interpreting_texts',
+        'representation_systems',
+        'linguistic_structures',
+        'sc_1', 'sc_2',
+        'econ_1', 'econ_2',
+        'eng_1', 'eng_2', 'eng_3'
+      ].includes(subtest);
+
+      if (isSubjectSubtest) {
+        const matchedSections = getMatchedSections(subtest);
+        if (matchedSections.length === 0) throw new Error('No section found for this subtest');
+        const matchedSectionIds = matchedSections.map((s) => s.id);
 
         const { data: passagesData } = await supabase
           .from('passages')
           .select('*')
-          .eq('section_id', section.id)
+          .in('section_id', matchedSectionIds)
           .order('sort_order', { ascending: true });
 
         const { data: questionsData } = await supabase
           .from('questions')
           .select('*')
-          .eq('section_id', section.id)
+          .in('section_id', matchedSectionIds)
           .order('sort_order', { ascending: true });
 
         const formattedPassages = (passagesData || []).map((passage: any) => {
@@ -185,6 +272,26 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           };
         });
 
+        // Load standalone questions without passages
+        const standaloneQuestions = (questionsData || [])
+          .filter((q) => !q.passage_id)
+          .map((q) => {
+            const content = q.content || {};
+            let qResolvedUrl;
+            if (content.image_url) {
+              const { data } = supabase.storage.from('ExamDataset').getPublicUrl(content.image_url);
+              qResolvedUrl = data.publicUrl;
+            }
+            return {
+              ...q,
+              isPassage: false,
+              content: {
+                ...content,
+                resolved_image_url: qResolvedUrl,
+              },
+            };
+          });
+
         const filteredPassages = formattedPassages.filter((passage: any) => {
           if (passage.questions.length === 0) return false;
           const firstQId = passage.questions[0].id;
@@ -196,7 +303,14 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           return rating === folder;
         });
 
-        setPracticeQuestions(filteredPassages);
+        const filteredStandalones = standaloneQuestions.filter((q) => {
+          const rating = userRatings[q.id];
+          if (folder === 'unclassified') return !rating;
+          return rating === folder;
+        });
+
+        const combined = [...filteredPassages, ...filteredStandalones];
+        setPracticeQuestions(combined);
       } else {
         if (targetIds.length === 0) {
           setPracticeQuestions([]);
@@ -229,7 +343,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                 options_urls: resolvedOptions,
               },
             };
-          } else if (subtest === 'latin_square') {
+          } else if (subtest === 'latin_square' && q.question_type === 'latin_square') {
             const content = q.content as any;
             const { data: imgData } = supabase.storage
               .from('ExamDataset')
@@ -261,6 +375,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   };
 
   // Main UI routing
+  const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
+
   if (selectedSubtest && selectedFolder) {
     if (isLoadingSession) {
       return (
@@ -271,10 +387,23 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       );
     }
 
-    const subtestTitles = {
-      figure_sequence: 'Figure Sequences',
+    const subtestTitles: Record<SubtestType, string> = {
+      figure_sequence: isPaper ? 'Completing Patterns' : 'Figure Sequences',
       math_equation: 'Mathematical Equations',
       latin_square: 'Latin Squares',
+      solving_quantitative: 'Solving Quantitative Problems',
+      inferring_relationships: 'Inferring Relationships',
+      numerical_series: 'Continuing Numerical Series',
+      interpreting_texts: 'Understanding and Interpreting Texts',
+      representation_systems: 'Using Representation Systems Flexibly',
+      linguistic_structures: 'Recognizing Linguistic Structures',
+      sc_1: 'Analyzing Scientific Relationships',
+      sc_2: 'Understanding Formal Depictions',
+      econ_1: 'Analyzing Economic Relationships',
+      econ_2: 'Analyzing Processes',
+      eng_1: 'Formalising Technical Relationships',
+      eng_2: 'Visualising Solids',
+      eng_3: 'Analysing Technical Relationships',
       module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
     };
 
@@ -285,6 +414,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         folderId={selectedFolder}
         questions={practiceQuestions}
         userId={profile?.id || ''}
+        userEmail={profile?.email || ''}
+        userFullName={profile?.full_name}
         supabase={supabase}
         onExit={handleExitPracticeSession}
         onQuestionRated={loadPracticeData}
@@ -293,10 +424,23 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   }
 
   if (selectedSubtest) {
-    const subtestTitles = {
-      figure_sequence: 'Figure Sequences',
+    const subtestTitles: Record<SubtestType, string> = {
+      figure_sequence: isPaper ? 'Completing Patterns' : 'Figure Sequences',
       math_equation: 'Mathematical Equations',
       latin_square: 'Latin Squares',
+      solving_quantitative: 'Solving Quantitative Problems',
+      inferring_relationships: 'Inferring Relationships',
+      numerical_series: 'Continuing Numerical Series',
+      interpreting_texts: 'Understanding and Interpreting Texts',
+      representation_systems: 'Using Representation Systems Flexibly',
+      linguistic_structures: 'Recognizing Linguistic Structures',
+      sc_1: 'Analyzing Scientific Relationships',
+      sc_2: 'Understanding Formal Depictions',
+      econ_1: 'Analyzing Economic Relationships',
+      econ_2: 'Analyzing Processes',
+      eng_1: 'Formalising Technical Relationships',
+      eng_2: 'Visualising Solids',
+      eng_3: 'Analysing Technical Relationships',
       module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
     };
 
@@ -322,113 +466,293 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   //Main subtest card list
   const subtests: {
-    id: 'figure_sequence' | 'math_equation' | 'latin_square' | 'module_mcq';
+    id: SubtestType;
     title: string;
     description: string;
     icon: any;
-  }[] = [
-    { id: 'figure_sequence', title: 'Figure Sequences', description: 'Train visual pattern recognition and transformations.', icon: Sparkles },
-    { id: 'math_equation', title: 'Mathematical Equations', description: 'Practice quantitative relationships and equation logic.', icon: FileText },
-    { id: 'latin_square', title: 'Latin Squares', description: 'Strengthen rule deduction and symbolic reasoning.', icon: Layers },
-  ];
+  }[] = isPaper
+    ? [
+        {
+          id: 'figure_sequence',
+          title: 'Completing Patterns',
+          description: 'Train visual pattern sequence completion.',
+          icon: Sparkles
+        },
+        {
+          id: 'solving_quantitative',
+          title: 'Solving Quantitative Problems',
+          description: 'Practice mathematical word problems.',
+          icon: FileText
+        },
+        {
+          id: 'inferring_relationships',
+          title: 'Inferring Relationships',
+          description: 'Identify the logical relationship between pairs of concepts.',
+          icon: BookOpen
+        },
+        {
+          id: 'numerical_series',
+          title: 'Continuing Numerical Series',
+          description: 'Find pattern rules and continue the numerical series.',
+          icon: Clock
+        }
+      ]
+    : [
+        {
+          id: 'figure_sequence',
+          title: 'Figure Sequences',
+          description: 'Train visual pattern recognition and transformations.',
+          icon: Sparkles
+        },
+        {
+          id: 'math_equation',
+          title: 'Mathematical Equations',
+          description: 'Practice quantitative relationships and equation logic.',
+          icon: FileText
+        },
+        {
+          id: 'latin_square',
+          title: 'Latin Squares',
+          description: 'Strengthen rule deduction and symbolic reasoning.',
+          icon: Layers
+        }
+      ];
 
   if (activeModule) {
-    const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
-    subtests.push({
-      id: 'module_mcq' as const,
-      title: `${moduleLabel} Module`,
-      description: `Practice subject-specific questions for ${moduleLabel}.`,
-      icon: Laptop,
-    });
+    const activeModLower = activeModule.toLowerCase();
+    
+    if (isPaper) {
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        subtests.push(
+          {
+            id: 'interpreting_texts',
+            title: 'Understanding and Interpreting Texts',
+            description: 'Practice reading comprehension and interpreting scientific texts.',
+            icon: Laptop,
+          },
+          {
+            id: 'representation_systems',
+            title: 'Using Representation Systems Flexibly',
+            description: 'Practice diagrammatic representations and switching formats.',
+            icon: Laptop,
+          },
+          {
+            id: 'linguistic_structures',
+            title: 'Recognizing Linguistic Structures',
+            description: 'Practice identifying grammatical and rule patterns.',
+            icon: Laptop,
+          }
+        );
+      } else if (activeModLower.includes('engin')) {
+        subtests.push(
+          {
+            id: 'eng_1',
+            title: 'Formalising Technical Relationships',
+            description: 'Practice formalizing technical and physical laws.',
+            icon: Laptop,
+          },
+          {
+            id: 'eng_2',
+            title: 'Visualising Solids',
+            description: 'Practice 3D spatial visualization and projections.',
+            icon: Laptop,
+          },
+          {
+            id: 'eng_3',
+            title: 'Analysing Technical Relationships',
+            description: 'Practice analyzing physical and technical relationships.',
+            icon: Laptop,
+          }
+        );
+      } else if (activeModLower.includes('econ')) {
+        subtests.push(
+          {
+            id: 'econ_1',
+            title: 'Analyzing Economic Relationships',
+            description: 'Practice analyzing economic data and charts.',
+            icon: Laptop,
+          },
+          {
+            id: 'econ_2',
+            title: 'Analyzing Processes',
+            description: 'Practice analyzing sequence flows and economic processes.',
+            icon: Laptop,
+          }
+        );
+      }
+    } else {
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        subtests.push(
+          {
+            id: 'sc_1',
+            title: 'Analyzing Scientific Relationships',
+            description: 'Practice analyzing interrelationships between scientific concepts.',
+            icon: Laptop,
+          },
+          {
+            id: 'sc_2',
+            title: 'Understanding Formal Depictions',
+            description: 'Practice transposing information into diagrams and formal systems.',
+            icon: Laptop,
+          }
+        );
+      } else {
+        const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
+        subtests.push({
+          id: 'module_mcq' as const,
+          title: `${moduleLabel} Module`,
+          description: `Practice subject-specific questions for ${moduleLabel}.`,
+          icon: Laptop,
+        });
+      }
+    }
   }
+
+  const coreSubtests = subtests.filter((sub) =>
+    [
+      'figure_sequence',
+      'math_equation',
+      'latin_square',
+      'solving_quantitative',
+      'inferring_relationships',
+      'numerical_series',
+    ].includes(sub.id)
+  );
+
+  const moduleSubtests = subtests.filter(
+    (sub) =>
+      ![
+        'figure_sequence',
+        'math_equation',
+        'latin_square',
+        'solving_quantitative',
+        'inferring_relationships',
+        'numerical_series',
+      ].includes(sub.id)
+  );
+
+  const renderSubtestCard = (sub: typeof subtests[number]) => {
+    const Icon = sub.icon;
+    const stats = getSubtestCounts(sub.id);
+    
+    // Calculate percentages for stacked progress bar
+    const pEasy = stats.total > 0 ? (stats.easy / stats.total) * 100 : 0;
+    const pMedium = stats.total > 0 ? (stats.medium / stats.total) * 100 : 0;
+    const pHard = stats.total > 0 ? (stats.hard / stats.total) * 100 : 0;
+    const pUnclassified = stats.total > 0 ? (stats.unclassified / stats.total) * 100 : 100;
+
+    return (
+      <KniCard key={sub.id} className="flex min-h-64 flex-col p-6 bg-white">
+        <div>
+          <div className="grid size-12 place-items-center rounded-2xl bg-orange-100 text-orange-700">
+            <Icon className="size-6" />
+          </div>
+          <h3 className="mt-6 text-xl font-bold text-slate-900">{sub.title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">{sub.description}</p>
+        </div>
+
+        <div className="mt-6 flex-1 flex flex-col justify-end">
+          {/* Stats Header */}
+          <div className="flex justify-between items-center text-xs font-semibold text-slate-500 mb-2">
+            <span>Progress Breakdown</span>
+            <span>{stats.total} total questions</span>
+          </div>
+
+          {/* Stacked Progress Bar */}
+          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex mb-4 border border-slate-100 shadow-inner">
+            {stats.easy > 0 && (
+              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${pEasy}%` }} title={`Easy: ${stats.easy}`} />
+            )}
+            {stats.medium > 0 && (
+              <div className="h-full bg-amber-400 transition-all duration-300" style={{ width: `${pMedium}%` }} title={`Medium: ${stats.medium}`} />
+            )}
+            {stats.hard > 0 && (
+              <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${pHard}%` }} title={`Hard: ${stats.hard}`} />
+            )}
+            {stats.unclassified > 0 && (
+              <div className="h-full bg-slate-200 transition-all duration-300" style={{ width: `${pUnclassified}%` }} title={`Unclassified: ${stats.unclassified}`} />
+            )}
+          </div>
+
+          {/* Legend */}
+          <div className="grid grid-cols-4 gap-1 text-[10px] font-bold text-slate-650 mb-6">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
+              <span>{stats.easy} Dễ</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-amber-400 shrink-0" />
+              <span>{stats.medium} Vừa</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-rose-500 shrink-0" />
+              <span>{stats.hard} Khó</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-slate-200 shrink-0" />
+              <span className="truncate">Chưa đánh giá</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedSubtest(sub.id)}
+            className="w-full inline-flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800 transition hover:bg-orange-100 cursor-pointer"
+          >
+            Enter Practice
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </KniCard>
+    );
+  };
 
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <div className="mb-8">
+      <div className="mb-5">
         <p className="text-sm font-medium text-orange-700">Practice Center</p>
         <h2 className="mt-1 text-3xl font-bold text-slate-900">Build skills one subtest at a time</h2>
-        <p className="mt-2 text-slate-500">
+        <p className="mt-2 text-slate-500 text-sm">
           Focused practice is separate from the timed mock exam and does not use a mock-test attempt.
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {subtests.map((sub) => {
-          const Icon = sub.icon;
-          const stats = getSubtestCounts(sub.id);
-          
-          // Calculate percentages for stacked progress bar
-          const pEasy = stats.total > 0 ? (stats.easy / stats.total) * 100 : 0;
-          const pMedium = stats.total > 0 ? (stats.medium / stats.total) * 100 : 0;
-          const pHard = stats.total > 0 ? (stats.hard / stats.total) * 100 : 0;
-          const pUnclassified = stats.total > 0 ? (stats.unclassified / stats.total) * 100 : 100;
+      {/* Core Test Section */}
+      {coreSubtests.length > 0 && (
+        <div className="mb-12">
+          <div className="my-2 pb-2 border-b border-slate-100">
+            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span className="h-6 w-1 bg-orange-500 rounded-full" />
+              Core Test Subtests
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              General cognitive abilities required for all academic studies.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {coreSubtests.map(renderSubtestCard)}
+          </div>
+        </div>
+      )}
 
-          return (
-            <KniCard key={sub.id} className="flex min-h-64 flex-col p-6 bg-white">
-              <div>
-                <div className="grid size-12 place-items-center rounded-2xl bg-orange-100 text-orange-700">
-                  <Icon className="size-6" />
-                </div>
-                <h3 className="mt-6 text-xl font-bold text-slate-900">{sub.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">{sub.description}</p>
-              </div>
-
-              <div className="mt-6 flex-1 flex flex-col justify-end">
-                {/* Stats Header */}
-                <div className="flex justify-between items-center text-xs font-semibold text-slate-500 mb-2">
-                  <span>Progress Breakdown</span>
-                  <span>{stats.total} total questions</span>
-                </div>
-
-                {/* Stacked Progress Bar */}
-                <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex mb-4 border border-slate-100 shadow-inner">
-                  {stats.easy > 0 && (
-                    <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${pEasy}%` }} title={`Easy: ${stats.easy}`} />
-                  )}
-                  {stats.medium > 0 && (
-                    <div className="h-full bg-amber-400 transition-all duration-300" style={{ width: `${pMedium}%` }} title={`Medium: ${stats.medium}`} />
-                  )}
-                  {stats.hard > 0 && (
-                    <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${pHard}%` }} title={`Hard: ${stats.hard}`} />
-                  )}
-                  {stats.unclassified > 0 && (
-                    <div className="h-full bg-slate-200 transition-all duration-300" style={{ width: `${pUnclassified}%` }} title={`Unclassified: ${stats.unclassified}`} />
-                  )}
-                </div>
-
-                {/* Legend */}
-                <div className="grid grid-cols-4 gap-1 text-[10px] font-bold text-slate-650 mb-6">
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
-                    <span>{stats.easy} Dễ</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-                    <span>{stats.medium} Vừa</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-                    <span>{stats.hard} Khó</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="size-2 rounded-full bg-slate-200 shrink-0" />
-                    <span className="truncate">Chưa đánh giá</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedSubtest(sub.id)}
-                  className="w-full inline-flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800 transition hover:bg-orange-100 cursor-pointer"
-                >
-                  Enter Practice
-                  <ChevronRight className="size-4" />
-                </button>
-              </div>
-            </KniCard>
-          );
-        })}
-      </div>
+      {/* Subject-Specific Module Focus Section */}
+      {moduleSubtests.length > 0 && (
+        <div>
+          <div className="mb-5 pb-2 border-b border-slate-100">
+            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+              <span className="h-6 w-1 bg-orange-500 rounded-full" />
+              Subject-Specific Module Focus
+            </h3>
+            <p className="text-sm text-slate-500 mt-1">
+              Practice for the {activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & Computer Science' : activeModule) : 'chosen'} module.
+            </p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {moduleSubtests.map(renderSubtestCard)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

@@ -85,7 +85,7 @@ export function useDashboardData(session: Session) {
         try {
           const { data: examsData } = await supabase
             .from('user_exams')
-            .select('*')
+            .select('*, exams(title, description, major)')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false });
 
@@ -107,6 +107,9 @@ export function useDashboardData(session: Session) {
           if (examsData) {
             setExams(examsData as Exam[]);
             setExamLimit(fetchedRole === 'admin' ? null : fetchedLimit);
+            if (examsData.length > 0) {
+              setSelectedExam(examsData[0] as Exam);
+            }
           } else {
             setExams([]);
             setExamLimit(null);
@@ -168,7 +171,13 @@ export function useDashboardData(session: Session) {
       }
 
       // Fetch question IDs for all core-test sections in one query
-      const coreSection = dbSections.filter(s => s.question_type !== 'module_mcq');
+      const coreSection = dbSections.filter(
+        (s) =>
+          s.question_type !== 'module_mcq' &&
+          s.question_type !== 'interpreting_texts' &&
+          s.question_type !== 'representation_systems' &&
+          s.question_type !== 'linguistic_structures'
+      );
       const coreSectionIds = coreSection.map(s => s.id);
 
       const { data: dbQuestions, error: questionsError } = await supabase
@@ -198,45 +207,76 @@ export function useDashboardData(session: Session) {
         questionIds: questionIdsBySectionId[s.id] || [],
       }));
 
-      // Fetch passages for the module_mcq section that matches the user's selected module
-      const targetModuleTitle = MODULE_TEST_LABELS[activeModule || ''];
-      const moduleSection = dbSections.find(
-        (s) => s.question_type === 'module_mcq' && s.title === targetModuleTitle
-      );
-      let moduleSectionObj = null;
+      // Fetch passages for module sections that match the user's selected module
+      const matchedModuleSections = dbSections.filter((s) => {
+        if (!activeModule) return false;
+        const normalizedModule = activeModule.toLowerCase();
 
-      if (moduleSection) {
+        if (EXAM_ID === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
+          // Main Mock Test matching (match by exact title)
+          const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
+          return (
+            (s.question_type === 'module_mcq' ||
+              s.question_type === 'interpreting_texts' ||
+              s.question_type === 'representation_systems' ||
+              s.question_type === 'linguistic_structures') &&
+            s.title === targetModuleTitle
+          );
+        } else {
+          // Practice Bank or other exams: match based on subtest-to-module mappings
+          const type = s.question_type;
+          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+            return type === 'representation_systems';
+          }
+          if (normalizedModule.includes('engin')) {
+            return type === 'representation_systems';
+          }
+          if (normalizedModule.includes('econ')) {
+            return type === 'interpreting_texts';
+          }
+          if (normalizedModule.includes('humanities')) {
+            return type === 'interpreting_texts' || type === 'linguistic_structures';
+          }
+          return false;
+        }
+      });
+
+      const moduleSectionObjs = [];
+      for (const mSec of matchedModuleSections) {
         const { data: dbPassages, error: passagesError } = await supabase
           .from('passages')
           .select('id')
-          .eq('section_id', moduleSection.id)
+          .eq('section_id', mSec.id)
           .order('sort_order', { ascending: true });
 
         if (!passagesError && dbPassages) {
-          moduleSectionObj = {
-            id: moduleSection.id,
-            title: `Module: ${MODULE_TEST_LABELS[activeModule || ''] || moduleSection.title}`,
-            questionType: moduleSection.question_type,
-            durationSeconds: moduleSection.duration_seconds,
-            questionCount: moduleSection.question_count, // Number of passages displayed on top
-            questionIds: dbPassages.map(p => p.id), // Array of passage_ids
-          };
+          moduleSectionObjs.push({
+            id: mSec.id,
+            title: `Module: ${mSec.title}`,
+            questionType: mSec.question_type,
+            durationSeconds: mSec.duration_seconds,
+            questionCount: mSec.question_count,
+            questionIds: dbPassages.map((p) => p.id),
+          });
         }
       }
 
-      const allSections = moduleSectionObj
-        ? [...coreSections, moduleSectionObj]
-        : coreSections;
+      const allSections = [...coreSections, ...moduleSectionObjs];
 
-      const flowSteps = [
-        { type: 'section' as const, sectionIndex: 0 },
-        { type: 'break' as const, breakDuration: BREAK_DURATIONS.SHORT },
-        { type: 'section' as const, sectionIndex: 1 },
-        { type: 'break' as const, breakDuration: BREAK_DURATIONS.SHORT },
-        { type: 'section' as const, sectionIndex: 2 },
-        { type: 'break' as const, breakDuration: BREAK_DURATIONS.LONG },
-        { type: 'section' as const, sectionIndex: 3 },
-      ];
+      const flowSteps = [];
+      for (let i = 0; i < allSections.length; i++) {
+        flowSteps.push({ type: 'section' as const, sectionIndex: i });
+        if (i < allSections.length - 1) {
+          const currentIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i].questionType);
+          const nextIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i + 1].questionType);
+
+          const breakDuration = (!currentIsModule && nextIsModule)
+            ? BREAK_DURATIONS.LONG
+            : BREAK_DURATIONS.SHORT;
+
+          flowSteps.push({ type: 'break' as const, breakDuration });
+        }
+      }
 
       // Initialize a real exam session in user_exams
       const { data: userExam, error: userExamError } = await supabase
@@ -373,56 +413,163 @@ export function useDashboardData(session: Session) {
   };
 
   const computeRadarStats = () => {
-    const categories: Record<string, { correct: number; total: number }> = {
-      figure_sequence: { correct: 0, total: 0 },
-      math_equation: { correct: 0, total: 0 },
-      latin_square: { correct: 0, total: 0 },
-      module_mcq: { correct: 0, total: 0 },
+    const isPaper = profile?.format === 'Paper';
+    const activeMod = activeModule || profile?.module_test || '';
+    const activeModLower = activeMod.toLowerCase();
+
+    // 1. Define categories based on format and active module
+    const categories: Record<string, { correct: number; total: number; label: string; matchKeywords: string[] }> = {};
+
+    if (isPaper) {
+      // Core Paper subtests
+      categories['solving_quantitative'] = { correct: 0, total: 0, label: 'Solving Quantitative Problems', matchKeywords: ['solving quantitative problems', 'solving quantitative', 'math equations', 'math equation'] };
+      categories['inferring_relationships'] = { correct: 0, total: 0, label: 'Inferring Relationships', matchKeywords: ['inferring relationships', 'inferring relation', 'latin squares', 'latin square'] };
+      categories['completing_patterns'] = { correct: 0, total: 0, label: 'Completing Patterns', matchKeywords: ['completing patterns', 'completing pattern', 'figure sequences', 'figure sequence'] };
+      categories['numerical_series'] = { correct: 0, total: 0, label: 'Continuing Numerical Series', matchKeywords: ['continuing numerical series', 'numerical series'] };
+
+      // Subject Module Paper subtests
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        categories['sc_1'] = { correct: 0, total: 0, label: 'Analysing Scientific Relationships', matchKeywords: ['analysing scientific relationships', 'scientific relationships', 'quantitative problems', 'quantitative problem'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
+      } else if (activeModLower.includes('econ')) {
+        categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
+        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+      } else if (activeModLower.includes('eng')) {
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalising Technical Relationships', matchKeywords: ['formalising technical relationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_2'] = { correct: 0, total: 0, label: 'Visualising Solids', matchKeywords: ['visualising solids', 'solids', 'solid'] };
+        categories['eng_3'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
+      } else {
+        // Fallback generic subject module
+        categories['module_mcq'] = { correct: 0, total: 0, label: 'Subject Module', matchKeywords: ['module', 'subject'] };
+      }
+    } else {
+      // Core Digital subtests
+      categories['figure_sequence'] = { correct: 0, total: 0, label: 'Figure Sequences', matchKeywords: ['figure sequences', 'figure sequence', 'figural sequence', 'completing patterns', 'completing pattern'] };
+      categories['math_equation'] = { correct: 0, total: 0, label: 'Math Equations', matchKeywords: ['math equations', 'math equation', 'mathematical equation', 'solving quantitative problems', 'solving quantitative'] };
+      categories['latin_square'] = { correct: 0, total: 0, label: 'Latin Squares', matchKeywords: ['latin squares', 'latin square', 'inferring relationships', 'inferring relation'] };
+
+      // Subject Module Digital subtests
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        categories['quantitative'] = { correct: 0, total: 0, label: 'Quantitative Problems', matchKeywords: ['quantitative problems', 'quantitative problem', 'analysing scientific relationships', 'scientific relationships'] };
+        categories['text'] = { correct: 0, total: 0, label: 'Text Completion', matchKeywords: ['text completion', 'text completions', 'understanding formal depictions', 'formal depictions'] };
+      } else if (activeModLower.includes('econ')) {
+        categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
+        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+      } else if (activeModLower.includes('eng')) {
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalising Technical Relationships', matchKeywords: ['formalising technical relationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_2'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
+      } else {
+        // Fallback generic subject module
+        categories['module_mcq'] = { correct: 0, total: 0, label: 'Subject Module', matchKeywords: ['module', 'subject'] };
+      }
+    }
+
+    // Helper to safely extract score from detailed section data
+    const getScore = (sectionData: any, sectionTitle: string): number => {
+      if (!sectionData) return 0;
+      if (Array.isArray(sectionData)) {
+        // Legacy array of answers: count the correct ones
+        return sectionData.filter((ans: any) => ans && (ans.is_correct === true || ans.correct === true)).length;
+      }
+      if (typeof sectionData !== 'object') return 0;
+      
+      const s = sectionData.score;
+      if (typeof s === 'number') return s;
+      if (typeof s === 'string') {
+        const p = parseInt(s, 10);
+        return isNaN(p) ? 0 : p;
+      }
+      if (typeof s === 'object' && s !== null) {
+        // Nested detailedAnswersByTitle object due to some legacy bug
+        if (s[sectionTitle] && typeof s[sectionTitle].score === 'number') {
+          return s[sectionTitle].score;
+        }
+        const titleLower = sectionTitle.toLowerCase();
+        const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
+        if (matchedKey && s[matchedKey] && typeof s[matchedKey].score === 'number') {
+          return s[matchedKey].score;
+        }
+      }
+      return 0;
     };
 
+    // Helper to safely extract max_score from detailed section data
+    const getMaxScore = (sectionData: any, sectionTitle: string): number => {
+      if (!sectionData) return 0;
+      if (Array.isArray(sectionData)) {
+        // Legacy array of answers: length of the array
+        return sectionData.length;
+      }
+      if (typeof sectionData !== 'object') return 0;
+      
+      const ms = sectionData.max_score;
+      if (typeof ms === 'number') return ms;
+      if (typeof ms === 'string') {
+        const p = parseInt(ms, 10);
+        return isNaN(p) ? 0 : p;
+      }
+      if (typeof sectionData.score === 'object' && sectionData.score !== null) {
+        // Nested detailedAnswersByTitle object
+        const s = sectionData.score;
+        if (s[sectionTitle] && typeof s[sectionTitle].max_score === 'number') {
+          return s[sectionTitle].max_score;
+        }
+        const titleLower = sectionTitle.toLowerCase();
+        const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
+        if (matchedKey && s[matchedKey] && typeof s[matchedKey].max_score === 'number') {
+          return s[matchedKey].max_score;
+        }
+      }
+      return 0;
+    };
+
+    // 2. Populate stats from past exams
     pastExams.forEach((attempt) => {
       const detailed = attempt.detailed_results;
       if (!detailed || typeof detailed !== 'object') return;
 
       Object.entries(detailed).forEach(([sectionTitle, sectionData]: [string, any]) => {
-        if (!sectionData || typeof sectionData !== 'object') return;
+        if (!sectionData) return;
 
-        let type = sectionData.type;
-        if (!type) {
-          const titleLower = sectionTitle.toLowerCase();
-          if (titleLower.includes('figure')) {
-            type = 'figure_sequence';
-          } else if (titleLower.includes('equation') || titleLower.includes('math')) {
-            type = 'math_equation';
-          } else if (titleLower.includes('latin') || titleLower.includes('square')) {
-            type = 'latin_square';
-          } else if (titleLower.includes('module') || titleLower.includes('computer') || titleLower.includes('economics') || titleLower.includes('engineering')) {
-            type = 'module_mcq';
+        const titleLower = sectionTitle.toLowerCase();
+        
+        // Find which category matches this section title
+        const matchedEntry = Object.entries(categories).find(([key, cat]) => {
+          return cat.matchKeywords.some(keyword => titleLower.includes(keyword));
+        });
+
+        if (matchedEntry) {
+          const key = matchedEntry[0];
+          categories[key].correct += getScore(sectionData, sectionTitle);
+          categories[key].total += getMaxScore(sectionData, sectionTitle);
+        } else {
+          // Fallback matching by type
+          let type = typeof sectionData === 'object' && sectionData !== null && !Array.isArray(sectionData) ? sectionData.type : undefined;
+          if (type) {
+            if (isPaper) {
+              if (type === 'figure_sequence') type = 'completing_patterns';
+              else if (type === 'math_equation') type = 'solving_quantitative';
+              else if (type === 'latin_square') type = 'inferring_relationships';
+            } else {
+              if (type === 'completing_patterns') type = 'figure_sequence';
+              else if (type === 'solving_quantitative') type = 'math_equation';
+              else if (type === 'inferring_relationships') type = 'latin_square';
+            }
+            if (categories[type]) {
+              categories[type].correct += getScore(sectionData, sectionTitle);
+              categories[type].total += getMaxScore(sectionData, sectionTitle);
+            }
           }
-        }
-
-        if (type && categories[type]) {
-          categories[type].correct += sectionData.score || 0;
-          categories[type].total += sectionData.max_score || 0;
         }
       });
     });
 
+    // 3. Return array of stats
     return Object.entries(categories).map(([key, data]) => {
-      const label =
-        key === 'figure_sequence'
-          ? 'Figure Sequences'
-          : key === 'math_equation'
-          ? 'Math Equations'
-          : key === 'latin_square'
-          ? 'Latin Squares'
-          : 'Subject Module';
-
       const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
-
       return {
         key,
-        label,
+        label: data.label,
         correct: data.correct,
         total: data.total,
         percentage: pct,

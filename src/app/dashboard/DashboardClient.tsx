@@ -15,18 +15,24 @@ import {
 import { DashboardView as DashboardOverview } from '@/components/dashboard/DashboardView';
 import { PracticeView } from '@/components/dashboard/PracticeView';
 import { MockTestView } from '@/components/dashboard/MockTestView';
+import { ReviewView } from '@/components/dashboard/ReviewView';
 
 export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
   const [activeView, setActiveView] = useState<DashboardView>('dashboard');
+  const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<any | null>(null);
 
-  // Reset briefing checklist and selected exam when leaving mock view
+  // Reset briefing checklist and select the active exam when leaving mock view
   useEffect(() => {
     if (activeView !== 'mock') {
       data.setBriefingChecklist([]);
-      data.setSelectedExam(null);
+      if (data.exams.length > 0) {
+        data.setSelectedExam(data.exams[0]);
+      } else {
+        data.setSelectedExam(null);
+      }
     }
-  }, [activeView]);
+  }, [activeView, data.exams]);
 
   // --------------- Gate screens ---------------
 
@@ -114,6 +120,10 @@ export default function DashboardClient({ session }: { session: Session }) {
           examLimit={data.examLimit}
           onViewChange={setActiveView}
           radarStats={data.computeRadarStats()}
+          onReviewAttempt={(attempt) => {
+            setSelectedAttemptForReview(attempt);
+            setActiveView('review');
+          }}
         />
       )}
 
@@ -142,6 +152,19 @@ export default function DashboardClient({ session }: { session: Session }) {
           onSelectExam={data.setSelectedExam}
           getExamAttemptInfo={data.getExamAttemptInfo}
           radarStats={data.computeRadarStats()}
+          onViewChange={setActiveView}
+        />
+      )}
+
+      {activeView === 'review' && selectedAttemptForReview && (
+        <ReviewView
+          profile={profile}
+          attempt={selectedAttemptForReview}
+          pastExams={data.pastExams}
+          onBack={() => {
+            setSelectedAttemptForReview(null);
+            setActiveView('dashboard');
+          }}
         />
       )}
 

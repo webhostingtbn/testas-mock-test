@@ -13,8 +13,12 @@ import FigureSequence from '@/components/question-types/FigureSequence';
 import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
+import ModuleQuestion from '@/components/question-types/ModuleQuestion';
+import NumericalSeries from '@/components/question-types/NumericalSeries';
 import { getMockQuestions } from '@/lib/mock-data';
 import RatingWidget from '@/components/exam/RatingWidget';
+import SecurityOverlay from '@/components/exam/SecurityOverlay';
+import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 
 const STORAGE_BUCKET = 'ExamDataset';
 
@@ -48,8 +52,39 @@ export default function ExamPage() {
   } = useExamStore();
 
   const [userId, setUserId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ email: string; fullName: string | null } | null>(null);
 
   useEffect(() => {
+    async function fetchProfile() {
+      const email = session?.user?.email;
+      if (!email) return;
+      
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('email', email)
+          .maybeSingle();
+        if (data) {
+          setUserProfile({
+            email: data.email,
+            fullName: data.full_name,
+          });
+        } else {
+          setUserProfile({
+            email: email,
+            fullName: session?.user?.name || null,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch user profile for watermark:', err);
+        setUserProfile({
+          email: email,
+          fullName: session?.user?.name || null,
+        });
+      }
+    }
+    
     async function resolveUserId() {
       if (session?.user?.id) {
         setUserId(session.user.id);
@@ -70,7 +105,11 @@ export default function ExamPage() {
         }
       }
     }
-    resolveUserId();
+
+    if (session) {
+      fetchProfile();
+      resolveUserId();
+    }
   }, [session, supabase]);
 
   // Wait for zustand hydration
@@ -109,7 +148,12 @@ export default function ExamPage() {
   const fetchQuestionsForSection = useCallback(async (section: typeof sections[0]) => {
     setIsLoadingQuestions(true);
     try {
-      if (section.questionType === 'module_mcq') {
+      if (
+        section.questionType === 'module_mcq' ||
+        section.questionType === 'interpreting_texts' ||
+        section.questionType === 'representation_systems' ||
+        section.questionType === 'linguistic_structures'
+      ) {
         const { data: passagesData, error: pError } = await supabase
           .from('passages')
           .select('*')
@@ -371,11 +415,31 @@ export default function ExamPage() {
           />
         );
       case 'module_mcq':
+      case 'interpreting_texts':
+      case 'representation_systems':
+      case 'linguistic_structures':
         return (
           <ModuleMCQ
             passage={q}
             selectedAnswers={answers[section.id] as Record<string, string> || {}}
             onAnswer={(questionId, val) => setAnswer(section.id, questionId, val)}
+          />
+        );
+      case 'solving_quantitative':
+      case 'inferring_relationships':
+        return (
+          <ModuleQuestion
+            question={q}
+            selectedAnswer={currentAnswer as string | null}
+            onAnswer={(optionId) => handleAnswer(optionId)}
+          />
+        );
+      case 'numerical_series':
+        return (
+          <NumericalSeries
+            question={q}
+            selectedAnswer={currentAnswer as string | null}
+            onAnswer={(val) => handleAnswer(val)}
           />
         );
       default:
@@ -405,6 +469,13 @@ export default function ExamPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-50 text-slate-800 overflow-hidden" style={{ fontSize: `${fontSize}px` }}>
+      <SecurityOverlay />
+      {userProfile && (
+        <WatermarkOverlay 
+          email={userProfile.email} 
+          fullName={userProfile.fullName} 
+        />
+      )}
       <ExamTopBar
         sectionTitle={section.title}
         totalQuestions={sectionQuestions.length}

@@ -39,6 +39,7 @@ interface MockTestViewProps {
     total: number;
     percentage: number;
   }[];
+  onViewChange: (view: any) => void;
 }
 
 export function MockTestView({
@@ -58,9 +59,10 @@ export function MockTestView({
   onSelectExam,
   getExamAttemptInfo,
   radarStats,
+  onViewChange,
 }: MockTestViewProps) {
   
-  // View 1: If no exam is selected for briefing, show mock exams list in full width
+  // View 1: If no exam is selected for briefing (meaning no active exams are configured)
   if (!selectedExam) {
     return (
       <div className="mx-auto w-full max-w-7xl">
@@ -68,72 +70,22 @@ export function MockTestView({
           <p className="text-sm font-medium text-orange-700">Mock Test Center</p>
           <h2 className="mt-1 text-3xl font-bold text-slate-900">Simulate the real exam</h2>
           <p className="mt-2 text-slate-500 max-w-2xl">
-            Test your skills under real-time constraints. Unanswered or incorrect answers automatically move to Practice mode as Hard.
+            Test your skills under real-time constraints.
           </p>
         </div>
 
-        {/* Exams List Card (Full Width) */}
-        <KniCard className="p-6 bg-white/80 backdrop-blur-md">
-          <h3 className="text-xl font-bold text-slate-900 mb-1">Available Mock Exams</h3>
-          <p className="text-sm text-slate-500 mb-6">Select a mock test below to review prerequisites and start.</p>
-          
-          <div className="space-y-4">
-            {exams.map((exam) => {
-              const info = getExamAttemptInfo(exam);
-              return (
-                <div 
-                  key={exam.id} 
-                  className="p-5 rounded-xl border border-orange-100/75 hover:border-orange-200 transition bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xs"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                      <h4 className="text-base font-bold text-slate-900 truncate">{exam.title}</h4>
-                      <span className="text-[10px] uppercase font-bold tracking-wider rounded-md px-1.5 py-0.5 border bg-slate-50 text-slate-600 border-slate-200">
-                        {exam.major ? MODULE_TEST_LABELS[exam.major] : "Core Test"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-3">
-                      {exam.description || "Simulated mock exam for TestAS preparation."}
-                    </p>
-                    
-                    <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                      <span>
-                        Attempts: <strong className="text-slate-800">{info.attemptCount}</strong>{info.limit !== null ? ` / ${info.limit}` : " (unlimited)"}
-                      </span>
-                      {info.attemptCount > 0 && (
-                        <span>
-                          Best Score: <strong className="text-emerald-600">{info.bestPercentage}%</strong>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Progress bar of best attempt */}
-                    {info.attemptCount > 0 && (
-                      <div className="mt-2.5 w-full max-w-[280px] flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${info.bestPercentage}%` }} />
-                        </div>
-                        <span className="text-[10px] font-bold text-emerald-600 shrink-0">{info.bestPercentage}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <KniButton
-                    disabled={info.limitReached}
-                    onClick={() => onSelectExam(exam)}
-                    className="shrink-0 h-10 px-5 text-sm font-semibold rounded-xl bg-orange-600 text-white hover:bg-orange-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-                  >
-                    {info.limitReached ? "Retakes Exhausted" : "Prepare Exam"}
-                  </KniButton>
-                </div>
-              );
-            })}
-            {exams.length === 0 && (
-              <div className="py-12 text-center text-slate-400 text-sm">
-                No active exams available at the moment.
-              </div>
-            )}
-          </div>
+        <KniCard className="p-8 border border-dashed border-orange-100/50 flex flex-col items-center justify-center text-center bg-orange-50/10 rounded-2xl py-16">
+          <Timer className="size-10 text-orange-300 mb-3" />
+          <h4 className="text-base font-bold text-slate-800">No active mock exams available</h4>
+          <p className="text-xs text-slate-500 mt-1.5 max-w-sm leading-relaxed">
+            There is currently no active mock test configured in the system. Please check back later or contact an administrator.
+          </p>
+          <KniButton
+            onClick={() => onViewChange('dashboard')}
+            className="mt-5 h-9 px-4 text-xs font-semibold"
+          >
+            Go Back to Dashboard
+          </KniButton>
         </KniCard>
       </div>
     );
@@ -144,13 +96,13 @@ export function MockTestView({
   const isAttemptLimitReached = selectedAttemptInfo.limitReached;
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full">
       <button 
-        onClick={() => onSelectExam(null)} 
+        onClick={() => onViewChange('dashboard')} 
         className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-semibold mb-6 cursor-pointer transition"
       >
         <ChevronLeft className="size-4" />
-        Back to Mock Exams
+        Back to Dashboard
       </button>
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">

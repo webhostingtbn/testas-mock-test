@@ -32,7 +32,7 @@ export function KniCard({
       <div
         onClick={onClick}
         className={cn(
-          'rounded-2xl border border-white/10 bg-slate-900/70 shadow-xl shadow-slate-950/80 backdrop-blur-sm',
+          'rounded-2xl border border-white/10 bg-slate-900/70 backdrop-blur-sm',
           onClick && 'cursor-pointer hover:bg-slate-900/90 transition-all duration-300',
           className
         )}
@@ -46,7 +46,7 @@ export function KniCard({
     <div
       onClick={onClick}
       className={cn(
-        'rounded-2xl border border-orange-100/60 bg-white/80 shadow-xl shadow-slate-200/60 backdrop-blur-sm',
+        'rounded-2xl border border-orange-100/60 bg-white/80 backdrop-blur-sm',
         'transition-all duration-300 hover:border-orange-200 hover:bg-white/90',
         onClick && 'cursor-pointer',
         className
@@ -143,7 +143,7 @@ export function KniProgress({
 }
 
 // --- View type ---
-export type DashboardView = 'dashboard' | 'practice' | 'mock' | 'users' | 'cms';
+export type DashboardView = 'dashboard' | 'practice' | 'mock' | 'users' | 'cms' | 'review';
 
 type AppNavItem = {
   id: DashboardView;

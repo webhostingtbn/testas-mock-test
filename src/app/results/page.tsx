@@ -78,15 +78,15 @@ export default function ResultsPage() {
         // 1. Fetch true questions from DB
         const { data: questionsData, error } = await supabase
           .from("questions")
-          .select("id, section_id, correct_answer")
+          .select("id, section_id, correct_answer, question_type")
           .in("section_id", sectionIds);
 
         if (error) throw error;
 
-        // 2. Build map of correct answers
-        const correctAnswersMap = (questionsData || []).reduce(
-          (acc: Record<string, any>, q) => {
-            acc[q.id] = q.correct_answer;
+        // 2. Build map of correct answers and types
+        const questionsMap = (questionsData || []).reduce(
+          (acc: Record<string, { correct: any; type: string }>, q) => {
+            acc[q.id] = { correct: q.correct_answer, type: q.question_type };
             return acc;
           },
           {}
@@ -108,7 +108,9 @@ export default function ResultsPage() {
           // Check each real question in the section
           actualQuestionIds.forEach((qId) => {
             const ans = sectionAnswers[qId];
-            const correctAns = correctAnswersMap[qId];
+            const qInfo = questionsMap[qId];
+            const correctAns = qInfo?.correct;
+            const qType = qInfo?.type;
 
             if (ans !== null && ans !== undefined) {
               answeredCount++;
@@ -119,7 +121,17 @@ export default function ResultsPage() {
               ans !== undefined &&
               correctAns !== undefined
             ) {
-              if (isDeepEqual(formatAns(ans), formatAns(correctAns))) {
+              let isCorrect = false;
+              if (qType === 'numerical_series') {
+                const getDistinctCharsSorted = (str: string) => {
+                  return Array.from(new Set(String(str).replace(/\s+/g, '').split(''))).sort().join('');
+                };
+                isCorrect = getDistinctCharsSorted(String(ans)) === getDistinctCharsSorted(String(correctAns));
+              } else {
+                isCorrect = isDeepEqual(formatAns(ans), formatAns(correctAns));
+              }
+
+              if (isCorrect) {
                 correctCount++;
               }
             }
@@ -184,14 +196,25 @@ export default function ResultsPage() {
           const formattedAnswers = result.actualQuestionIds.map(
             (qId: string) => {
               const ans = sectionAnswers[qId];
-              const correctAns = correctAnswersMap[qId];
+              const qInfo = questionsMap[qId];
+              const correctAns = qInfo?.correct;
+              const qType = qInfo?.type;
               const formattedUserAns = formatAns(ans);
               const formattedCorrectAns = formatAns(correctAns);
-              const isCorrect =
-                ans !== null &&
-                ans !== undefined &&
-                correctAns !== undefined &&
-                isDeepEqual(formattedUserAns, formattedCorrectAns);
+              
+              let isCorrect = false;
+              if (qType === 'numerical_series') {
+                const getDistinctCharsSorted = (str: string) => {
+                  return Array.from(new Set(String(str).replace(/\s+/g, '').split(''))).sort().join('');
+                };
+                isCorrect = getDistinctCharsSorted(String(ans)) === getDistinctCharsSorted(String(correctAns));
+              } else {
+                isCorrect =
+                  ans !== null &&
+                  ans !== undefined &&
+                  correctAns !== undefined &&
+                  isDeepEqual(formattedUserAns, formattedCorrectAns);
+              }
 
               if (!isCorrect) {
                 incorrectOrUnansweredQuestionIds.push(qId);

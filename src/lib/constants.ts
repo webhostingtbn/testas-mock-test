@@ -70,6 +70,12 @@ export const SECTION_TYPE_LABELS: Record<string, string> = {
   math_equation: 'Mathematical Equations',
   latin_square: 'Latin Squares',
   module_mcq: 'Module Test',
+  solving_quantitative: 'Solving Quantitative Problems',
+  inferring_relationships: 'Inferring Relationships',
+  numerical_series: 'Continuing Numerical Series',
+  interpreting_texts: 'Understanding and Interpreting Texts',
+  representation_systems: 'Using Representation Systems Flexibly',
+  linguistic_structures: 'Recognizing Linguistic Structures',
 } as const;
 
 /** Font size options */
