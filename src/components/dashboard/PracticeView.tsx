@@ -556,12 +556,6 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             icon: Laptop,
           },
           {
-            id: 'econ_2',
-            title: 'Analyzing Processes',
-            description: 'Practice analyzing sequence flows and economic processes.',
-            icon: Laptop,
-          },
-          {
             id: 'sc_2',
             title: 'Understanding Formal Depictions',
             description: 'Practice transposing information into diagrams and formal systems.',
