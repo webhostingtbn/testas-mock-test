@@ -12,6 +12,7 @@ import { ZoomableImage } from './ZoomableImage';
 
 export interface ModuleQuestion {
   id: string;
+  sort_order?: number;
   content: {
     question_text: string;
     options: Record<string, string>;
@@ -146,10 +147,10 @@ export default function ModuleMCQ({
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
-                    {index + 1}
+                    {question.sort_order ?? (index + 1)}
                   </div>
                   <span className="font-medium text-gray-800 text-sm">
-                    Question {index + 1}
+                    Question {question.sort_order ?? (index + 1)}
                   </span>
                   {isAnswered && (
                     <span className="text-[10px] bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full font-medium ml-2">

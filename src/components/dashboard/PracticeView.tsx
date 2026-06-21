@@ -272,25 +272,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             };
           });
 
-        const filteredPassages = formattedPassages.filter((passage: any) => {
-          if (passage.questions.length === 0) return false;
-          const firstQId = passage.questions[0].id;
-          const rating = userRatings[firstQId];
-
-          if (folder === 'unclassified') {
-            return !rating;
-          }
-          return rating === folder;
-        });
-
-        const filteredStandalones = standaloneQuestions.filter((q) => {
-          const rating = userRatings[q.id];
-          if (folder === 'unclassified') return !rating;
-          return rating === folder;
-        });
-
         const hasStandalones = standaloneQuestions.length > 0;
-        const combined = [...filteredPassages, ...filteredStandalones].sort((a, b) => {
+        const allCombined = [...formattedPassages, ...standaloneQuestions].sort((a, b) => {
           const aOrder = a.isPassage
             ? (hasStandalones && a.questions.length > 0 ? a.questions[0].sort_order : a.sort_order)
             : a.sort_order;
@@ -299,6 +282,27 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             : b.sort_order;
           return aOrder - bOrder;
         });
+
+        const allCombinedWithNumbers = allCombined.map((item, index) => ({
+          ...item,
+          display_number: index + 1,
+          total_subtest_questions: allCombined.length,
+        }));
+
+        const combined = allCombinedWithNumbers.filter((item: any) => {
+          if (item.isPassage) {
+            if (item.questions.length === 0) return false;
+            const firstQId = item.questions[0].id;
+            const rating = userRatings[firstQId];
+            if (folder === 'unclassified') return !rating;
+            return rating === folder;
+          } else {
+            const rating = userRatings[item.id];
+            if (folder === 'unclassified') return !rating;
+            return rating === folder;
+          }
+        });
+
         setPracticeQuestions(combined);
       } else {
         if (targetIds.length === 0) {

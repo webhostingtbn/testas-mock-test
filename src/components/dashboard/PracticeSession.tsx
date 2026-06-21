@@ -336,7 +336,7 @@ export default function PracticeSession({
           <div className="flex items-center justify-between sm:justify-end gap-4">
             {/* Progress Badge */}
             <div className="text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-100 px-3 py-1.5 rounded-lg">
-              Question <span className="font-bold text-slate-800">{currentIndex + 1}</span> of <span className="font-bold text-slate-800">{questions.length}</span>
+              Question <span className="font-bold text-slate-800">{currentQuestion.display_number ?? (currentIndex + 1)}</span> of <span className="font-bold text-slate-800">{currentQuestion.total_subtest_questions ?? questions.length}</span>
             </div>
 
             {/* Timer Badge */}
@@ -399,7 +399,7 @@ export default function PracticeSession({
                     title={!isActive && !isCurrentRated ? "Rate the current question first to proceed" : undefined}
                     className={`w-9 h-9 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer ${btnClass}`}
                   >
-                    {idx + 1}
+                    {q.display_number ?? (idx + 1)}
                   </button>
                 );
               })}
