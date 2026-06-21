@@ -44,6 +44,7 @@ export interface Exam {
   title: string;
   description: string | null;
   major: MajorType | null;
+  format?: 'Digital' | 'Paper' | null;
   is_active: boolean;
   retry_number?: number | null;
   created_at: string;

@@ -42,6 +42,7 @@ export function useDashboardData(session: Session) {
     async function loadProfile() {
       let fetchedRole = 'user';
       let fetchedLimit = 1;
+      let userFormat = 'Digital';
 
       try {
         if (!session?.user?.email) {
@@ -70,6 +71,7 @@ export function useDashboardData(session: Session) {
 
           fetchedRole = realProfile.role || 'user';
           fetchedLimit = realProfile.allow_test_limit ?? 1;
+          userFormat = realProfile.format || 'Digital';
 
           setProfile(realProfile as Profile);
 
@@ -85,7 +87,7 @@ export function useDashboardData(session: Session) {
         try {
           const { data: examsData } = await supabase
             .from('user_exams')
-            .select('*, exams(title, description, major)')
+            .select('*, exams(title, description, major, format)')
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false });
 
@@ -102,6 +104,7 @@ export function useDashboardData(session: Session) {
             .from('exams')
             .select('*')
             .eq('is_active', true)
+            .eq('format', userFormat)
             .order('created_at', { ascending: true });
 
           if (examsData) {
@@ -412,8 +415,9 @@ export function useDashboardData(session: Session) {
     };
   };
 
-  const computeRadarStats = () => {
-    const isPaper = profile?.format === 'Paper';
+  const computeRadarStats = (formatOverride?: 'Digital' | 'Paper') => {
+    const selectedFormat = formatOverride || profile?.format || 'Digital';
+    const isPaper = selectedFormat === 'Paper';
     const activeMod = activeModule || profile?.module_test || '';
     const activeModLower = activeMod.toLowerCase();
 
@@ -525,6 +529,9 @@ export function useDashboardData(session: Session) {
 
     // 2. Populate stats from past exams
     pastExams.forEach((attempt) => {
+      const examFormat = attempt.exams?.format || 'Digital';
+      if (examFormat !== selectedFormat) return;
+
       const detailed = attempt.detailed_results;
       if (!detailed || typeof detailed !== 'object') return;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from 'react';
 import {
   CircleUserRound, Target, CheckCircle2, ShieldCheck, BookOpen, Timer
 } from 'lucide-react';
@@ -21,9 +22,26 @@ interface DashboardViewProps {
     total: number;
     percentage: number;
   }[];
+  activeFormatTab: 'Digital' | 'Paper';
+  onFormatTabChange: (tab: 'Digital' | 'Paper') => void;
 }
 
-export function DashboardView({ profile, activeModule, pastExams, examLimit, onViewChange, radarStats, onReviewAttempt }: DashboardViewProps) {
+export function DashboardView({
+  profile,
+  activeModule,
+  pastExams,
+  examLimit,
+  onViewChange,
+  radarStats,
+  onReviewAttempt,
+  activeFormatTab,
+  onFormatTabChange,
+}: DashboardViewProps) {
+  const filteredPastExams = pastExams.filter((attempt) => {
+    const examFormat = attempt.exams?.format || 'Digital';
+    return examFormat === activeFormatTab;
+  });
+
   const cx = 200;
   const cy = 150;
   const maxRadius = 82;
@@ -117,12 +135,38 @@ export function DashboardView({ profile, activeModule, pastExams, examLimit, onV
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_0.75fr] lg:flex-grow lg:min-h-0 items-stretch">
         {/* Left Column: Recent Mock Tests list of individual cards */}
         <div className="flex flex-col lg:h-full lg:min-h-0 justify-start">
-          <div className="flex items-center justify-between mb-2 shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 mb-2.5 shrink-0">
             <div>
               <h3 className="text-base font-bold text-slate-900">Recent Mock Tests</h3>
               <p className="text-[11px] text-slate-500 mt-0.5">Your exam attempts and performance history</p>
+              
+              {/* Format Switcher Tabs */}
+              <div className="flex items-center gap-1 mt-2.5 bg-slate-100 p-0.5 rounded-lg w-fit border border-slate-200/50">
+                <button
+                  type="button"
+                  onClick={() => onFormatTabChange('Digital')}
+                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    activeFormatTab === 'Digital'
+                      ? 'bg-white text-orange-700 shadow-xs border border-orange-100/50'
+                      : 'text-slate-505 hover:text-slate-800'
+                  }`}
+                >
+                  Digital
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFormatTabChange('Paper')}
+                  className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
+                    activeFormatTab === 'Paper'
+                      ? 'bg-white text-orange-700 shadow-xs border border-orange-100/50'
+                      : 'text-slate-505 hover:text-slate-800'
+                  }`}
+                >
+                  Paper
+                </button>
+              </div>
             </div>
-            <div className="flex gap-1.5 shrink-0">
+            <div className="flex gap-1.5 shrink-0 items-center">
               <KniButton variant="secondary" className="h-7.5 px-2.5 text-[11px]" onClick={() => onViewChange('practice')}>
                 Practice Bins
               </KniButton>
@@ -132,9 +176,9 @@ export function DashboardView({ profile, activeModule, pastExams, examLimit, onV
             </div>
           </div>
 
-          {pastExams.length > 0 ? (
+          {filteredPastExams.length > 0 ? (
             <div className="space-y-2 lg:flex-grow lg:min-h-0 overflow-y-auto pr-1 custom-scrollbar">
-              {pastExams.map((attempt) => {
+              {filteredPastExams.map((attempt) => {
                 const dateStr = new Date(attempt.created_at).toLocaleDateString('vi-VN', {
                   day: '2-digit',
                   month: '2-digit',
@@ -209,9 +253,9 @@ export function DashboardView({ profile, activeModule, pastExams, examLimit, onV
           ) : (
             <KniCard className="p-6 border border-dashed border-orange-100/50 flex flex-col items-center justify-center text-center bg-orange-50/10 rounded-2xl lg:h-full lg:min-h-0">
               <Timer className="size-8 text-orange-300 mb-2" />
-              <h4 className="text-xs font-bold text-slate-700">No mock tests taken yet</h4>
+              <h4 className="text-xs font-bold text-slate-700">No {activeFormatTab.toLowerCase()} mock tests taken</h4>
               <p className="text-[11px] text-slate-400 mt-1 max-w-xs leading-relaxed">
-                Simulate a full timed exam in official TestAS conditions to track your progress here.
+                Simulate a full timed exam in official {activeFormatTab} conditions to track your progress here.
               </p>
               <KniButton
                 onClick={() => onViewChange('mock')}

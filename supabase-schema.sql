@@ -71,6 +71,7 @@ CREATE TABLE public.exams (
   title TEXT NOT NULL,
   description TEXT,
   major major_type,             -- NULL = core test (all majors)
+  format TEXT NOT NULL DEFAULT 'Digital' CHECK (format IN ('Digital', 'Paper')),
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

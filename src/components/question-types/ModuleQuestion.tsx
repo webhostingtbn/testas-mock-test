@@ -1,5 +1,7 @@
 'use client';
 
+import { ZoomableImage } from './ZoomableImage';
+
 interface ModuleQuestionProps {
   question: {
     id: string;
@@ -36,13 +38,13 @@ export default function ModuleQuestion({
             </div>
           )}
           {environment_images && environment_images.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-4">
+            <div className="mt-4 flex flex-col gap-4">
               {environment_images.map((img, idx) => (
-                <div key={idx} className="rounded-xl border border-blue-200 overflow-hidden bg-white">
+                <div key={idx} className="w-full">
                   {img.startsWith('http') || img.startsWith('/') ? (
-                    <img src={img} alt={`Environment ${idx + 1}`} className="max-h-48 object-contain" />
+                    <ZoomableImage src={img} alt={`Environment ${idx + 1}`} />
                   ) : (
-                    <div className="w-48 h-32 flex items-center justify-center text-sm text-gray-400 bg-gray-50">
+                    <div className="w-48 h-32 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-blue-250 rounded-xl">
                       [Image placeholder]
                     </div>
                   )}
@@ -62,11 +64,11 @@ export default function ModuleQuestion({
           {question_text}
         </p>
         {question_image && (
-          <div className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50 inline-block">
+          <div className="w-full">
             {question_image.startsWith('http') || question_image.startsWith('/') ? (
-              <img src={question_image} alt="Question" className="max-h-64 object-contain" />
+              <ZoomableImage src={question_image} alt="Question" />
             ) : (
-              <div className="w-64 h-40 flex items-center justify-center text-sm text-gray-400">
+              <div className="w-64 h-40 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-250 rounded-xl">
                 [Image placeholder]
               </div>
             )}

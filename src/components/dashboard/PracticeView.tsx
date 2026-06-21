@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Sparkles, FileText, Layers, Laptop, ChevronRight, BookOpen, Clock } from 'lucide-react';
+import { Sparkles, FileText, Layers, Laptop, ChevronRight, BookOpen, Clock, Target, BarChart3 } from 'lucide-react';
 import { KniCard } from '@/components/KniPrimitives';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile, ModuleTestType } from '@/lib/types';
@@ -19,6 +19,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   const [sections, setSections] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [userRatings, setUserRatings] = useState<Record<string, 'easy' | 'medium' | 'hard'>>({});
+
+  const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
 
   type SubtestType = 
     | 'figure_sequence' 
@@ -76,9 +78,17 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           s.title === moduleTitle
       );
     }
+
+    if (subtest === 'figure_sequence') {
+      return sections.filter((s) =>
+        isPaper
+          ? s.question_type === 'completing patterns' || s.title.toLowerCase().includes('completing patterns')
+          : s.question_type === 'figure_sequence' && s.title.toLowerCase().includes('figure sequence')
+      );
+    }
     
     return sections.filter((s) => s.question_type === subtest);
-  }, [sections, activeModule]);
+  }, [sections, activeModule, isPaper]);
 
   // Navigation State inside SPA
   const [selectedSubtest, setSelectedSubtest] = useState<SubtestType | null>(null);
@@ -136,25 +146,9 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   }, [loadPracticeData]);
 
   const getSubtestCounts = (subtest: SubtestType) => {
-    // Filter questions belonging to this subtest
-    let subtestQuestions = [];
-    const isSubjectSubtest = [
-      'module_mcq',
-      'interpreting_texts',
-      'representation_systems',
-      'linguistic_structures',
-      'sc_1', 'sc_2',
-      'econ_1', 'econ_2',
-      'eng_1', 'eng_2', 'eng_3'
-    ].includes(subtest);
-
-    if (isSubjectSubtest) {
-      const matchedSections = getMatchedSections(subtest);
-      const matchedSectionIds = new Set(matchedSections.map(s => s.id));
-      subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
-    } else {
-      subtestQuestions = questions.filter(q => q.question_type === subtest);
-    }
+    const matchedSections = getMatchedSections(subtest);
+    const matchedSectionIds = new Set(matchedSections.map(s => s.id));
+    const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
     let easy = 0;
     let medium = 0;
@@ -175,24 +169,9 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   };
 
   const getQuestionIdsForFolder = (subtest: SubtestType, folder: string) => {
-    let subtestQuestions = [];
-    const isSubjectSubtest = [
-      'module_mcq',
-      'interpreting_texts',
-      'representation_systems',
-      'linguistic_structures',
-      'sc_1', 'sc_2',
-      'econ_1', 'econ_2',
-      'eng_1', 'eng_2', 'eng_3'
-    ].includes(subtest);
-
-    if (isSubjectSubtest) {
-      const matchedSections = getMatchedSections(subtest);
-      const matchedSectionIds = new Set(matchedSections.map(s => s.id));
-      subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
-    } else {
-      subtestQuestions = questions.filter(q => q.question_type === subtest);
-    }
+    const matchedSections = getMatchedSections(subtest);
+    const matchedSectionIds = new Set(matchedSections.map(s => s.id));
+    const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
     return subtestQuestions
       .filter((q) => {
@@ -269,6 +248,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             image_url: passage.image_url,
             resolved_image_url: resolvedUrl,
             questions: pQuestions,
+            sort_order: passage.sort_order,
           };
         });
 
@@ -309,7 +289,16 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           return rating === folder;
         });
 
-        const combined = [...filteredPassages, ...filteredStandalones];
+        const hasStandalones = standaloneQuestions.length > 0;
+        const combined = [...filteredPassages, ...filteredStandalones].sort((a, b) => {
+          const aOrder = a.isPassage
+            ? (hasStandalones && a.questions.length > 0 ? a.questions[0].sort_order : a.sort_order)
+            : a.sort_order;
+          const bOrder = b.isPassage
+            ? (hasStandalones && b.questions.length > 0 ? b.questions[0].sort_order : b.sort_order)
+            : b.sort_order;
+          return aOrder - bOrder;
+        });
         setPracticeQuestions(combined);
       } else {
         if (targetIds.length === 0) {
@@ -375,7 +364,6 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   };
 
   // Main UI routing
-  const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
 
   if (selectedSubtest && selectedFolder) {
     if (isLoadingSession) {
@@ -419,6 +407,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         supabase={supabase}
         onExit={handleExitPracticeSession}
         onQuestionRated={loadPracticeData}
+        isPaper={isPaper}
       />
     );
   }
@@ -525,21 +514,15 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       if (activeModLower.includes('science') || activeModLower === 'cs') {
         subtests.push(
           {
-            id: 'interpreting_texts',
-            title: 'Understanding and Interpreting Texts',
-            description: 'Practice reading comprehension and interpreting scientific texts.',
+            id: 'sc_1',
+            title: 'Analyzing Scientific Relationships',
+            description: 'Practice analyzing interrelationships between scientific concepts.',
             icon: Laptop,
           },
           {
-            id: 'representation_systems',
-            title: 'Using Representation Systems Flexibly',
-            description: 'Practice diagrammatic representations and switching formats.',
-            icon: Laptop,
-          },
-          {
-            id: 'linguistic_structures',
-            title: 'Recognizing Linguistic Structures',
-            description: 'Practice identifying grammatical and rule patterns.',
+            id: 'sc_2',
+            title: 'Understanding Formal Depictions',
+            description: 'Practice transposing information into diagrams and formal systems.',
             icon: Laptop,
           }
         );
@@ -581,32 +564,76 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         );
       }
     } else {
-      if (activeModLower.includes('science') || activeModLower === 'cs') {
-        subtests.push(
-          {
-            id: 'sc_1',
-            title: 'Analyzing Scientific Relationships',
-            description: 'Practice analyzing interrelationships between scientific concepts.',
-            icon: Laptop,
-          },
-          {
-            id: 'sc_2',
-            title: 'Understanding Formal Depictions',
-            description: 'Practice transposing information into diagrams and formal systems.',
-            icon: Laptop,
-          }
-        );
-      } else {
-        const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
-        subtests.push({
-          id: 'module_mcq' as const,
-          title: `${moduleLabel} Module`,
-          description: `Practice subject-specific questions for ${moduleLabel}.`,
-          icon: Laptop,
-        });
-      }
+      const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
+      subtests.push({
+        id: 'module_mcq' as const,
+        title: `${moduleLabel} Module`,
+        description: `Practice subject-specific questions for ${moduleLabel}.`,
+        icon: Laptop,
+      });
     }
   }
+
+  const getOverallStats = () => {
+    let totalQuestions = 0;
+    let totalEasy = 0;
+    let totalMedium = 0;
+    let totalHard = 0;
+    let totalUnclassified = 0;
+    
+    let activeModuleTotal = 0;
+    let activeModuleEasy = 0;
+    let activeModuleMedium = 0;
+    let activeModuleHard = 0;
+    let activeModuleUnclassified = 0;
+
+    subtests.forEach((sub) => {
+      const counts = getSubtestCounts(sub.id);
+      
+      totalQuestions += counts.total;
+      totalEasy += counts.easy;
+      totalMedium += counts.medium;
+      totalHard += counts.hard;
+      totalUnclassified += counts.unclassified;
+
+      const isModuleSub = ![
+        'figure_sequence',
+        'math_equation',
+        'latin_square',
+        'solving_quantitative',
+        'inferring_relationships',
+        'numerical_series',
+      ].includes(sub.id);
+
+      if (isModuleSub) {
+        activeModuleTotal += counts.total;
+        activeModuleEasy += counts.easy;
+        activeModuleMedium += counts.medium;
+        activeModuleHard += counts.hard;
+        activeModuleUnclassified += counts.unclassified;
+      }
+    });
+
+    const totalRated = totalEasy + totalMedium + totalHard;
+    const activeModuleRated = activeModuleEasy + activeModuleMedium + activeModuleHard;
+
+    return {
+      totalQuestions,
+      totalEasy,
+      totalMedium,
+      totalHard,
+      totalUnclassified,
+      totalRated,
+      activeModuleTotal,
+      activeModuleEasy,
+      activeModuleMedium,
+      activeModuleHard,
+      activeModuleUnclassified,
+      activeModuleRated,
+    };
+  };
+
+  const overallStats = getOverallStats();
 
   const coreSubtests = subtests.filter((sub) =>
     [
@@ -707,6 +734,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     );
   };
 
+  const overallProgressPercent = overallStats.totalQuestions > 0 
+    ? (overallStats.totalRated / overallStats.totalQuestions) * 100 
+    : 0;
+
   return (
     <div className="mx-auto w-full max-w-7xl">
       <div className="mb-5">
@@ -715,6 +746,112 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         <p className="mt-2 text-slate-500 text-sm">
           Focused practice is separate from the timed mock exam and does not use a mock-test attempt.
         </p>
+      </div>
+
+      {/* Analysis Metrics Grid */}
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {/* Overall Progress Card */}
+        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 text-orange-600 shrink-0">
+              <Target className="size-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overall Progress</p>
+              <h4 className="text-xl font-extrabold text-slate-900 leading-tight">
+                {overallStats.totalRated} / {overallStats.totalQuestions}
+              </h4>
+            </div>
+          </div>
+          <div className="mt-4 flex-1 flex flex-col justify-end">
+            <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1.5">
+              <span>Completion Rate</span>
+              <span className="text-orange-700">{Math.round(overallProgressPercent)}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-100 shadow-inner">
+              <div
+                className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500"
+                style={{ width: `${overallProgressPercent}%` }}
+              />
+            </div>
+          </div>
+        </KniCard>
+
+        {/* Difficulty Distribution Card */}
+        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 shrink-0">
+              <BarChart3 className="size-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Difficulty distribution</p>
+              <h4 className="text-xl font-extrabold text-slate-900 leading-tight">
+                Practice Strength
+              </h4>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mt-auto">
+            <div className="flex items-center gap-1.5 bg-emerald-50/50 border border-emerald-100/50 px-2 py-1 rounded-lg">
+              <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalEasy} Dễ</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-amber-50/50 border border-amber-100/50 px-2 py-1 rounded-lg">
+              <span className="size-2 rounded-full bg-amber-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalMedium} Vừa</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-rose-50/50 border border-rose-100/50 px-2 py-1 rounded-lg">
+              <span className="size-2 rounded-full bg-rose-500 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalHard} Khó</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-slate-50/50 border border-slate-100/50 px-2 py-1 rounded-lg">
+              <span className="size-2 rounded-full bg-slate-300 shrink-0" />
+              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalUnclassified} Chưa thử</span>
+            </div>
+          </div>
+        </KniCard>
+
+        {/* Active Focus Card */}
+        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-600 shrink-0">
+              <BookOpen className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Module focus</p>
+              <h4 className="text-sm font-extrabold text-slate-900 leading-tight truncate">
+                {activeModule ? getModuleTitle(activeModule) : 'No Module Selected'}
+              </h4>
+            </div>
+          </div>
+          <div className="mt-4 flex-1 flex flex-col justify-end">
+            {activeModule ? (
+              <>
+                <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1.5">
+                  <span>Practice Progress</span>
+                  <span className="text-blue-700">
+                    {overallStats.activeModuleRated} / {overallStats.activeModuleTotal}
+                  </span>
+                </div>
+                <div className="w-full h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-100 shadow-inner">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${
+                        overallStats.activeModuleTotal > 0
+                          ? (overallStats.activeModuleRated / overallStats.activeModuleTotal) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <p className="text-xs font-bold text-slate-400 italic">
+                Choose a module in your profile to track active module progress.
+              </p>
+            )}
+          </div>
+        </KniCard>
       </div>
 
       {/* Core Test Section */}

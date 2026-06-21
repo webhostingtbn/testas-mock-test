@@ -23,7 +23,33 @@ interface PracticeSessionProps {
   supabase: any;
   onExit: () => void;
   onQuestionRated: () => void; // Trigger list reload on ratings change
+  isPaper?: boolean;
 }
+
+const QUESTION_TIME_LIMITS: Record<string, number> = {
+  figure_sequence: 75, // 75s Digital (Completing Patterns / Figure Sequences)
+  math_equation: 75,
+  latin_square: 90,
+  solving_quantitative: 120,
+  inferring_relationships: 27,
+  numerical_series: 68,
+  interpreting_texts: 122,
+  representation_systems: 150,
+  linguistic_structures: 136,
+  sc_1: 163,
+  sc_2: 231,
+  econ_1: 163,
+  econ_2: 231,
+  eng_1: 163,
+  eng_2: 81,
+  eng_3: 163,
+  module_mcq: 245,
+};
+
+const getLimitForSubtest = (type: string, isPaper: boolean) => {
+  if (type === 'figure_sequence') return isPaper ? 55 : 75;
+  return QUESTION_TIME_LIMITS[type] || 120;
+};
 
 export default function PracticeSession({
   subtestType,
@@ -36,6 +62,7 @@ export default function PracticeSession({
   supabase,
   onExit,
   onQuestionRated,
+  isPaper = false,
 }: PracticeSessionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -43,6 +70,9 @@ export default function PracticeSession({
   
   // Stopwatch per question
   const [seconds, setSeconds] = useState(0);
+
+  const limit = getLimitForSubtest(subtestType, isPaper);
+  const isTimeExpired = seconds > limit;
 
   const switcherContainerRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -218,6 +248,8 @@ export default function PracticeSession({
 
     switch (type) {
       case 'figure_sequence':
+      case 'completing patterns':
+      case 'completing_patterns':
         return (
           <FigureSequence
             question={q}
@@ -310,7 +342,14 @@ export default function PracticeSession({
             {/* Timer Badge */}
             <div className="flex items-center gap-1.5 text-xs font-bold font-mono text-slate-700 bg-slate-100 border border-slate-100/50 px-3 py-1.5 rounded-lg shrink-0">
               <Clock className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-              {formatTime(seconds)}
+              <span className={isTimeExpired ? 'text-rose-600' : ''}>
+                {formatTime(seconds)}
+              </span>
+              {isTimeExpired && (
+                <span className="ml-1 text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded font-sans font-semibold">
+                  Limit Exceeded ({limit}s)
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -426,22 +465,33 @@ export default function PracticeSession({
 
           {/* Middle: Rating Smiley Buttons */}
           <div className="flex px-2 items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
-            <div className="text-sm mr-1">
-              <div>Rate again</div>
+            <div className="text-sm mr-1 font-semibold">
+              {isTimeExpired ? (
+                <div className="text-[10px] text-rose-500 leading-tight max-w-[125px] text-center sm:text-left animate-fade-in">
+                  Time limit exceeded. Easy disabled.
+                </div>
+              ) : (
+                <div>Rate again</div>
+              )}
             </div>
             {ratingOptions.map((opt) => {
               const isActive = currentRating === opt.id;
               const Icon = opt.icon;
+              const isEasyDisabled = opt.id === 'easy' && isTimeExpired;
+
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => handleRatingChange(opt.id)}
-                  title={opt.title}
-                  className={`p-2 flex gap-1 rounded-lg border transition-all duration-150 cursor-pointer ${
-                    isActive 
-                      ? `${opt.activeClass} shadow-xs scale-105` 
-                      : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                  disabled={isEasyDisabled}
+                  onClick={() => !isEasyDisabled && handleRatingChange(opt.id)}
+                  title={isEasyDisabled ? `Time limit (${limit}s) exceeded. Easy rating disabled.` : opt.title}
+                  className={`p-2 flex gap-1 rounded-lg border transition-all duration-150 ${
+                    isEasyDisabled
+                      ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40'
+                      : isActive 
+                        ? `${opt.activeClass} shadow-xs scale-105 cursor-pointer` 
+                        : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 cursor-pointer'
                   }`}
                 >
                   {opt.title}

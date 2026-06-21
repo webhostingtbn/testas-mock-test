@@ -21,6 +21,16 @@ export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
   const [activeView, setActiveView] = useState<DashboardView>('dashboard');
   const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<any | null>(null);
+  
+  // Lifted tab state for dashboard format switching
+  const [activeFormatTab, setActiveFormatTab] = useState<'Digital' | 'Paper'>('Digital');
+
+  // Synchronize activeFormatTab with user's allocated format once profile loads
+  useEffect(() => {
+    if (data.profile?.format) {
+      setActiveFormatTab(data.profile.format as 'Digital' | 'Paper');
+    }
+  }, [data.profile?.format]);
 
   // Reset briefing checklist and select the active exam when leaving mock view
   useEffect(() => {
@@ -119,7 +129,9 @@ export default function DashboardClient({ session }: { session: Session }) {
           pastExams={data.pastExams}
           examLimit={data.examLimit}
           onViewChange={setActiveView}
-          radarStats={data.computeRadarStats()}
+          radarStats={data.computeRadarStats(activeFormatTab)}
+          activeFormatTab={activeFormatTab}
+          onFormatTabChange={setActiveFormatTab}
           onReviewAttempt={(attempt) => {
             setSelectedAttemptForReview(attempt);
             setActiveView('review');

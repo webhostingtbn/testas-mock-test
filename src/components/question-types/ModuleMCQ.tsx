@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ZoomableImage } from './ZoomableImage';
 
 export interface ModuleQuestion {
   id: string;
@@ -32,42 +33,33 @@ interface ModuleMCQProps {
   onAnswer: (questionId: string, answer: string) => void;
 }
 
-function prepareLatex(text: string) {
-  if (!text) return '';
+function prepareLatex(text: any) {
+  if (typeof text !== 'string') return '';
   return text
     .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$') // inline: \( ... \) to $...$
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
-function ZoomableImage({ src, alt = 'Graphic' }: { src: string; alt?: string }) {
-  const [imageScale, setImageScale] = useState(100);
-
-  return (
-    <div className="flex flex-col relative items-center justify-start gap-1 bg-gray-50/50 rounded-xl border border-gray-100 w-full overflow-hidden">
-      <div className="w-full overflow-auto flex justify-center border border-gray-200 rounded-lg bg-white min-h-37.5">
-        <img
-          src={src}
-          alt={alt}
-          style={{ width: `${imageScale}%`, maxWidth: 'none' }}
-          className="rounded object-contain transition-all duration-75 m-0! mb-10!"
-        />
-      </div>
-      <div className="w-full absolute bottom-2 max-w-sm flex items-center gap-3 px-4 py-1 bg-white rounded-full border border-gray-200 shadow-sm mt-2">
-        <span className="text-xs text-gray-500 font-medium">Zoom</span>
-        <input
-          type="range"
-          min="10"
-          max="300"
-          value={imageScale}
-          onChange={(e) => setImageScale(Number(e.target.value))}
-          className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-        />
-        <span className="text-xs text-gray-500 font-medium w-10 text-right">
-          {imageScale}%
-        </span>
-      </div>
-    </div>
-  );
+function normalizeOptions(options: any): { id: string; text: string }[] {
+  if (!options) return [];
+  if (Array.isArray(options)) {
+    return options.map((opt) => {
+      if (typeof opt === 'string') {
+        return { id: opt, text: opt };
+      }
+      return {
+        id: opt.id || '',
+        text: opt.text || '',
+      };
+    });
+  }
+  if (typeof options === 'object') {
+    return Object.entries(options).map(([key, val]) => ({
+      id: key,
+      text: typeof val === 'string' ? val : (val as any)?.text || '',
+    }));
+  }
+  return [];
 }
 
 export default function ModuleMCQ({
@@ -79,6 +71,9 @@ export default function ModuleMCQ({
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(
     passage.questions && passage.questions.length > 0 ? passage.questions[0].id : null
   );
+  
+  // State to track if passage is collapsed on mobile
+  const [isPassageCollapsed, setIsPassageCollapsed] = useState(false);
 
   const toggleQuestion = (questionId: string) => {
     setOpenQuestionId((prev) => (prev === questionId ? null : questionId));
@@ -87,14 +82,21 @@ export default function ModuleMCQ({
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-stretch">
       {/* Left side: Passage */}
-      <div className="w-full lg:w-1/2 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden h-[calc(100vh-180px)] box-border ">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+      <div className="w-full lg:w-1/2 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden lg:h-[calc(100vh-180px)] h-auto box-border">
+        <div 
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+              setIsPassageCollapsed(!isPassageCollapsed);
+            }
+          }}
+          className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between cursor-pointer lg:cursor-default select-none"
+        >
           <h2 className="text-xl font-bold text-gray-900">{passage.title}</h2>
+          <span className="lg:hidden text-xs font-semibold px-2.5 py-1 bg-orange-100 text-orange-700 rounded-full flex items-center gap-1">
+            {isPassageCollapsed ? 'Show Reference Info' : 'Hide Reference Info'}
+          </span>
         </div>
-        <div className="p-6 overflow-y-auto">
-          {passage.resolved_image_url && (
-            <ZoomableImage src={passage.resolved_image_url} alt="Passage graphic" />
-          )}
+        <div className={`p-6 overflow-y-auto flex-col gap-4 ${isPassageCollapsed ? 'hidden lg:flex' : 'flex'}`}>
           <div className="prose prose-orange max-w-none text-gray-800 prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl">
             <ReactMarkdown
               remarkPlugins={[remarkMath, remarkGfm]}
@@ -103,11 +105,14 @@ export default function ModuleMCQ({
               {prepareLatex(passage.body_markdown)}
             </ReactMarkdown>
           </div>
+          {passage.resolved_image_url && (
+            <ZoomableImage src={passage.resolved_image_url} alt="Passage graphic" />
+          )}
         </div>
       </div>
 
       {/* Right side: Questions */}
-      <div className="w-full lg:w-1/2 flex flex-col gap-1 h-[calc(100vh-180px)] overflow-y-auto pr-2 box-border ">
+      <div className="w-full lg:w-1/2 flex flex-col gap-1 lg:h-[calc(100vh-180px)] h-auto overflow-y-auto pr-2 box-border">
         <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Questions ({(passage.questions || []).length})
         </div>
@@ -176,14 +181,14 @@ export default function ModuleMCQ({
                   </div>
 
                   <div className="space-y-2">
-                    {Object.entries(question.content.options || {}).map(
-                      ([letter, text]) => {
-                        const isSelected = selectedOption === letter;
+                    {normalizeOptions(question.content.options).map((option, idx) => {
+                        const isSelected = selectedOption === option.id;
+                        const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
 
                         return (
                           <div
-                            key={letter}
-                            onClick={() => onAnswer(question.id, letter)}
+                            key={option.id}
+                            onClick={() => onAnswer(question.id, option.id)}
                             className={`
                               flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all duration-200
                               ${
@@ -220,14 +225,13 @@ export default function ModuleMCQ({
                                   remarkPlugins={[remarkMath, remarkGfm]}
                                   rehypePlugins={[rehypeKatex]}
                                 >
-                                  {prepareLatex(text as string)}
+                                  {prepareLatex(option.text)}
                                 </ReactMarkdown>
                               </div>
                             </div>
                           </div>
                         );
-                      }
-                    )}
+                      })}
                   </div>
                 </div>
               )}
