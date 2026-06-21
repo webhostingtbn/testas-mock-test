@@ -385,7 +385,7 @@ export function AdminUsersPanel() {
         const { data: allUsers, error: fetchError } = await supabase
           .from('profiles')
           .select(`
-            id, email, full_name, role, created_at, phonenumber, allow_test_limit, status, module_test,
+            id, email, full_name, role, created_at, phonenumber, allow_test_limit, status, module_test, format,
             user_exams (
               id, created_at, status, total_score, max_score, detailed_results
             )
@@ -396,7 +396,6 @@ export function AdminUsersPanel() {
 
         const formattedUsers = (allUsers || []).map(u => ({
           ...u,
-          format: 'Digital',
           user_exams: (u.user_exams || []).sort(
             (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
@@ -673,10 +672,11 @@ export function AdminUsersPanel() {
                 <span className="text-right">Actions</span>
               </div>
             ) : (
-              <div className="hidden lg:grid grid-cols-[1.5fr_1.5fr_1.2fr_1.3fr] gap-4 border-b border-orange-100 bg-orange-50/30 px-5 py-4 text-sm font-semibold text-slate-500">
+              <div className="hidden lg:grid grid-cols-[1.2fr_1.2fr_1.1fr_1fr_1.5fr] gap-4 border-b border-orange-100 bg-orange-50/30 px-5 py-4 text-sm font-semibold text-slate-500">
                 <span>User</span>
                 <span>Email</span>
                 <span>Module Allocation</span>
+                <span>Format</span>
                 <span className="text-right">Actions</span>
               </div>
             )}
@@ -694,7 +694,7 @@ export function AdminUsersPanel() {
                       onClick={() => toggleExpand(user.id)}
                       className={`grid gap-4 px-5 py-5 items-center cursor-pointer transition-colors hover:bg-orange-55/30 ${
                         isExpanded ? 'bg-orange-50/15' : 'bg-white/50'
-                      } ${activeSubTab === 'pending' ? 'lg:grid-cols-[1.5fr_1.5fr_1fr_1.2fr]' : 'lg:grid-cols-[1.5fr_1.5fr_1.2fr_1.3fr]'}`}
+                      } ${activeSubTab === 'pending' ? 'lg:grid-cols-[1.5fr_1.5fr_1fr_1.2fr]' : 'lg:grid-cols-[1.2fr_1.2fr_1.1fr_1fr_1.5fr]'}`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-orange-400 to-amber-300 font-bold text-slate-950 text-sm">
@@ -715,26 +715,47 @@ export function AdminUsersPanel() {
                         </div>
                       )}
                       {activeSubTab === 'approved' && (
-                        <div className="flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
-                          {['natural_computer_science', 'economics', 'engineering'].map(module => {
-                            const isCurrent = user.module_test === module;
-                            const label = module === 'natural_computer_science' ? 'CS' : module === 'economics' ? 'Economics' : 'Engineering';
-                            return (
-                              <button
-                                key={module}
-                                type="button"
-                                onClick={() => handleUpdateModule(user.id, module)}
-                                className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition ${
-                                  isCurrent
-                                    ? 'border-orange-300/60 bg-orange-600/10 text-orange-850'
-                                    : 'border-orange-200 bg-orange-50/30 text-slate-400 hover:text-slate-700'
-                                }`}
-                              >
-                                {label}
-                              </button>
-                            );
-                          })}
-                        </div>
+                        <>
+                          <div className="flex flex-wrap gap-1.5" onClick={e => e.stopPropagation()}>
+                            {['natural_computer_science', 'economics', 'engineering'].map(module => {
+                              const isCurrent = user.module_test === module;
+                              const label = module === 'natural_computer_science' ? 'CS' : module === 'economics' ? 'Economics' : 'Engineering';
+                              return (
+                                <button
+                                  key={module}
+                                  type="button"
+                                  onClick={() => handleUpdateModule(user.id, module)}
+                                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                                    isCurrent
+                                      ? 'border-orange-300/60 bg-orange-600/10 text-orange-850'
+                                      : 'border-orange-200 bg-orange-50/30 text-slate-400 hover:text-slate-700'
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5" onClick={e => e.stopPropagation()}>
+                            {['Digital', 'Paper'].map(fmt => {
+                              const isCurrent = (user.format || 'Digital').toLowerCase() === fmt.toLowerCase();
+                              return (
+                                <button
+                                  key={fmt}
+                                  type="button"
+                                  onClick={() => handleUpdateFormat(user.id, fmt)}
+                                  className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                                    isCurrent
+                                      ? 'border-orange-300/60 bg-orange-600/10 text-orange-850'
+                                      : 'border-orange-200 bg-orange-50/30 text-slate-400 hover:text-slate-700'
+                                  }`}
+                                >
+                                  {fmt}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
 
                       <div className="flex gap-2 justify-between lg:justify-end items-center" onClick={e => e.stopPropagation()}>
