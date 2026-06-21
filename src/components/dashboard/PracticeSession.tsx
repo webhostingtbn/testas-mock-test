@@ -383,6 +383,9 @@ export default function PracticeSession({
                 } else if (isAnswered || isRated) {
                   btnClass = "bg-orange-100/60 border-orange-200 text-orange-850 hover:bg-orange-100";
                 }
+                if (!isActive && !isCurrentRated) {
+                  btnClass += " opacity-50 cursor-not-allowed hover:bg-white hover:text-slate-650";
+                }
 
                 return (
                   <button
@@ -391,7 +394,9 @@ export default function PracticeSession({
                       buttonRefs.current[idx] = el;
                     }}
                     type="button"
+                    disabled={!isActive && !isCurrentRated}
                     onClick={() => setCurrentIndex(idx)}
+                    title={!isActive && !isCurrentRated ? "Rate the current question first to proceed" : undefined}
                     className={`w-9 h-9 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer ${btnClass}`}
                   >
                     {idx + 1}
@@ -454,9 +459,10 @@ export default function PracticeSession({
           <div className="flex-1 flex justify-start">
             <KniButton
               onClick={() => setCurrentIndex((idx) => Math.max(0, idx - 1))}
-              disabled={currentIndex === 0}
+              disabled={currentIndex === 0 || !isCurrentRated}
+              title={!isCurrentRated ? "Rate the current question first to proceed" : undefined}
               variant="outline"
-              className="h-10 px-4 text-xs"
+              className="h-10 px-4 text-xs disabled:opacity-25"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Previous
