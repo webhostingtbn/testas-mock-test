@@ -42,6 +42,8 @@ const QUESTION_TIME_LIMITS: Record<string, number> = {
   econ_2: 231,
   eng_1: 163,
   eng_2: 81,
+  eng_2_2d: 69,
+  eng_2_3d: 69,
   eng_3: 163,
   module_mcq: 245,
 };

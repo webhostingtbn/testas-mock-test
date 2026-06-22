@@ -1,5 +1,11 @@
 'use client';
 
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { ZoomableImage } from './ZoomableImage';
 
 interface ModuleQuestionProps {
@@ -10,11 +16,47 @@ interface ModuleQuestionProps {
       question_image?: string;
       environment_text?: string;
       environment_images?: string[];
-      options: { id: string; text?: string; image?: string }[];
+      options: any;
     };
   };
   selectedAnswer: string | null;
   onAnswer: (optionId: string) => void;
+}
+
+function prepareLatex(text: any) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$') // inline: \( ... \) to $...$
+    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
+}
+
+function normalizeOptions(options: any): { id: string; text?: string; image?: string }[] {
+  if (!options) return [];
+  if (Array.isArray(options)) {
+    return options.map((opt) => {
+      if (typeof opt === 'string') {
+        return { id: opt, text: opt };
+      }
+      return {
+        id: opt.id || '',
+        text: opt.text || '',
+        image: opt.image,
+      };
+    });
+  }
+  if (typeof options === 'object') {
+    return Object.entries(options).map(([key, val]) => {
+      if (typeof val === 'string') {
+        return { id: key, text: val };
+      }
+      return {
+        id: key,
+        text: (val as any)?.text || '',
+        image: (val as any)?.image,
+      };
+    });
+  }
+  return [];
 }
 
 export default function ModuleQuestion({
@@ -23,6 +65,7 @@ export default function ModuleQuestion({
   onAnswer,
 }: ModuleQuestionProps) {
   const { question_text, question_image, environment_text, environment_images, options } = question.content;
+  const normalized = normalizeOptions(options);
 
   return (
     <div className="space-y-6">
@@ -81,10 +124,10 @@ export default function ModuleQuestion({
         <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
           Select your answer
         </h3>
-        <div className="space-y-3">
-          {options.map((option, idx) => {
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {normalized.map((option, idx) => {
             const isSelected = selectedAnswer === option.id;
-            const letter = String.fromCharCode(65 + idx);
+            const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
 
             return (
               <button
@@ -104,7 +147,7 @@ export default function ModuleQuestion({
                 <div
                   className={`
                     w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
-                    transition-colors duration-200
+                    transition-colors duration-205
                     ${
                       isSelected
                         ? 'bg-orange-500 text-white'
@@ -118,9 +161,16 @@ export default function ModuleQuestion({
                 {/* Option content */}
                 <div className="flex-1">
                   {option.text && (
-                    <p className={`text-sm ${isSelected ? 'text-orange-900 font-medium' : 'text-gray-700'}`}>
-                      {option.text}
-                    </p>
+                    <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
+                      isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
+                    }`}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkMath, remarkGfm]}
+                        rehypePlugins={[rehypeKatex]}
+                      >
+                        {prepareLatex(option.text)}
+                      </ReactMarkdown>
+                    </div>
                   )}
                   {option.image && (
                     <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 inline-block">

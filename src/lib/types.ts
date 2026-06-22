@@ -16,7 +16,16 @@ export type QuestionType =
   | 'numerical_series'
   | 'interpreting_texts'
   | 'representation_systems'
-  | 'linguistic_structures';
+  | 'linguistic_structures'
+  | 'sc_1'
+  | 'sc_2'
+  | 'econ_1'
+  | 'econ_2'
+  | 'eng_1'
+  | 'eng_2'
+  | 'eng_2_2d'
+  | 'eng_2_3d'
+  | 'eng_3';
 
 export type ExamStatus = 'not_started' | 'in_progress' | 'completed';
 

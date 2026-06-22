@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Sparkles, FileText, Layers, Laptop, ChevronRight, BookOpen, Clock, Target, BarChart3 } from 'lucide-react';
+import { Sparkles, FileText, Layers, Laptop, ChevronRight, BookOpen, Clock, Target, BarChart3, Flame, Check } from 'lucide-react';
 import { KniCard } from '@/components/KniPrimitives';
 import { createClient } from '@/lib/supabase/client';
 import type { Profile, ModuleTestType } from '@/lib/types';
@@ -19,6 +19,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   const [sections, setSections] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [userRatings, setUserRatings] = useState<Record<string, 'easy' | 'medium' | 'hard'>>({});
+  const [userPracticeDates, setUserPracticeDates] = useState<Set<string>>(new Set());
 
   const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
 
@@ -38,6 +39,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     | 'econ_2'
     | 'eng_1'
     | 'eng_2'
+    | 'eng_2_2d'
+    | 'eng_2_3d'
     | 'eng_3'
     | 'module_mcq';
 
@@ -48,6 +51,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     econ_2: ['processes', 'economic processes'],
     eng_1: ['formalising technical', 'formalizing technical'],
     eng_2: ['visualising solids', 'visualizing solids', 'solids'],
+    eng_2_2d: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'],
+    eng_2_3d: ['visualising solids - 3d', 'visualizing solids - 3d', 'solids - 3d', 'visualizing solids 3d'],
     eng_3: ['analysing technical', 'analyzing technical'],
   };
 
@@ -121,19 +126,25 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         .select('id, question_type, section_id');
       if (qData) setQuestions(qData);
 
-      // 3. Fetch user ratings
+      // 3. Fetch user ratings with updated_at
       const { data: rData } = await supabase
         .from('user_question_practices')
-        .select('question_id, difficulty')
+        .select('question_id, difficulty, updated_at')
         .eq('user_id', profile.id);
 
       const ratingMap: Record<string, 'easy' | 'medium' | 'hard'> = {};
+      const dateSet = new Set<string>();
       if (rData) {
         rData.forEach((row) => {
           ratingMap[row.question_id] = row.difficulty as 'easy' | 'medium' | 'hard';
+          if (row.updated_at) {
+            const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
+            dateSet.add(dateStr);
+          }
         });
       }
       setUserRatings(ratingMap);
+      setUserPracticeDates(dateSet);
     } catch (err) {
       console.error('Failed to load practice data:', err);
     } finally {
@@ -195,7 +206,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         'linguistic_structures',
         'sc_1', 'sc_2',
         'econ_1', 'econ_2',
-        'eng_1', 'eng_2', 'eng_3'
+        'eng_1', 'eng_2', 'eng_2_2d', 'eng_2_3d', 'eng_3'
       ].includes(subtest);
 
       if (isSubjectSubtest) {
@@ -393,8 +404,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       sc_2: 'Understanding Formal Depictions',
       econ_1: 'Analyzing Economic Relationships',
       econ_2: 'Analyzing Processes',
-      eng_1: 'Formalising Technical Relationships',
+      eng_1: 'Formalizing Technical Interrelationships',
       eng_2: 'Visualising Solids',
+      eng_2_2d: 'Visualising Solids (2D)',
+      eng_2_3d: 'Visualising Solids (3D)',
       eng_3: 'Analysing Technical Relationships',
       module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
     };
@@ -431,8 +444,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       sc_2: 'Understanding Formal Depictions',
       econ_1: 'Analyzing Economic Relationships',
       econ_2: 'Analyzing Processes',
-      eng_1: 'Formalising Technical Relationships',
+      eng_1: 'Formalizing Technical Interrelationships',
       eng_2: 'Visualising Solids',
+      eng_2_2d: 'Visualising Solids (2D)',
+      eng_2_3d: 'Visualising Solids (3D)',
       eng_3: 'Analysing Technical Relationships',
       module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
     };
@@ -534,14 +549,20 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         subtests.push(
           {
             id: 'eng_1',
-            title: 'Formalising Technical Relationships',
+            title: 'Formalizing Technical Interrelationships',
             description: 'Practice formalizing technical and physical laws.',
             icon: Laptop,
           },
           {
-            id: 'eng_2',
-            title: 'Visualising Solids',
-            description: 'Practice 3D spatial visualization and projections.',
+            id: 'eng_2_2d',
+            title: 'Visualising Solids (2D)',
+            description: 'Practice 2D projections and views of 3D objects.',
+            icon: Laptop,
+          },
+          {
+            id: 'eng_2_3d',
+            title: 'Visualising Solids (3D)',
+            description: 'Practice 3D cube rotations and direction analysis.',
             icon: Laptop,
           },
           {
@@ -709,19 +730,19 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           <div className="grid grid-cols-4 gap-1 text-[10px] font-bold text-slate-650 mb-6">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
-              <span>{stats.easy} Dễ</span>
+              <span>{stats.easy} Easy</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-              <span>{stats.medium} Vừa</span>
+              <span>{stats.medium} Medium</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-              <span>{stats.hard} Khó</span>
+              <span>{stats.hard} Hard</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-slate-200 shrink-0" />
-              <span className="truncate">Chưa đánh giá</span>
+              <span className="truncate">Unclassified</span>
             </div>
           </div>
 
@@ -742,120 +763,274 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     ? (overallStats.totalRated / overallStats.totalQuestions) * 100 
     : 0;
 
+  // Helper: calculate streaks and weekly activity
+  const getStreakAndActivity = () => {
+    const sortedDates = Array.from(userPracticeDates).sort();
+    if (sortedDates.length === 0) return { currentStreak: 0, maxStreak: 0, weekCheckedIn: Array(7).fill(false), weeklyActiveCount: 0 };
+
+    // Calculate max streak
+    let maxStreak = 0;
+    let currentRun = 0;
+    let prevDate: Date | null = null;
+
+    // Convert date strings back to local Date objects (just date parts, ignoring time)
+    const parsedDates = sortedDates.map(d => new Date(d + 'T00:00:00'));
+
+    parsedDates.forEach(date => {
+      if (!prevDate) {
+        currentRun = 1;
+      } else {
+        const diffTime = date.getTime() - prevDate.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          currentRun++;
+        } else if (diffDays > 1) {
+          maxStreak = Math.max(maxStreak, currentRun);
+          currentRun = 1;
+        }
+      }
+      prevDate = date;
+    });
+    maxStreak = Math.max(maxStreak, currentRun);
+
+    // Calculate current streak
+    let currentStreak = 0;
+    const today = new Date();
+    const todayStr = today.toLocaleDateString('en-CA');
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+
+    if (userPracticeDates.has(todayStr) || userPracticeDates.has(yesterdayStr)) {
+      // Start counting back from whichever date is active (today or yesterday)
+      let checkDate = userPracticeDates.has(todayStr) ? new Date() : yesterday;
+      while (true) {
+        const checkStr = checkDate.toLocaleDateString('en-CA');
+        if (userPracticeDates.has(checkStr)) {
+          currentStreak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Calculate weekly checked-in days (Monday to Sunday of the current week)
+    // Find the Monday of the current week
+    const curr = new Date();
+    const day = curr.getDay(); // 0 is Sunday, 1 is Monday, etc.
+    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    const monday = new Date(curr.setDate(diff));
+
+    const weekCheckedIn = Array(7).fill(false);
+    let weeklyActiveCount = 0;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toLocaleDateString('en-CA');
+      if (userPracticeDates.has(dateStr)) {
+        weekCheckedIn[i] = true;
+        weeklyActiveCount++;
+      }
+    }
+
+    return { currentStreak, maxStreak, weekCheckedIn, weeklyActiveCount };
+  };
+
+  const { currentStreak, maxStreak, weekCheckedIn, weeklyActiveCount } = getStreakAndActivity();
+
+  // LeetCode Donut Chart math
+  const totalQs = overallStats.totalQuestions || 1;
+  const easyPercent = (overallStats.totalEasy / totalQs) * 100;
+  const mediumPercent = (overallStats.totalMedium / totalQs) * 100;
+  const hardPercent = (overallStats.totalHard / totalQs) * 100;
+  const unclassifiedPercent = (overallStats.totalUnclassified / totalQs) * 100;
+
   return (
     <div className="mx-auto w-full max-w-7xl">
-      <div className="mb-5">
-        <p className="text-sm font-medium text-orange-700">Practice Center</p>
-        <h2 className="mt-1 text-3xl font-bold text-slate-900">Build skills one subtest at a time</h2>
-        <p className="mt-2 text-slate-500 text-sm">
-          Focused practice is separate from the timed mock exam and does not use a mock-test attempt.
-        </p>
-      </div>
-
-      {/* Analysis Metrics Grid */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-        {/* Overall Progress Card */}
-        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 text-orange-600 shrink-0">
-              <Target className="size-5" />
-            </div>
+      {/* Top Header & Metrics Section Container */}
+      <div className="bg-slate-50/50 border border-slate-200/50 rounded-[32px] p-6 sm:p-8 mb-10 shadow-xs backdrop-blur-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Card 1: Difficulty Breakdown */}
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overall Progress</p>
-              <h4 className="text-xl font-extrabold text-slate-900 leading-tight">
-                {overallStats.totalRated} / {overallStats.totalQuestions}
-              </h4>
+              <h3 className="text-base font-extrabold text-slate-800">Difficulty Breakdown</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Based on your ratings</p>
             </div>
-          </div>
-          <div className="mt-4 flex-1 flex flex-col justify-end">
-            <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1.5">
-              <span>Completion Rate</span>
-              <span className="text-orange-700">{Math.round(overallProgressPercent)}%</span>
-            </div>
-            <div className="w-full h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-100 shadow-inner">
-              <div
-                className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full transition-all duration-500"
-                style={{ width: `${overallProgressPercent}%` }}
-              />
-            </div>
-          </div>
-        </KniCard>
 
-        {/* Difficulty Distribution Card */}
-        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-emerald-500/10 to-teal-500/10 text-emerald-600 shrink-0">
-              <BarChart3 className="size-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Difficulty distribution</p>
-              <h4 className="text-xl font-extrabold text-slate-900 leading-tight">
-                Practice Strength
-              </h4>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-auto">
-            <div className="flex items-center gap-1.5 bg-emerald-50/50 border border-emerald-100/50 px-2 py-1 rounded-lg">
-              <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalEasy} Dễ</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-amber-50/50 border border-amber-100/50 px-2 py-1 rounded-lg">
-              <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalMedium} Vừa</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-rose-50/50 border border-rose-100/50 px-2 py-1 rounded-lg">
-              <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalHard} Khó</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-50/50 border border-slate-100/50 px-2 py-1 rounded-lg">
-              <span className="size-2 rounded-full bg-slate-300 shrink-0" />
-              <span className="text-xs font-bold text-slate-700 truncate">{overallStats.totalUnclassified} Chưa thử</span>
-            </div>
-          </div>
-        </KniCard>
-
-        {/* Active Focus Card */}
-        <KniCard className="flex flex-col p-5 bg-white/70 backdrop-blur-md border border-orange-100/60 shadow-xs hover:shadow-sm hover:scale-[1.01] hover:border-orange-200 transition-all duration-300">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 text-blue-600 shrink-0">
-              <BookOpen className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Module focus</p>
-              <h4 className="text-sm font-extrabold text-slate-900 leading-tight truncate">
-                {activeModule ? getModuleTitle(activeModule) : 'No Module Selected'}
-              </h4>
-            </div>
-          </div>
-          <div className="mt-4 flex-1 flex flex-col justify-end">
-            {activeModule ? (
-              <>
-                <div className="flex justify-between items-center text-xs font-bold text-slate-700 mb-1.5">
-                  <span>Practice Progress</span>
-                  <span className="text-blue-700">
-                    {overallStats.activeModuleRated} / {overallStats.activeModuleTotal}
+            <div className="flex items-center gap-6 my-3">
+              {/* Donut Chart */}
+              <div className="relative size-24 flex items-center justify-center shrink-0">
+                <svg className="size-full transform -rotate-90" viewBox="0 0 36 36">
+                  {/* Base / Unclassified segment */}
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.915"
+                    fill="none"
+                    stroke="#f1f5f9"
+                    strokeWidth="3.2"
+                  />
+                  {/* Easy segment */}
+                  {easyPercent > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="3.2"
+                      strokeDasharray={`${easyPercent} ${100 - easyPercent}`}
+                      strokeDashoffset={100}
+                    />
+                  )}
+                  {/* Medium segment */}
+                  {mediumPercent > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#fbbf24"
+                      strokeWidth="3.2"
+                      strokeDasharray={`${mediumPercent} ${100 - mediumPercent}`}
+                      strokeDashoffset={100 - easyPercent}
+                    />
+                  )}
+                  {/* Hard segment */}
+                  {hardPercent > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="3.2"
+                      strokeDasharray={`${hardPercent} ${100 - hardPercent}`}
+                      strokeDashoffset={100 - easyPercent - mediumPercent}
+                    />
+                  )}
+                </svg>
+                {/* Center text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-xl font-extrabold text-slate-800 leading-none">
+                    {overallStats.totalRated}
+                  </span>
+                  <span className="text-[9px] font-bold text-slate-400 mt-1 leading-none">
+                    / {overallStats.totalQuestions}
                   </span>
                 </div>
-                <div className="w-full h-2 bg-slate-100/80 rounded-full overflow-hidden border border-slate-100 shadow-inner">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${
-                        overallStats.activeModuleTotal > 0
-                          ? (overallStats.activeModuleRated / overallStats.activeModuleTotal) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
+              </div>
+
+              {/* Legend List */}
+              <div className="flex-1 flex flex-col gap-2 min-w-0">
+                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#10b981]" />
+                    <span>Easy</span>
+                  </div>
+                  <span className="text-slate-850 font-bold">{overallStats.totalEasy} rated</span>
                 </div>
-              </>
-            ) : (
-              <p className="text-xs font-bold text-slate-400 italic">
-                Choose a module in your profile to track active module progress.
+                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#fbbf24]" />
+                    <span>Medium</span>
+                  </div>
+                  <span className="text-slate-850 font-bold">{overallStats.totalMedium} rated</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#ef4444]" />
+                    <span>Hard</span>
+                  </div>
+                  <span className="text-slate-850 font-bold">{overallStats.totalHard} rated</span>
+                </div>
+              </div>
+            </div>
+          </KniCard>
+
+          {/* Card 2: Overall Progress */}
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800">Overall Progress</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Question bank completion</p>
+            </div>
+
+            <div className="flex flex-col items-center justify-center my-3 text-center">
+              <span className="text-3xl font-extrabold text-slate-850 leading-none">
+                {Math.round(overallProgressPercent)}%
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-wider">
+                Completion Rate
+              </span>
+            </div>
+
+            <div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner mb-1">
+                <div
+                  className="h-full bg-gradient-to-r from-orange-500 to-amber-450 rounded-full transition-all duration-500"
+                  style={{ width: `${overallProgressPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                <span>0 questions</span>
+                <span>{overallStats.totalQuestions} total</span>
+              </div>
+              <p className="text-xs font-bold text-slate-500 text-center">
+                {overallStats.totalRated} of {overallStats.totalQuestions} questions rated
               </p>
-            )}
-          </div>
-        </KniCard>
+            </div>
+          </KniCard>
+
+          {/* Card 3: Activity Streak */}
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800">Activity Streak</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Practice frequency</p>
+            </div>
+
+            <div className="my-2.5">
+              <div className="flex items-center gap-1.5 justify-start">
+                <span className="text-3xl font-extrabold text-slate-900 leading-none">
+                  {currentStreak}
+                </span>
+                <Flame className="size-7 text-orange-500 fill-orange-100 shrink-0" />
+              </div>
+              <p className="text-sm font-extrabold text-slate-800 mt-1">Day Streak!</p>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Max Streak: {maxStreak} days</p>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-1 mb-2">
+                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((dayLabel, idx) => {
+                  const isActive = weekCheckedIn[idx];
+                  return (
+                    <div key={idx} className="flex flex-col items-center gap-1">
+                      <div
+                        className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                          isActive
+                            ? 'bg-orange-500 border border-orange-500 text-white shadow-sm shadow-orange-100'
+                            : 'bg-white border border-slate-200 text-slate-400'
+                        }`}
+                      >
+                        {isActive ? (
+                          <Check className="size-4 stroke-[3]" />
+                        ) : (
+                          dayLabel
+                        )}
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{dayLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-wider">
+                Checked in {weeklyActiveCount} of 7 days this week
+              </p>
+            </div>
+          </KniCard>
+        </div>
       </div>
 
       {/* Core Test Section */}
@@ -878,7 +1053,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
       {/* Subject-Specific Module Focus Section */}
       {moduleSubtests.length > 0 && (
-        <div>
+        <div id="subject-module-focus">
           <div className="mb-5 pb-2 border-b border-slate-100">
             <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <span className="h-6 w-1 bg-orange-500 rounded-full" />

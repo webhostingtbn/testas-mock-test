@@ -439,8 +439,9 @@ export function useDashboardData(session: Session) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
         categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
       } else if (activeModLower.includes('eng')) {
-        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalising Technical Relationships', matchKeywords: ['formalising technical relationships', 'technical relationships', 'formalising technical'] };
-        categories['eng_2'] = { correct: 0, total: 0, label: 'Visualising Solids', matchKeywords: ['visualising solids', 'solids', 'solid'] };
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_2_2d'] = { correct: 0, total: 0, label: 'Visualising Solids (2D)', matchKeywords: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'] };
+        categories['eng_2_3d'] = { correct: 0, total: 0, label: 'Visualising Solids (3D)', matchKeywords: ['visualising solids - 3d', 'visualizing solids - 3d', 'solids - 3d', 'visualizing solids 3d'] };
         categories['eng_3'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
       } else {
         // Fallback generic subject module
@@ -460,7 +461,7 @@ export function useDashboardData(session: Session) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
         categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
       } else if (activeModLower.includes('eng')) {
-        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalising Technical Relationships', matchKeywords: ['formalising technical relationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
         categories['eng_2'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
       } else {
         // Fallback generic subject module
