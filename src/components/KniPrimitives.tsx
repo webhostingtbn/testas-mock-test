@@ -244,7 +244,7 @@ export function KniHeader({
           <button
             type="button"
             onClick={onLogout}
-            className="grid size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600 md:hidden"
+            className="grid size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600"
             title="Log out"
             aria-label="Log out"
           >
@@ -288,8 +288,8 @@ export function KniSidebar({
         // Always shown on md+, hidden on mobile
         'hidden md:flex shrink-0 flex-col border-r border-orange-100/60 bg-white/80 backdrop-blur-xl shadow-sm',
         'transition-[width] duration-300 ease-in-out overflow-hidden',
-        // Collapsed = narrow icon strip; Expanded = full text sidebar (lg+ only)
-        isExpanded ? 'lg:w-56 w-[72px]' : 'w-[72px]',
+        // Collapsed = narrow icon strip; Expanded = full text sidebar (md+ only)
+        isExpanded ? 'md:w-56 w-[72px]' : 'w-[72px]',
         'py-5 px-3',
       )}
     >
@@ -297,7 +297,7 @@ export function KniSidebar({
       <div
         className={cn(
           'flex items-center mb-6 min-w-0 transition-all duration-300',
-          isExpanded ? 'lg:px-1 lg:gap-3 px-1.5 gap-0' : 'px-1.5 gap-0'
+          isExpanded ? 'md:px-1 md:gap-3 px-1.5 gap-0' : 'px-1.5 gap-0'
         )}
       >
         <button
@@ -310,7 +310,7 @@ export function KniSidebar({
         <span
           className={cn(
             'font-bold text-base text-slate-800 tracking-wide whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
-            isExpanded ? 'lg:max-w-40 lg:opacity-100' : 'max-w-0 opacity-0',
+            isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
           )}
         >
           KNI TestAS
@@ -332,14 +332,14 @@ export function KniSidebar({
                 isActive
                   ? 'bg-gradient-to-r from-orange-600 to-amber-500 text-white shadow-md shadow-orange-600/15 font-semibold'
                   : 'text-slate-500 hover:bg-orange-50 hover:text-slate-900',
-                isExpanded ? 'lg:px-3 lg:gap-3 px-[15px] gap-0' : 'px-[15px] gap-0'
+                isExpanded ? 'md:px-3 md:gap-3 px-[15px] gap-0' : 'px-[15px] gap-0'
               )}
             >
               <item.icon className="size-[18px] shrink-0" />
               <span
                 className={cn(
                   'text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
-                  isExpanded ? 'lg:max-w-40 lg:opacity-100' : 'max-w-0 opacity-0',
+                  isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
                 )}
               >
                 {item.label}
@@ -358,14 +358,14 @@ export function KniSidebar({
             onClick={onLogout}
             className={cn(
               'flex items-center w-full h-10 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200 text-left',
-              isExpanded ? 'lg:px-3 lg:gap-3 px-[15px] gap-0' : 'px-[15px] gap-0'
+              isExpanded ? 'md:px-3 md:gap-3 px-[15px] gap-0' : 'px-[15px] gap-0'
             )}
           >
             <LogOut className="size-[18px] shrink-0" />
             <span
               className={cn(
                 'text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
-                isExpanded ? 'lg:max-w-40 lg:opacity-100' : 'max-w-0 opacity-0',
+                isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
               )}
             >
               Log out
@@ -373,14 +373,14 @@ export function KniSidebar({
           </button>
         )}
 
-        {/* Collapse/expand toggle — lg+ only */}
+        {/* Collapse/expand toggle — md+ only */}
         {onToggleExpand && (
           <button
             type="button"
             title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
             onClick={onToggleExpand}
             className={cn(
-              'hidden lg:flex items-center w-full h-10 rounded-xl text-slate-400 hover:bg-orange-50 hover:text-slate-700 transition-all duration-200 text-left',
+              'hidden md:flex items-center w-full h-10 rounded-xl text-slate-400 hover:bg-orange-50 hover:text-slate-700 transition-all duration-200 text-left',
               isExpanded ? 'px-3 gap-3' : 'px-[15px] gap-0'
             )}
           >
@@ -391,7 +391,7 @@ export function KniSidebar({
             <span
               className={cn(
                 'text-sm font-medium whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
-                isExpanded ? 'lg:max-w-40 lg:opacity-100' : 'max-w-0 opacity-0',
+                isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
               )}
             >
               Collapse
