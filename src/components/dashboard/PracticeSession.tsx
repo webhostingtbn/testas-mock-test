@@ -6,6 +6,7 @@ import { KniButton, KniCard, KniBadge } from '@/components/KniPrimitives';
 import FigureSequence from '@/components/question-types/FigureSequence';
 import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
+import CompletingPatterns from '@/components/question-types/CompletingPatterns';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
 import ModuleQuestion from '@/components/question-types/ModuleQuestion';
 import NumericalSeries from '@/components/question-types/NumericalSeries';
@@ -28,6 +29,7 @@ interface PracticeSessionProps {
 
 const QUESTION_TIME_LIMITS: Record<string, number> = {
   figure_sequence: 75, // 75s Digital (Completing Patterns / Figure Sequences)
+  completing_patterns: 75,
   math_equation: 75,
   latin_square: 90,
   solving_quantitative: 120,
@@ -250,10 +252,17 @@ export default function PracticeSession({
 
     switch (type) {
       case 'figure_sequence':
+        return (
+          <FigureSequence
+            question={q}
+            selectedAnswer={currentAnswer}
+            onAnswer={handleAnswerChange}
+          />
+        );
       case 'completing patterns':
       case 'completing_patterns':
         return (
-          <FigureSequence
+          <CompletingPatterns
             question={q}
             selectedAnswer={currentAnswer}
             onAnswer={handleAnswerChange}
@@ -305,7 +314,7 @@ export default function PracticeSession({
   ];
 
   return (
-    <div className="max-w-7xl mx-auto flex flex-col h-full pb-24">
+    <div className=" mx-auto flex flex-col h-full pb-24">
       <SecurityOverlay />
       <WatermarkOverlay email={userEmail} fullName={userFullName} />
       {/* Practice Header Card */}
@@ -456,7 +465,7 @@ export default function PracticeSession({
 
       {/* Navigation Footer */}
       <div className="absolute inset-x-0 bottom-0 bg-white border-t border-slate-200 shadow-xs py-3 z-30">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4">
+        <div className=" mx-auto px-6 flex items-center justify-between gap-4">
           {/* Left: Previous Button */}
           <div className="flex-1 flex justify-start">
             <KniButton

@@ -104,6 +104,15 @@ export const useExamStore = create<ExamState>()(
 
       // ---- Start exam ----
       startExam: ({ examId, userExamId, sections, flowSteps }) => {
+        const state = get();
+        if (state.userExamId === userExamId) {
+          set({
+            currentExamId: examId,
+            sections,
+            flowSteps,
+          });
+          return;
+        }
         set({
           currentExamId: examId,
           userExamId,

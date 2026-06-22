@@ -600,7 +600,7 @@ function MockBriefing({
     label: 'Format',
     value: 'Digital'
   }];
-  return <div className="mx-auto w-full max-w-7xl">
+  return <div className="mx-auto w-full ">
       <button type="button" onClick={onBack} className="mb-5 inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-white/70 px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-orange-300 hover:bg-orange-50">
         <ArrowLeft className="size-4" />
         Back to Dashboard
@@ -711,7 +711,7 @@ function Dashboard({
   setView: (view: View) => void;
   onStartMock: (subtest: (typeof subtests)[number]) => void;
 }) {
-  return <div className="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[1.15fr_.85fr]">
+  return <div className="mx-auto grid w-full  gap-5 xl:grid-cols-[1.15fr_.85fr]">
       <div className="space-y-5">
         <div>
           <p className="text-sm font-medium text-orange-700">Student Home</p>
@@ -821,7 +821,7 @@ function PracticeBins({
     amber: 'from-amber-500/25 to-amber-400/5 text-amber-700 border-amber-200',
     rose: 'from-rose-500/25 to-rose-400/5 text-rose-700 border-rose-200'
   };
-  return <div className="mx-auto w-full max-w-7xl">
+  return <div className="mx-auto w-full ">
       {/* back button: border-white/10 text-slate-200 hover:bg-white/[0.08] → border-orange-200 text-slate-600 hover:bg-orange-100 */}
       <button type="button" onClick={() => setView('dashboard')} className="mb-5 inline-flex items-center gap-2 rounded-xl border border-orange-200 px-3 py-2 text-sm text-slate-600 transition hover:bg-orange-100">
         <ArrowLeft className="size-4" />
@@ -944,7 +944,7 @@ function AdminUsers({
   users: typeof usersSeed;
   onStatus: (index: number, status: string) => void;
 }) {
-  return <div className="mx-auto w-full max-w-7xl">
+  return <div className="mx-auto w-full ">
       <div className="mb-6 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div>
           <p className="text-sm text-orange-700">Admin Console</p>
@@ -1041,7 +1041,7 @@ function AdminCms({
   saveState: 'idle' | 'saved';
   saveQuestion: () => void;
 }) {
-  return <div className="mx-auto grid w-full max-w-7xl gap-5 xl:grid-cols-[1fr_.9fr]">
+  return <div className="mx-auto grid w-full  gap-5 xl:grid-cols-[1fr_.9fr]">
       <GlassCard className="p-5 md:p-6">
         <div className="mb-6 flex items-center justify-between">
           <div>

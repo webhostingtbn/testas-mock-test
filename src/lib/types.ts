@@ -11,6 +11,7 @@ export type QuestionType =
   | 'math_equation'
   | 'latin_square'
   | 'module_mcq'
+  | 'completing_patterns'
   | 'solving_quantitative'
   | 'inferring_relationships'
   | 'numerical_series'
@@ -90,7 +91,7 @@ export interface Question {
   section_id: string;
   sort_order: number;
   question_type: QuestionType;
-  content: FigureSequenceContent | MathEquationContent | LatinSquareContent | ModuleMCQContent;
+  content: FigureSequenceContent | MathEquationContent | LatinSquareContent | ModuleMCQContent | CompletingPatternsContent;
   correct_answer: unknown;
   created_at: string;
 }
@@ -170,12 +171,23 @@ export interface MCQOption {
   image?: string;
 }
 
+export interface CompletingPatternsContent {
+  grid_image_url: string;
+  options_image_url: string;
+  options_layout?: {
+    rows: number;
+    cols: number;
+    options: string[];
+  };
+}
+
 // ---- Answer types ----
 
 export type FigureSequenceAnswer = number;          // Index of selected option
 export type MathEquationAnswer = Record<string, number>; // { A: 3, B: 5, ... }
 export type LatinSquareAnswer = string;             // Selected letter
 export type ModuleMCQAnswer = string;               // Selected option ID
+export type CompletingPatternsAnswer = string;      // Selected option letter (A-F)
 
 // ---- Exam flow types ----
 

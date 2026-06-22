@@ -39,6 +39,7 @@ interface ExamConfig {
   is_active: boolean;
   retry_number: number | null;
   created_at: string;
+  format: string | null;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -316,7 +317,7 @@ export default function AdminPage() {
         setUsers(formattedUsers as ProfileWithExams[]);
 
         const { data: examsData, error: examsError } = await supabase
-          .from('exams').select('id, title, is_active, retry_number, created_at')
+          .from('exams').select('id, title, is_active, retry_number, created_at, format')
           .order('created_at', { ascending: false });
 
         if (examsError) throw examsError;
@@ -336,13 +337,41 @@ export default function AdminPage() {
   const toggleExamActive = async (examId: string, shouldActivate: boolean) => {
     setIsUpdatingExamId(examId);
     try {
+      const targetExam = exams.find(e => e.id === examId);
+      const examFormat = targetExam?.format || 'Digital';
+
       if (shouldActivate) {
-        await supabase.from('exams').update({ is_active: false }).eq('is_active', true);
-        await supabase.from('exams').update({ is_active: true }).eq('id', examId);
-        setExams(prev => prev.map(e => ({ ...e, is_active: e.id === examId })));
+        // Deactivate all active exams of the same format
+        await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('is_active', true)
+          .eq('format', examFormat);
+
+        // Activate the target exam
+        await supabase
+          .from('exams')
+          .update({ is_active: true })
+          .eq('id', examId);
+
+        setExams(prev =>
+          prev.map(e => {
+            const f = e.format || 'Digital';
+            if (f === examFormat) {
+              return { ...e, is_active: e.id === examId };
+            }
+            return e;
+          })
+        );
       } else {
-        await supabase.from('exams').update({ is_active: false }).eq('id', examId);
-        setExams(prev => prev.map(e => e.id === examId ? { ...e, is_active: false } : e));
+        await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('id', examId);
+
+        setExams(prev =>
+          prev.map(e => (e.id === examId ? { ...e, is_active: false } : e))
+        );
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to update exam activation.');
@@ -440,7 +469,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-gray-50/50">
       {/* ── Header ── */}
       <header className="border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className=" mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UserSquare className="w-8 h-8 text-orange-500" />
             <div>
@@ -460,7 +489,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-4 space-y-6">
+      <main className=" mx-auto px-6 py-4 space-y-6">
 
         {/* ── Stat Pills ── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3">

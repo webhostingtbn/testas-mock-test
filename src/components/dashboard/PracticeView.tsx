@@ -1,9 +1,24 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
-import { Sparkles, FileText, Layers, Laptop, ChevronRight, BookOpen, Clock, Target, BarChart3, Flame, Check } from 'lucide-react';
-import { KniCard } from '@/components/KniPrimitives';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  Sparkles,
+  Blocks,
+  FileText,
+  Layers,
+  Laptop,
+  ChevronRight,
+  BookOpen,
+  Clock,
+  ArrowUpRight,
+  Search,
+  Target,
+  Check,
+  Flame,
+} from 'lucide-react';
+import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
 import { createClient } from '@/lib/supabase/client';
+import { cn } from '@/lib/utils';
 import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
 import PracticeSession from './PracticeSession';
@@ -23,13 +38,13 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
 
-  type SubtestType = 
-    | 'figure_sequence' 
-    | 'math_equation' 
-    | 'latin_square' 
-    | 'solving_quantitative' 
-    | 'inferring_relationships' 
-    | 'numerical_series' 
+  type SubtestType =
+    | 'figure_sequence'
+    | 'math_equation'
+    | 'latin_square'
+    | 'solving_quantitative'
+    | 'inferring_relationships'
+    | 'numerical_series'
     | 'interpreting_texts'
     | 'representation_systems'
     | 'linguistic_structures'
@@ -63,7 +78,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         keywords.some((kw) => s.title.toLowerCase().includes(kw))
       );
     }
-    
+
     if (
       subtest === 'interpreting_texts' ||
       subtest === 'representation_systems' ||
@@ -71,7 +86,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     ) {
       return sections.filter((s) => s.question_type === subtest);
     }
-    
+
     if (subtest === 'module_mcq') {
       const moduleTitle = getModuleTitle(activeModule);
       return sections.filter(
@@ -91,7 +106,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           : s.question_type === 'figure_sequence' && s.title.toLowerCase().includes('figure sequence')
       );
     }
-    
+
     return sections.filter((s) => s.question_type === subtest);
   }, [sections, activeModule, isPaper]);
 
@@ -100,6 +115,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   const [selectedFolder, setSelectedFolder] = useState<'easy' | 'medium' | 'hard' | 'unclassified' | null>(null);
   const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSubtestId, setSelectedSubtestId] = useState<string | null>(null);
 
   const getModuleTitle = (mod: string | null) => {
     if (!mod) return '';
@@ -109,6 +126,157 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     if (m.includes('science') || m === 'cs') return 'Natural Science and Computer Science';
     return '';
   };
+
+  // Main subtest card list
+  const subtests = useMemo(() => {
+    const paperSubtests: {
+      id: SubtestType;
+      title: string;
+      description: string;
+      icon: any;
+    }[] = [
+      {
+        id: 'figure_sequence',
+        title: 'Completing Patterns',
+        description: 'Train visual pattern sequence completion.',
+        icon: Blocks
+      },
+      {
+        id: 'solving_quantitative',
+        title: 'Solving Quantitative Problems',
+        description: 'Practice mathematical word problems.',
+        icon: FileText
+      },
+      {
+        id: 'inferring_relationships',
+        title: 'Inferring Relationships',
+        description: 'Identify the logical relationship between pairs of concepts.',
+        icon: BookOpen
+      },
+      {
+        id: 'numerical_series',
+        title: 'Continuing Numerical Series',
+        description: 'Find pattern rules and continue the numerical series.',
+        icon: Clock
+      }
+    ];
+
+    const digitalSubtests: {
+      id: SubtestType;
+      title: string;
+      description: string;
+      icon: any;
+    }[] = [
+      {
+        id: 'figure_sequence',
+        title: 'Figure Sequences',
+        description: 'Train visual pattern recognition and transformations.',
+        icon: Blocks
+      },
+      {
+        id: 'math_equation',
+        title: 'Mathematical Equations',
+        description: 'Practice quantitative relationships and equation logic.',
+        icon: FileText
+      },
+      {
+        id: 'latin_square',
+        title: 'Latin Squares',
+        description: 'Strengthen rule deduction and symbolic reasoning.',
+        icon: Layers
+      }
+    ];
+
+    const baseSubtests = isPaper ? paperSubtests : digitalSubtests;
+
+    if (activeModule) {
+      const activeModLower = activeModule.toLowerCase();
+
+      if (isPaper) {
+        if (activeModLower.includes('science') || activeModLower === 'cs') {
+          baseSubtests.push(
+            {
+              id: 'sc_1',
+              title: 'Analyzing Scientific Relationships',
+              description: 'Practice analyzing interrelationships between scientific concepts.',
+              icon: Laptop,
+            },
+            {
+              id: 'sc_2',
+              title: 'Understanding Formal Depictions',
+              description: 'Practice transposing information into diagrams and formal systems.',
+              icon: Laptop,
+            }
+          );
+        } else if (activeModLower.includes('engin')) {
+          baseSubtests.push(
+            {
+              id: 'eng_1',
+              title: 'Formalizing Technical Interrelationships',
+              description: 'Practice formalizing technical and physical laws.',
+              icon: Laptop,
+            },
+            {
+              id: 'eng_2_2d',
+              title: 'Visualising Solids (2D)',
+              description: 'Practice 2D projections and views of 3D objects.',
+              icon: Laptop,
+            },
+            {
+              id: 'eng_2_3d',
+              title: 'Visualising Solids (3D)',
+              description: 'Practice 3D cube rotations and direction analysis.',
+              icon: Laptop,
+            },
+            {
+              id: 'eng_3',
+              title: 'Analysing Technical Relationships',
+              description: 'Practice analyzing physical and technical relationships.',
+              icon: Laptop,
+            }
+          );
+        } else if (activeModLower.includes('econ')) {
+          baseSubtests.push(
+            {
+              id: 'econ_1',
+              title: 'Analyzing Economic Relationships',
+              description: 'Practice analyzing economic data and charts.',
+              icon: Laptop,
+            },
+            {
+              id: 'sc_2',
+              title: 'Understanding Formal Depictions',
+              description: 'Practice transposing information into diagrams and formal systems.',
+              icon: Laptop,
+            }
+          );
+        }
+      } else {
+        const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
+        baseSubtests.push({
+          id: 'module_mcq' as const,
+          title: `${moduleLabel} Module`,
+          description: `Practice subject-specific questions for ${moduleLabel}.`,
+          icon: Laptop,
+        });
+      }
+    }
+
+    return baseSubtests;
+  }, [activeModule, isPaper]);
+
+  const filteredSubtests = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (!normalizedQuery) return subtests;
+    return subtests.filter(sub =>
+      sub.title.toLowerCase().includes(normalizedQuery) ||
+      sub.description.toLowerCase().includes(normalizedQuery)
+    );
+  }, [searchQuery, subtests]);
+
+  const selectedSubtestData = useMemo(() => {
+    return subtests.find(s => s.id === selectedSubtestId) ?? subtests[0];
+  }, [subtests, selectedSubtestId]);
 
   const loadPracticeData = useCallback(async () => {
     if (!profile) return;
@@ -383,9 +551,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   if (selectedSubtest && selectedFolder) {
     if (isLoadingSession) {
       return (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-          <p className="text-slate-500 text-sm">Loading practice session...</p>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="size-12 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500"></div>
         </div>
       );
     }
@@ -466,137 +633,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="size-12 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500"></div>
       </div>
     );
-  }
-
-  //Main subtest card list
-  const subtests: {
-    id: SubtestType;
-    title: string;
-    description: string;
-    icon: any;
-  }[] = isPaper
-    ? [
-        {
-          id: 'figure_sequence',
-          title: 'Completing Patterns',
-          description: 'Train visual pattern sequence completion.',
-          icon: Sparkles
-        },
-        {
-          id: 'solving_quantitative',
-          title: 'Solving Quantitative Problems',
-          description: 'Practice mathematical word problems.',
-          icon: FileText
-        },
-        {
-          id: 'inferring_relationships',
-          title: 'Inferring Relationships',
-          description: 'Identify the logical relationship between pairs of concepts.',
-          icon: BookOpen
-        },
-        {
-          id: 'numerical_series',
-          title: 'Continuing Numerical Series',
-          description: 'Find pattern rules and continue the numerical series.',
-          icon: Clock
-        }
-      ]
-    : [
-        {
-          id: 'figure_sequence',
-          title: 'Figure Sequences',
-          description: 'Train visual pattern recognition and transformations.',
-          icon: Sparkles
-        },
-        {
-          id: 'math_equation',
-          title: 'Mathematical Equations',
-          description: 'Practice quantitative relationships and equation logic.',
-          icon: FileText
-        },
-        {
-          id: 'latin_square',
-          title: 'Latin Squares',
-          description: 'Strengthen rule deduction and symbolic reasoning.',
-          icon: Layers
-        }
-      ];
-
-  if (activeModule) {
-    const activeModLower = activeModule.toLowerCase();
-    
-    if (isPaper) {
-      if (activeModLower.includes('science') || activeModLower === 'cs') {
-        subtests.push(
-          {
-            id: 'sc_1',
-            title: 'Analyzing Scientific Relationships',
-            description: 'Practice analyzing interrelationships between scientific concepts.',
-            icon: Laptop,
-          },
-          {
-            id: 'sc_2',
-            title: 'Understanding Formal Depictions',
-            description: 'Practice transposing information into diagrams and formal systems.',
-            icon: Laptop,
-          }
-        );
-      } else if (activeModLower.includes('engin')) {
-        subtests.push(
-          {
-            id: 'eng_1',
-            title: 'Formalizing Technical Interrelationships',
-            description: 'Practice formalizing technical and physical laws.',
-            icon: Laptop,
-          },
-          {
-            id: 'eng_2_2d',
-            title: 'Visualising Solids (2D)',
-            description: 'Practice 2D projections and views of 3D objects.',
-            icon: Laptop,
-          },
-          {
-            id: 'eng_2_3d',
-            title: 'Visualising Solids (3D)',
-            description: 'Practice 3D cube rotations and direction analysis.',
-            icon: Laptop,
-          },
-          {
-            id: 'eng_3',
-            title: 'Analysing Technical Relationships',
-            description: 'Practice analyzing physical and technical relationships.',
-            icon: Laptop,
-          }
-        );
-      } else if (activeModLower.includes('econ')) {
-        subtests.push(
-          {
-            id: 'econ_1',
-            title: 'Analyzing Economic Relationships',
-            description: 'Practice analyzing economic data and charts.',
-            icon: Laptop,
-          },
-          {
-            id: 'sc_2',
-            title: 'Understanding Formal Depictions',
-            description: 'Practice transposing information into diagrams and formal systems.',
-            icon: Laptop,
-          }
-        );
-      }
-    } else {
-      const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
-      subtests.push({
-        id: 'module_mcq' as const,
-        title: `${moduleLabel} Module`,
-        description: `Practice subject-specific questions for ${moduleLabel}.`,
-        icon: Laptop,
-      });
-    }
   }
 
   const getOverallStats = () => {
@@ -605,7 +645,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     let totalMedium = 0;
     let totalHard = 0;
     let totalUnclassified = 0;
-    
+
     let activeModuleTotal = 0;
     let activeModuleEasy = 0;
     let activeModuleMedium = 0;
@@ -614,7 +654,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
     subtests.forEach((sub) => {
       const counts = getSubtestCounts(sub.id);
-      
+
       totalQuestions += counts.total;
       totalEasy += counts.easy;
       totalMedium += counts.medium;
@@ -660,108 +700,13 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   const overallStats = getOverallStats();
 
-  const coreSubtests = subtests.filter((sub) =>
-    [
-      'figure_sequence',
-      'math_equation',
-      'latin_square',
-      'solving_quantitative',
-      'inferring_relationships',
-      'numerical_series',
-    ].includes(sub.id)
-  );
-
-  const moduleSubtests = subtests.filter(
-    (sub) =>
-      ![
-        'figure_sequence',
-        'math_equation',
-        'latin_square',
-        'solving_quantitative',
-        'inferring_relationships',
-        'numerical_series',
-      ].includes(sub.id)
-  );
-
-  const renderSubtestCard = (sub: typeof subtests[number]) => {
-    const Icon = sub.icon;
-    const stats = getSubtestCounts(sub.id);
-    
-    // Calculate percentages for stacked progress bar
-    const pEasy = stats.total > 0 ? (stats.easy / stats.total) * 100 : 0;
-    const pMedium = stats.total > 0 ? (stats.medium / stats.total) * 100 : 0;
-    const pHard = stats.total > 0 ? (stats.hard / stats.total) * 100 : 0;
-    const pUnclassified = stats.total > 0 ? (stats.unclassified / stats.total) * 100 : 100;
-
-    return (
-      <KniCard key={sub.id} className="flex min-h-64 flex-col p-6 bg-white">
-        <div>
-          <div className="grid size-12 place-items-center rounded-2xl bg-orange-100 text-orange-700">
-            <Icon className="size-6" />
-          </div>
-          <h3 className="mt-6 text-xl font-bold text-slate-900">{sub.title}</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">{sub.description}</p>
-        </div>
-
-        <div className="mt-6 flex-1 flex flex-col justify-end">
-          {/* Stats Header */}
-          <div className="flex justify-between items-center text-xs font-semibold text-slate-500 mb-2">
-            <span>Progress Breakdown</span>
-            <span>{stats.total} total questions</span>
-          </div>
-
-          {/* Stacked Progress Bar */}
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex mb-4 border border-slate-100 shadow-inner">
-            {stats.easy > 0 && (
-              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${pEasy}%` }} title={`Easy: ${stats.easy}`} />
-            )}
-            {stats.medium > 0 && (
-              <div className="h-full bg-amber-400 transition-all duration-300" style={{ width: `${pMedium}%` }} title={`Medium: ${stats.medium}`} />
-            )}
-            {stats.hard > 0 && (
-              <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${pHard}%` }} title={`Hard: ${stats.hard}`} />
-            )}
-            {stats.unclassified > 0 && (
-              <div className="h-full bg-slate-200 transition-all duration-300" style={{ width: `${pUnclassified}%` }} title={`Unclassified: ${stats.unclassified}`} />
-            )}
-          </div>
-
-          {/* Legend */}
-          <div className="grid grid-cols-4 gap-1 text-[10px] font-bold text-slate-650 mb-6">
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
-              <span>{stats.easy} Easy</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-amber-400 shrink-0" />
-              <span>{stats.medium} Medium</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-              <span>{stats.hard} Hard</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-slate-200 shrink-0" />
-              <span className="truncate">Unclassified</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSelectedSubtest(sub.id)}
-            className="w-full inline-flex items-center justify-between rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-bold text-orange-800 transition hover:bg-orange-100 cursor-pointer"
-          >
-            Enter Practice
-            <ChevronRight className="size-4" />
-          </button>
-        </div>
-      </KniCard>
-    );
-  };
-
-  const overallProgressPercent = overallStats.totalQuestions > 0 
-    ? (overallStats.totalRated / overallStats.totalQuestions) * 100 
+  const overallProgressPercent = overallStats.totalQuestions > 0
+    ? (overallStats.totalRated / overallStats.totalQuestions) * 100
     : 0;
+
+  const selectedActivity = filteredSubtests.length > 0
+    ? filteredSubtests[0]
+    : { label: 'Start your first practice session', percentage: 0, total: 0, correct: 0 };
 
   // Helper: calculate streaks and weekly activity
   const getStreakAndActivity = () => {
@@ -803,7 +748,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
     if (userPracticeDates.has(todayStr) || userPracticeDates.has(yesterdayStr)) {
       // Start counting back from whichever date is active (today or yesterday)
-      let checkDate = userPracticeDates.has(todayStr) ? new Date() : yesterday;
+      const checkDate = userPracticeDates.has(todayStr) ? new Date() : yesterday;
       while (true) {
         const checkStr = checkDate.toLocaleDateString('en-CA');
         if (userPracticeDates.has(checkStr)) {
@@ -840,238 +785,232 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   const { currentStreak, maxStreak, weekCheckedIn, weeklyActiveCount } = getStreakAndActivity();
 
-  // LeetCode Donut Chart math
-  const totalQs = overallStats.totalQuestions || 1;
-  const easyPercent = (overallStats.totalEasy / totalQs) * 100;
-  const mediumPercent = (overallStats.totalMedium / totalQs) * 100;
-  const hardPercent = (overallStats.totalHard / totalQs) * 100;
-  const unclassifiedPercent = (overallStats.totalUnclassified / totalQs) * 100;
+  const selectedSubtestCounts = selectedSubtestId ? getSubtestCounts(selectedSubtestId as SubtestType) : null;
+  const selectedSubtestPercent = selectedSubtestCounts && selectedSubtestCounts.total > 0
+    ? Math.round((selectedSubtestCounts.easy + selectedSubtestCounts.medium + selectedSubtestCounts.hard) / selectedSubtestCounts.total * 100)
+    : 0;
 
   return (
-    <div className="mx-auto w-full max-w-7xl">
-      {/* Top Header & Metrics Section Container */}
-      <div className="py-6 sm:py-8 mb-10 shadow-xs">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Card 1: Difficulty Breakdown */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-800">Difficulty Breakdown</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Based on your ratings</p>
+    <div className="mx-auto w-full max-w-[1480px]">
+      <div className="grid gap-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <section className="flex min-w-0 flex-col gap-6">
+          {/* Recommended Next Card */}
+          <KniCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600">
+              <Target className="size-6" />
             </div>
-
-            <div className="flex items-center gap-6 my-3">
-              {/* Donut Chart */}
-              <div className="relative size-24 flex items-center justify-center shrink-0">
-                <svg className="size-full transform -rotate-90" viewBox="0 0 36 36">
-                  {/* Base / Unclassified segment */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.915"
-                    fill="none"
-                    stroke="#e2e8f0"
-                    strokeWidth="3.2"
-                  />
-                  {/* Easy segment */}
-                  {easyPercent > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="3.2"
-                      strokeDasharray={`${easyPercent} ${100 - easyPercent}`}
-                      strokeDashoffset={100}
-                    />
-                  )}
-                  {/* Medium segment */}
-                  {mediumPercent > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#fbbf24"
-                      strokeWidth="3.2"
-                      strokeDasharray={`${mediumPercent} ${100 - mediumPercent}`}
-                      strokeDashoffset={100 - easyPercent}
-                    />
-                  )}
-                  {/* Hard segment */}
-                  {hardPercent > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="3.2"
-                      strokeDasharray={`${hardPercent} ${100 - hardPercent}`}
-                      strokeDashoffset={100 - easyPercent - mediumPercent}
-                    />
-                  )}
-                </svg>
-                {/* Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-extrabold text-slate-900 leading-none">
-                    {overallStats.totalRated}
-                  </span>
-                  <span className="text-[9px] font-bold text-slate-400 mt-1 leading-none">
-                    / {overallStats.totalQuestions}
-                  </span>
-                </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                Recommended next
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h3 className="truncate text-base font-black text-slate-950">
+                  {filteredSubtests.length > 0
+                    ? filteredSubtests[0].title
+                    : 'Start your first practice session'}
+                </h3>
+                <span className="text-xs font-semibold text-slate-400">
+                  {overallStats.totalRated > 0
+                    ? `${overallStats.totalEasy + overallStats.totalMedium + overallStats.totalHard}/${overallStats.totalQuestions} questions rated`
+                    : 'Ready for your first session'}
+                </span>
               </div>
-
-              {/* Legend List */}
-              <div className="flex-1 flex flex-col gap-2 min-w-0">
-                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="size-2 rounded-full bg-[#10b981]" />
-                    <span>Easy</span>
-                  </div>
-                  <span className="text-slate-800 font-extrabold">{overallStats.totalEasy} rated</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="size-2 rounded-full bg-[#fbbf24]" />
-                    <span>Medium</span>
-                  </div>
-                  <span className="text-slate-800 font-extrabold">{overallStats.totalMedium} rated</span>
-                </div>
-                <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
-                    <span className="size-2 rounded-full bg-[#ef4444]" />
-                    <span>Hard</span>
-                  </div>
-                  <span className="text-slate-800 font-extrabold">{overallStats.totalHard} rated</span>
-                </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="grid size-12 place-items-center rounded-full border-4 border-orange-100 text-xs font-black text-orange-700">
+                {(selectedSubtestPercent || overallProgressPercent).toFixed(2)}%
               </div>
+              <KniButton
+                onClick={() => setSelectedSubtestId(filteredSubtests[0]?.id)}
+                className="h-11 px-5 text-sm"
+              >
+                Continue
+                <ChevronRight className="size-4" />
+              </KniButton>
             </div>
           </KniCard>
 
-          {/* Card 2: Overall Progress */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-800">Overall Progress</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Question bank completion</p>
-            </div>
+          {/* Practice List with Search */}
+          <section>
+            <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
+                  Your study plan
+                </p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                  Recommended practice
+                </h2>
+              </div>
 
-            <div className="flex flex-col items-center justify-center my-3 text-center">
-              <span className="text-3xl font-extrabold text-slate-900 leading-none">
-                {Math.round(overallProgressPercent)}%
-              </span>
-              <span className="text-[10px] font-bold text-slate-450 mt-1 uppercase tracking-wider">
-                Completion Rate
-              </span>
-            </div>
-
-            <div>
-              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner mb-1">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-500"
-                  style={{ width: `${overallProgressPercent}%` }}
+              <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-orange-300 focus-within:text-orange-600">
+                <Search className="size-4" />
+                <span className="sr-only">Search practice areas</span>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Find a practice area"
+                  className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 sm:w-44"
                 />
+              </label>
+            </div>
+
+            <KniCard className="overflow-hidden p-0">
+              {filteredSubtests.length > 0 ? filteredSubtests.map((sub) => {
+                const Icon = sub.icon;
+                const counts = getSubtestCounts(sub.id);
+                const selected = selectedSubtestId === sub.id;
+                const percent = counts.total > 0
+                  ? Math.round((counts.easy + counts.medium + counts.hard) / counts.total * 100)
+                  : 0;
+
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setSelectedSubtest(sub.id)}
+                    className={cn(
+                      'flex w-full items-center gap-4 border-b border-slate-100 p-4 text-left transition last:border-b-0 sm:p-5',
+                      selected ? 'bg-orange-50/10' : 'hover:bg-slate-50/50',
+                    )}
+                  >
+                    <div className={cn(
+                      'grid size-11 shrink-0 place-items-center rounded-full',
+                      selected ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-650',
+                    )}>
+                      {percent >= 70
+                        ? <Check className="size-5" />
+                        : <Icon className="size-5" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{sub.title}</p>
+                          <p className="mt-1 text-xs font-medium text-slate-400">
+                            {counts.total > 0
+                              ? `${counts.easy + counts.medium + counts.hard} rated from ${counts.total} questions`
+                              : 'No activity yet'}
+                          </p>
+                        </div>
+                        <span className="text-sm font-black text-slate-950">{percent}%</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="size-4 shrink-0 text-slate-300" />
+                  </button>
+                );
+              }) : (
+                <div className="px-5 py-10 text-center">
+                  <p className="text-sm font-bold text-slate-700">No matching practice area</p>
+                  <p className="mt-1 text-xs text-slate-400">Try a shorter search term.</p>
+                </div>
+              )}
+            </KniCard>
+          </section>
+        </section>
+
+        <aside className="flex min-w-0 flex-col gap-6">
+          {/* Difficulty Breakdown Card */}
+          <KniCard className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
+                  Difficulty Breakdown
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+                  Based on your ratings
+                </h2>
               </div>
-              <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                <span>0 questions</span>
-                <span>{overallStats.totalQuestions} total</span>
+              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Target className="size-5" />
               </div>
-              <p className="text-xs font-bold text-slate-500 text-center">
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <span className="size-2 rounded-full bg-emerald-500" />
+                  Easy
+                </div>
+                <span className="text-sm font-black text-slate-950">{overallStats.totalEasy} questions</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <span className="size-2 rounded-full bg-amber-400" />
+                  Medium
+                </div>
+                <span className="text-sm font-black text-slate-950">{overallStats.totalMedium} questions</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                  <span className="size-2 rounded-full bg-rose-500" />
+                  Hard
+                </div>
+                <span className="text-sm font-black text-slate-950">{overallStats.totalHard} questions</span>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <KniProgress value={overallProgressPercent} className="h-3" />
+              <p className="mt-3 text-xs font-medium text-slate-400">
                 {overallStats.totalRated} of {overallStats.totalQuestions} questions rated
               </p>
             </div>
           </KniCard>
 
-          {/* Card 3: Activity Streak */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
-            <div>
-              <h3 className="text-base font-extrabold text-slate-800">Activity Streak</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Practice frequency</p>
+          {/* Overall Progress Card */}
+          <KniCard className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Overall Progress
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+                  {Math.round(overallProgressPercent)}% completion
+                </h2>
+              </div>
+              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Check className="size-5" />
+              </div>
             </div>
 
-            <div className="my-2.5">
-              <div className="flex items-center gap-1.5 justify-start">
-                <span className="text-3xl font-extrabold text-slate-900 leading-none">
-                  {currentStreak}
-                </span>
-                <Flame className="size-7 text-orange-500 fill-orange-100 shrink-0" />
-              </div>
-              <p className="text-sm font-extrabold text-slate-700 mt-1">Day Streak!</p>
-              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Max Streak: {maxStreak} days</p>
-            </div>
+            <KniProgress value={overallProgressPercent} className="mt-5 h-3" />
 
-            <div>
-              <div className="flex items-center justify-between gap-1 mb-2">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((dayLabel, idx) => {
-                  const isActive = weekCheckedIn[idx];
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-1">
-                      <div
-                        className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                          isActive
-                            ? 'bg-orange-500 border border-orange-500 text-white shadow-sm shadow-orange-100'
-                            : 'bg-slate-50 border border-slate-200 text-slate-400'
-                        }`}
-                      >
-                        {isActive ? (
-                          <Check className="size-4 stroke-[3] text-white" />
-                        ) : (
-                          dayLabel
-                        )}
-                      </div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{dayLabel}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-wider">
-                Checked in {weeklyActiveCount} of 7 days this week
-              </p>
+            <div className="mt-5 text-sm text-slate-500">
+              You have rated {overallStats.totalRated} out of {overallStats.totalQuestions} questions.
             </div>
           </KniCard>
-        </div>
+
+          {/* Activity Streak Card */}
+          <KniCard className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Activity Streak
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+                  {currentStreak} day streak
+                </h2>
+              </div>
+              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Flame className="size-5" />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-2xl font-black text-slate-950">{currentStreak}</span>
+                  <span className="text-sm font-bold text-orange-600">day streak</span>
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Max Streak: {maxStreak} days
+            </p>
+          </KniCard>
+        </aside>
       </div>
-
-
-
-
-      {/* Core Test Section */}
-      {coreSubtests.length > 0 && (
-        <div className="mb-12">
-          <div className="my-2 pb-2 border-b border-slate-100">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span className="h-6 w-1 bg-orange-500 rounded-full" />
-              Core Test Subtests
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              General cognitive abilities required for all academic studies.
-            </p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {coreSubtests.map(renderSubtestCard)}
-          </div>
-        </div>
-      )}
-
-      {/* Subject-Specific Module Focus Section */}
-      {moduleSubtests.length > 0 && (
-        <div id="subject-module-focus">
-          <div className="mb-5 pb-2 border-b border-slate-100">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <span className="h-6 w-1 bg-orange-500 rounded-full" />
-              Subject-Specific Module Focus
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Practice for the {activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & Computer Science' : activeModule) : 'chosen'} module.
-            </p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {moduleSubtests.map(renderSubtestCard)}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-

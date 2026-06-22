@@ -184,11 +184,31 @@ function generateModuleMCQQuestions(count: number): MockQuestion[] {
   }));
 }
 
+// ---- COMPLETING PATTERNS QUESTIONS ----
+function generateCompletingPatternsQuestions(count: number): MockQuestion[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `q-pattern-${i + 1}`,
+    content: {
+      // Sample mock image placeholders that load reliably
+      grid_image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&auto=format&fit=crop&q=80',
+      options_image_url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=500&auto=format&fit=crop&q=80',
+      options_layout: {
+        rows: 2,
+        cols: 3,
+        options: ['A', 'B', 'C', 'D', 'E', 'F']
+      }
+    },
+    correct_answer: ['A', 'B', 'C', 'D', 'E', 'F'][Math.floor(Math.random() * 6)],
+  }));
+}
+
 // ---- MAIN EXPORT ----
 export function getMockQuestions(questionType: string, count: number): MockQuestion[] {
   switch (questionType) {
     case 'figure_sequence':
       return generateFigureSequenceQuestions(count);
+    case 'completing_patterns':
+      return generateCompletingPatternsQuestions(count);
     case 'math_equation':
       return generateMathEquationQuestions(count);
     case 'latin_square':

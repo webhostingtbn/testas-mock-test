@@ -41,6 +41,7 @@ interface ExamConfig {
   is_active: boolean;
   retry_number: number | null;
   created_at: string;
+  format: string | null;
 }
 
 interface CmsQuestion {
@@ -404,7 +405,7 @@ export function AdminUsersPanel() {
 
         const { data: examsData, error: examsError } = await supabase
           .from('exams')
-          .select('id, title, is_active, retry_number, created_at')
+          .select('id, title, is_active, retry_number, created_at, format')
           .order('created_at', { ascending: false });
 
         if (examsError) throw examsError;
@@ -468,13 +469,41 @@ export function AdminUsersPanel() {
   const toggleExamActive = async (examId: string, shouldActivate: boolean) => {
     setIsUpdatingExamId(examId);
     try {
+      const targetExam = exams.find(e => e.id === examId);
+      const examFormat = targetExam?.format || 'Digital';
+
       if (shouldActivate) {
-        await supabase.from('exams').update({ is_active: false }).eq('is_active', true);
-        await supabase.from('exams').update({ is_active: true }).eq('id', examId);
-        setExams(prev => prev.map(e => ({ ...e, is_active: e.id === examId })));
+        // Deactivate all active exams of the same format
+        await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('is_active', true)
+          .eq('format', examFormat);
+
+        // Activate the target exam
+        await supabase
+          .from('exams')
+          .update({ is_active: true })
+          .eq('id', examId);
+
+        setExams(prev =>
+          prev.map(e => {
+            const f = e.format || 'Digital';
+            if (f === examFormat) {
+              return { ...e, is_active: e.id === examId };
+            }
+            return e;
+          })
+        );
       } else {
-        await supabase.from('exams').update({ is_active: false }).eq('id', examId);
-        setExams(prev => prev.map(e => e.id === examId ? { ...e, is_active: false } : e));
+        await supabase
+          .from('exams')
+          .update({ is_active: false })
+          .eq('id', examId);
+
+        setExams(prev =>
+          prev.map(e => (e.id === examId ? { ...e, is_active: false } : e))
+        );
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to update exam activation.');
@@ -562,7 +591,7 @@ export function AdminUsersPanel() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className=" mx-auto">
       {/* Title */}
       <div className="mb-6">
         <p className="text-sm font-medium text-orange-700">Admin Panel</p>
@@ -976,7 +1005,7 @@ export function AdminCmsPanel() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className=" mx-auto">
       <div className="mb-6">
         <p className="text-sm font-medium text-orange-700">Admin CMS</p>
         <h2 className="text-3xl font-bold text-slate-900 mt-1">Question CMS</h2>

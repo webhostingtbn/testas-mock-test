@@ -1,21 +1,28 @@
 'use client';
 
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  LayoutDashboard, BookOpen, Timer,
-  Users, PenLine, LogOut, PanelLeftClose, PanelLeftOpen,
+  Bell,
+  BookOpen,
+  LayoutDashboard,
+  LogOut,
+  PenLine,
+  Timer,
+  Users,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// --- Background Gradient ---
 export function KniBackground() {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_12%_12%,rgba(234,88,12,.14),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,.16),transparent_28%),linear-gradient(135deg,#fff7ed,#ffffff_46%,#fffbeb)]" />
+    <div className="pointer-events-none fixed inset-0 z-0 bg-kni-canvas">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(234,88,12,.08),transparent_28%),radial-gradient(circle_at_88%_4%,rgba(15,23,42,.06),transparent_26%)]" />
+    </div>
   );
 }
 
-// --- Card Primitives ---
 export function KniCard({
   children,
   className,
@@ -27,29 +34,20 @@ export function KniCard({
   variant?: 'light' | 'dark';
   onClick?: () => void;
 }) {
-  if (variant === 'dark') {
-    return (
-      <div
-        onClick={onClick}
-        className={cn(
-          'rounded-2xl border border-white/10 bg-slate-900/70 backdrop-blur-sm',
-          onClick && 'cursor-pointer hover:bg-slate-900/90 transition-all duration-300',
-          className
-        )}
-      >
-        {children}
-      </div>
-    );
-  }
-
   return (
     <div
       onClick={onClick}
       className={cn(
-        'rounded-2xl border border-orange-100/60 bg-white/80 backdrop-blur-sm',
-        'transition-all duration-300 hover:border-orange-200 hover:bg-white/90',
-        onClick && 'cursor-pointer',
-        className
+        'rounded-[22px] border transition duration-200',
+        variant === 'dark'
+          ? 'border-white/10 bg-kni-ink text-white'
+          : 'border-slate-100 bg-white shadow-sm',
+        onClick && (
+          variant === 'dark'
+            ? 'cursor-pointer hover:border-white/20 hover:bg-slate-900'
+            : 'cursor-pointer hover:-translate-y-0.5 hover:border-slate-200 hover:shadow-md'
+        ),
+        className,
       )}
     >
       {children}
@@ -57,7 +55,6 @@ export function KniCard({
   );
 }
 
-// --- Button Primitive ---
 export function KniButton({
   children,
   onClick,
@@ -75,14 +72,13 @@ export function KniButton({
   type?: 'button' | 'submit' | 'reset';
   title?: string;
 }) {
-  const baseStyles = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
-
+  const baseStyles = 'inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50';
   const variants = {
-    primary: 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-500/25',
-    secondary: 'bg-white hover:bg-orange-50 text-slate-950 border border-orange-200 shadow-sm',
-    outline: 'border border-orange-300/50 text-orange-800 hover:bg-orange-600/15',
-    ghost: 'text-slate-600 hover:bg-orange-50 hover:text-slate-950',
-    danger: 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-500/25',
+    primary: 'bg-kni-ink text-white shadow-sm hover:bg-orange-600',
+    secondary: 'border border-slate-200 bg-white text-slate-900 shadow-sm hover:border-slate-300 hover:bg-slate-50',
+    outline: 'border border-slate-300 bg-transparent text-slate-700 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700',
+    ghost: 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+    danger: 'bg-red-600 text-white shadow-sm hover:bg-red-500',
   };
 
   return (
@@ -98,7 +94,6 @@ export function KniButton({
   );
 }
 
-// --- Badge Primitive ---
 export function KniBadge({
   status,
   className,
@@ -107,48 +102,57 @@ export function KniBadge({
   className?: string;
 }) {
   const styles: Record<string, string> = {
-    Approved: 'border-emerald-300/30 bg-emerald-500/15 text-emerald-700',
-    Pending: 'border-amber-300/30 bg-amber-500/15 text-amber-700',
-    Rejected: 'border-rose-300/30 bg-rose-500/15 text-rose-700',
-    Easy: 'border-emerald-300/30 bg-emerald-500/15 text-emerald-700',
-    Medium: 'border-amber-300/30 bg-amber-500/15 text-amber-700',
-    Hard: 'border-rose-300/30 bg-rose-500/15 text-rose-700',
+    Approved: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    Pending: 'border-amber-200 bg-amber-50 text-amber-700',
+    Rejected: 'border-rose-200 bg-rose-50 text-rose-700',
+    Easy: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    Medium: 'border-amber-200 bg-amber-50 text-amber-700',
+    Hard: 'border-rose-200 bg-rose-50 text-rose-700',
   };
 
-  const matchedStyle = styles[status] || 'border-slate-200 bg-slate-50 text-slate-600';
-
   return (
-    <span className={cn('w-fit rounded-full border px-3 py-1 text-xs font-semibold', matchedStyle, className)}>
+    <span className={cn(
+      'w-fit rounded-full border px-3 py-1 text-xs font-semibold',
+      styles[status] || 'border-slate-200 bg-slate-50 text-slate-600',
+      className,
+    )}>
       {status}
     </span>
   );
 }
 
-// --- Progress Indicator ---
 export function KniProgress({
   value,
   className,
 }: {
-  value: number; // percentage 0-100
+  value: number;
   className?: string;
 }) {
   return (
-    <div className={cn('h-2 w-full overflow-hidden rounded-full bg-orange-100', className)}>
+    <div className={cn('h-2 w-full overflow-hidden rounded-full bg-slate-100', className)}>
       <div
-        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-300"
+        className="h-full rounded-full bg-orange-600 transition-all duration-300"
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
       />
     </div>
   );
 }
 
-// --- View type ---
 export type DashboardView = 'dashboard' | 'practice' | 'mock' | 'users' | 'cms' | 'review';
 
 type AppNavItem = {
   id: DashboardView;
   icon: typeof LayoutDashboard;
   label: string;
+};
+
+const VIEW_LABELS: Record<DashboardView, string> = {
+  dashboard: 'Dashboard',
+  practice: 'Practice',
+  mock: 'Mock Test',
+  users: 'Users',
+  cms: 'Content Management',
+  review: 'Attempt Review',
 };
 
 function getNavigation(isAdmin?: boolean): AppNavItem[] {
@@ -166,87 +170,85 @@ function getNavigation(isAdmin?: boolean): AppNavItem[] {
   return nav;
 }
 
-// --- Header Primitive ---
+function accountInitial(email?: string) {
+  return email?.trim().charAt(0).toUpperCase() || 'S';
+}
+
 export function KniHeader({
   email,
+  avatarUrl,
   onLogout,
-  isAdmin,
-  activeView,
+  activeView = 'dashboard',
   onViewChange,
-  isSidebarExpanded,
 }: {
   email?: string;
+  avatarUrl?: string | null;
   onLogout?: () => void;
   isAdmin?: boolean;
   activeView?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
   isSidebarExpanded?: boolean;
 }) {
+  const [imageError, setImageError] = useState(false);
   const router = useRouter();
-  const nav = getNavigation(isAdmin);
-
-  const handleNav = (item: AppNavItem) => {
-    if (onViewChange) {
-      onViewChange(item.id);
-    } else if (item.id === 'dashboard') {
-      router.push('/dashboard');
-    }
+  const goHome = () => {
+    if (onViewChange) onViewChange('dashboard');
+    else router.push('/dashboard');
   };
 
   return (
-    <header className="relative z-10 flex items-center justify-between border-b border-orange-100/70 bg-white/70 px-4 py-3.5 backdrop-blur-xl md:px-6">
-      {/* Site title */}
-      <div
-        onClick={() => handleNav({ id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' })}
-        className="flex min-w-0 items-center gap-3 cursor-pointer select-none"
-      >
-        <div className="hidden text-left sm:block">
-          <p className="text-xs text-slate-400">mocktest.kni.vn</p>
-          <h1 className="truncate text-base font-semibold text-slate-900 leading-tight">TestAS Prep Platform</h1>
-        </div>
-      </div>
+    <header className="relative z-20 flex min-h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 md:px-8">
+      <button type="button" onClick={goHome} className="min-w-0 text-left">
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
+          TestAS Preparation
+        </p>
+        <h1 className="mt-1 truncate text-lg font-black tracking-tight text-slate-950">
+          {VIEW_LABELS[activeView]}
+        </h1>
+      </button>
 
-      {/* Center text nav — only on lg+ when sidebar is collapsed (icon-only mode) */}
-      {!isSidebarExpanded && (
-        <nav className="mx-4 hidden flex-1 justify-center gap-1 lg:flex" aria-label="Primary navigation">
-          {nav.map(item => {
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleNav(item)}
-                className={cn(
-                  'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
-                    : 'text-slate-600 hover:bg-orange-50 hover:text-slate-950'
-                )}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      )}
+      <div className="flex items-center gap-2 md:gap-3">
+        <button
+          type="button"
+          aria-label="Notifications"
+          title="Notifications"
+          className="relative hidden size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 sm:grid"
+        >
+          <Bell className="size-5" />
+          <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-orange-600 ring-2 ring-white" />
+        </button>
 
-      {/* Right side */}
-      <div className="flex items-center gap-3 ml-auto">
         {email && (
-          <div className="hidden lg:block text-right">
-            <p className="text-xs text-slate-400">Signed in as</p>
-            <p className="text-xs font-semibold text-slate-700">{email}</p>
+          <div className="hidden text-right lg:block">
+            <p className="max-w-56 truncate text-xs font-bold text-slate-800">{email}</p>
+            <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
+              Student account
+            </p>
           </div>
         )}
-        {/* Mobile logout — sidebar handles it on md+ */}
+
+        {avatarUrl && !imageError ? (
+          <img
+            src={avatarUrl}
+            alt={email || 'Profile'}
+            onError={() => setImageError(true)}
+            className="size-10 rounded-full object-cover border border-slate-100 shadow-sm"
+          />
+        ) : (
+          <div className="grid size-10 place-items-center rounded-full bg-kni-ink text-sm font-black text-white">
+            {accountInitial(email)}
+          </div>
+        )}
+
         {onLogout && (
           <button
             type="button"
             onClick={onLogout}
-            className="grid size-9 place-items-center rounded-full border border-orange-200 bg-white/80 text-slate-600 hover:bg-orange-50 hover:text-slate-950 shadow-sm md:hidden"
-            title="Log Out"
+            className="grid size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600 md:hidden"
+            title="Log out"
+            aria-label="Log out"
           >
-            <LogOut className="size-4" />
+            <LogOut className="size-4.5" />
           </button>
         )}
       </div>
@@ -254,8 +256,6 @@ export function KniHeader({
   );
 }
 
-
-// --- Sidebar Primitive ---
 export function KniSidebar({
   onLogout,
   isAdmin,
@@ -300,9 +300,13 @@ export function KniSidebar({
           isExpanded ? 'lg:px-1 lg:gap-3 px-1.5 gap-0' : 'px-1.5 gap-0'
         )}
       >
-        <div className="size-9 shrink-0 overflow-hidden rounded-xl bg-white shadow-md shadow-orange-500/10 border border-orange-100/50">
+        <button
+          type="button"
+          onClick={() => handleNav(nav[0])}
+          className="size-9 shrink-0 overflow-hidden rounded-full shadow-md shadow-orange-500/10 border border-orange-100/50 cursor-pointer"
+        >
           <img src="/logo.webp" alt="KNI Logo" className="w-full h-full object-cover" />
-        </div>
+        </button>
         <span
           className={cn(
             'font-bold text-base text-slate-800 tracking-wide whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out',
@@ -399,7 +403,6 @@ export function KniSidebar({
   );
 }
 
-
 function KniMobileNav({
   isAdmin,
   activeView,
@@ -440,10 +443,10 @@ function KniMobileNav({
   );
 }
 
-// --- Layout Shell ---
 export function KniShell({
   children,
   email,
+  avatarUrl,
   onLogout,
   isAdmin,
   activeView = 'dashboard',
@@ -451,26 +454,29 @@ export function KniShell({
 }: {
   children: ReactNode;
   email?: string;
+  avatarUrl?: string | null;
   major?: string;
   onLogout?: () => void;
   isAdmin?: boolean;
   activeView?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
 }) {
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
-
-  // Persist expand state across reloads
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('kni-sidebar-expanded');
-      if (stored !== null) setSidebarExpanded(stored === 'true');
-    } catch {}
-  }, []);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('kni-sidebar-expanded');
+        if (stored !== null) return stored === 'true';
+      } catch {}
+    }
+    return false;
+  });
 
   const toggleSidebar = () => {
     setSidebarExpanded(prev => {
       const next = !prev;
-      try { localStorage.setItem('kni-sidebar-expanded', String(next)); } catch {}
+      try {
+        localStorage.setItem('kni-sidebar-expanded', String(next));
+      } catch {}
       return next;
     });
   };
@@ -490,13 +496,14 @@ export function KniShell({
         <section className="flex flex-col flex-1 min-w-0 min-h-0">
           <KniHeader
             email={email}
+            avatarUrl={avatarUrl}
             onLogout={onLogout}
             isAdmin={isAdmin}
             activeView={activeView}
             onViewChange={onViewChange}
             isSidebarExpanded={sidebarExpanded}
           />
-          <main className="relative z-10 flex-1 overflow-y-auto p-4 pb-20 md:p-5 md:pb-5">
+          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5 pb-24 md:p-7 md:pb-7 xl:p-8">
             {children}
           </main>
         </section>

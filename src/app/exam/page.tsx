@@ -12,6 +12,7 @@ import BreakScreen from '@/components/exam/BreakScreen';
 import FigureSequence from '@/components/question-types/FigureSequence';
 import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
+import CompletingPatterns from '@/components/question-types/CompletingPatterns';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
 import ModuleQuestion from '@/components/question-types/ModuleQuestion';
 import NumericalSeries from '@/components/question-types/NumericalSeries';
@@ -395,6 +396,14 @@ export default function ExamPage() {
           <FigureSequence
             question={q}
             selectedAnswer={currentAnswer as { image1: number | null; image2: number | null } | null}
+            onAnswer={handleAnswer}
+          />
+        );
+      case 'completing_patterns':
+        return (
+          <CompletingPatterns
+            question={q}
+            selectedAnswer={currentAnswer as string | null}
             onAnswer={handleAnswer}
           />
         );

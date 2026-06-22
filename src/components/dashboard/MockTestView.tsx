@@ -65,7 +65,7 @@ export function MockTestView({
   // View 1: If no exam is selected for briefing (meaning no active exams are configured)
   if (!selectedExam) {
     return (
-      <div className="mx-auto w-full max-w-7xl">
+      <div className="mx-auto w-full ">
         <div className="mb-8">
           <p className="text-sm font-medium text-orange-700">Mock Test Center</p>
           <h2 className="mt-1 text-3xl font-bold text-slate-900">Simulate the real exam</h2>

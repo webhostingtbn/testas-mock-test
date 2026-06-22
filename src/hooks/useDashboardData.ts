@@ -39,6 +39,7 @@ export function useDashboardData(session: Session) {
   // --------------- Effects ---------------
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
     async function loadProfile() {
       let fetchedRole = 'user';
       let fetchedLimit = 1;
@@ -49,11 +50,11 @@ export function useDashboardData(session: Session) {
           console.warn('[DashboardClient] No session or user email found', { session, user: session?.user });
 
           // Only redirect after a small delay to ensure session is fully loaded
-          const timer = setTimeout(() => {
+          timer = setTimeout(() => {
             console.warn('[DashboardClient] Redirecting to login due to missing session');
             router.push('/login');
           }, 500);
-          return () => clearTimeout(timer);
+          return;
         }
 
         try {
@@ -141,7 +142,11 @@ export function useDashboardData(session: Session) {
     }
 
     loadProfile();
-  }, [router, supabase, session]);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [router, supabase, session, searchParams]);
 
   useEffect(() => {
     if (profile) {
@@ -306,6 +311,143 @@ export function useDashboardData(session: Session) {
       router.push('/exam');
     } catch (err) {
       console.error('Error starting exam:', err);
+      setIsStarting(false);
+    }
+  };
+
+  const handleResumeExam = async (userExamId: string, examId: string) => {
+    setIsStarting(true);
+
+    try {
+      // Fetch real sections from Supabase, ordered by sort_order
+      const { data: dbSections, error: sectionsError } = await supabase
+        .from('sections')
+        .select('id, title, question_type, duration_seconds, question_count, sort_order')
+        .eq('exam_id', examId)
+        .order('sort_order', { ascending: true });
+
+      if (sectionsError || !dbSections || dbSections.length === 0) {
+        throw new Error('Failed to load sections from database');
+      }
+
+      // Fetch question IDs for all core-test sections in one query
+      const coreSection = dbSections.filter(
+        (s) =>
+          s.question_type !== 'module_mcq' &&
+          s.question_type !== 'interpreting_texts' &&
+          s.question_type !== 'representation_systems' &&
+          s.question_type !== 'linguistic_structures'
+      );
+      const coreSectionIds = coreSection.map(s => s.id);
+
+      const { data: dbQuestions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, section_id, sort_order')
+        .in('section_id', coreSectionIds)
+        .order('sort_order', { ascending: true });
+
+      if (questionsError) throw new Error('Failed to load questions');
+
+      // Group question IDs by section_id
+      const questionIdsBySectionId: Record<string, string[]> = {};
+      for (const q of (dbQuestions || [])) {
+        if (!questionIdsBySectionId[q.section_id]) {
+          questionIdsBySectionId[q.section_id] = [];
+        }
+        questionIdsBySectionId[q.section_id].push(q.id);
+      }
+
+      // Build real sections array for the exam store
+      const coreSections = coreSection.map(s => ({
+        id: s.id,
+        title: s.title,
+        questionType: s.question_type,
+        durationSeconds: s.duration_seconds,
+        questionCount: s.question_count,
+        questionIds: questionIdsBySectionId[s.id] || [],
+      }));
+
+      // Fetch passages for module sections that match the user's selected module
+      const matchedModuleSections = dbSections.filter((s) => {
+        if (!activeModule) return false;
+        const normalizedModule = activeModule.toLowerCase();
+
+        if (examId === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
+          // Main Mock Test matching (match by exact title)
+          const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
+          return (
+            (s.question_type === 'module_mcq' ||
+              s.question_type === 'interpreting_texts' ||
+              s.question_type === 'representation_systems' ||
+              s.question_type === 'linguistic_structures') &&
+            s.title === targetModuleTitle
+          );
+        } else {
+          // Practice Bank or other exams: match based on subtest-to-module mappings
+          const type = s.question_type;
+          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+            return type === 'representation_systems';
+          }
+          if (normalizedModule.includes('engin')) {
+            return type === 'representation_systems';
+          }
+          if (normalizedModule.includes('econ')) {
+            return type === 'interpreting_texts';
+          }
+          if (normalizedModule.includes('humanities')) {
+            return type === 'interpreting_texts' || type === 'linguistic_structures';
+          }
+          return false;
+        }
+      });
+
+      const moduleSectionObjs = [];
+      for (const mSec of matchedModuleSections) {
+        const { data: dbPassages, error: passagesError } = await supabase
+          .from('passages')
+          .select('id')
+          .eq('section_id', mSec.id)
+          .order('sort_order', { ascending: true });
+
+        if (!passagesError && dbPassages) {
+          moduleSectionObjs.push({
+            id: mSec.id,
+            title: `Module: ${mSec.title}`,
+            questionType: mSec.question_type,
+            durationSeconds: mSec.duration_seconds,
+            questionCount: mSec.question_count,
+            questionIds: dbPassages.map((p) => p.id),
+          });
+        }
+      }
+
+      const allSections = [...coreSections, ...moduleSectionObjs];
+
+      const flowSteps = [];
+      for (let i = 0; i < allSections.length; i++) {
+        flowSteps.push({ type: 'section' as const, sectionIndex: i });
+        if (i < allSections.length - 1) {
+          const currentIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i].questionType);
+          const nextIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i + 1].questionType);
+
+          const breakDuration = (!currentIsModule && nextIsModule)
+            ? BREAK_DURATIONS.LONG
+            : BREAK_DURATIONS.SHORT;
+
+          flowSteps.push({ type: 'break' as const, breakDuration });
+        }
+      }
+
+      startExam({
+        examId,
+        userExamId,
+        sections: allSections,
+        flowSteps,
+      });
+
+      router.push('/exam');
+    } catch (err) {
+      console.error('Error resuming exam:', err);
       setIsStarting(false);
     }
   };
@@ -607,6 +749,7 @@ export function useDashboardData(session: Session) {
     isAttemptLimitReached,
     getExamAttemptInfo,
     computeRadarStats,
+    handleResumeExam,
 
     // Gate-screen config state
     selectedModule,

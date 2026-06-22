@@ -139,7 +139,7 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
   const overallPercentage = attempt.max_score > 0 ? Math.round((attempt.total_score / attempt.max_score) * 100) : 0;
 
   return (
-    <div className="mx-auto w-full max-w-7xl pb-10">
+    <div className="mx-auto w-full  pb-10">
       <button 
         onClick={onBack} 
         className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-semibold mb-5 cursor-pointer transition shrink-0"

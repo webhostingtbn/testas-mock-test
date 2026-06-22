@@ -24,6 +24,11 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-kni-canvas: var(--kni-canvas);
+  --color-kni-surface: var(--kni-surface);
+  --color-kni-soft: var(--kni-soft);
+  --color-kni-ink: var(--kni-ink);
+  --color-kni-accent: var(--kni-accent);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -82,6 +87,11 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --kni-canvas: #e9e7e3;
+  --kni-surface: #ffffff;
+  --kni-soft: #f7f4ef;
+  --kni-ink: #15171b;
+  --kni-accent: #ea580c;
 }
 
 .dark {
@@ -124,16 +134,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
   }
 }
 
-/* Custom, sleek scrollbar matching the preparation platform theme */
+/* Shared product scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(249, 115, 22, 0.25) transparent;
+  scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
@@ -143,10 +154,10 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(249, 115, 22, 0.25);
+  background: rgba(15, 23, 42, 0.18);
   border-radius: 9999px;
   transition: background-color 0.2s;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(234, 88, 12, 0.45);
+  background: rgba(234, 88, 12, 0.5);
 }

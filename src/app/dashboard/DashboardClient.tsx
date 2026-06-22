@@ -23,7 +23,7 @@ export default function DashboardClient({ session }: { session: Session }) {
   const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<any | null>(null);
   
   // Lifted tab state for dashboard format switching
-  const [activeFormatTab, setActiveFormatTab] = useState<'Digital' | 'Paper'>('Digital');
+  const [activeFormatTab, setActiveFormatTab] = useState<'Digital' | 'Paper'>(data.profile?.format as 'Digital' | 'Paper' || 'Digital');
 
   // Synchronize activeFormatTab with user's allocated format once profile loads
   useEffect(() => {
@@ -117,6 +117,7 @@ export default function DashboardClient({ session }: { session: Session }) {
   return (
     <KniShell
       email={profile?.email}
+      avatarUrl={profile?.avatar_url}
       onLogout={data.handleLogout}
       isAdmin={data.isAdmin}
       activeView={activeView}
@@ -135,6 +136,9 @@ export default function DashboardClient({ session }: { session: Session }) {
           onReviewAttempt={(attempt) => {
             setSelectedAttemptForReview(attempt);
             setActiveView('review');
+          }}
+          onResumeAttempt={(attempt) => {
+            data.handleResumeExam(attempt.id, attempt.exam_id);
           }}
         />
       )}
