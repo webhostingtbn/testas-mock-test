@@ -482,7 +482,7 @@ export function KniShell({
   };
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-orange-50 text-slate-950 flex flex-col relative">
+    <div className="h-screen max-h-screen w-full overflow-hidden bg-orange-50 text-slate-950 flex flex-col relative">
       <KniBackground />
       <div className="relative flex flex-1 min-h-0">
         <KniSidebar
