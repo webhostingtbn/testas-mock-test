@@ -14,6 +14,7 @@ interface ModuleQuestionProps {
     content: {
       question_text: string;
       question_image?: string;
+      image_url?: string;
       environment_text?: string;
       environment_images?: string[];
       options: any;
@@ -64,8 +65,9 @@ export default function ModuleQuestion({
   selectedAnswer,
   onAnswer,
 }: ModuleQuestionProps) {
-  const { question_text, question_image, environment_text, environment_images, options } = question.content;
+  const { question_text, question_image, image_url, environment_text, environment_images, options } = question.content;
   const normalized = normalizeOptions(options);
+  const displayImage = question_image || image_url;
 
   return (
     <div className="space-y-6">
@@ -106,10 +108,10 @@ export default function ModuleQuestion({
         <p className="text-gray-800 text-base leading-relaxed mb-4">
           {question_text}
         </p>
-        {question_image && (
+        {displayImage && (
           <div className="w-full">
-            {question_image.startsWith('http') || question_image.startsWith('/') ? (
-              <ZoomableImage src={question_image} alt="Question" />
+            {displayImage.startsWith('http') || displayImage.startsWith('/') ? (
+              <ZoomableImage src={displayImage} alt="Question" />
             ) : (
               <div className="w-64 h-40 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-250 rounded-xl">
                 [Image placeholder]

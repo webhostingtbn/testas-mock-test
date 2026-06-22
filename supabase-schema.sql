@@ -16,7 +16,8 @@ CREATE TYPE public.question_type AS ENUM (
   'figure_sequence',
   'math_equation',
   'latin_square',
-  'module_mcq'          -- Module-specific multiple choice (with environment/scheme)
+  'module_mcq',          -- Module-specific multiple choice (with environment/scheme)
+  'completing_patterns'
 );
 
 CREATE TYPE public.exam_status AS ENUM (
@@ -63,6 +64,28 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Trigger to prevent non-admins from changing role, status, or allow_test_limit
+CREATE OR REPLACE FUNCTION public.check_profile_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    IF (SELECT role FROM public.profiles WHERE id = auth.uid()) IS DISTINCT FROM 'admin' THEN
+      IF OLD.role IS DISTINCT FROM NEW.role OR
+         OLD.status IS DISTINCT FROM NEW.status OR
+         OLD.allow_test_limit IS DISTINCT FROM NEW.allow_test_limit THEN
+        RAISE EXCEPTION 'Only admins can modify role, status, or allow_test_limit.';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_check_profile_update
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.check_profile_update();
+
 
 -- 3. EXAMS (exam definitions)
 -- -------------------------------------------------------------

@@ -187,11 +187,11 @@ export function DashboardView({
         <section className="flex min-w-0 flex-col gap-6">
           <div className="grid overflow-hidden rounded-[26px] bg-kni-soft sm:min-h-[250px] sm:grid-cols-[minmax(0,1fr)_250px]">
             <div className="relative z-10 p-6 sm:p-8 lg:p-10">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-orange-700 shadow-sm">
+              {/* <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-orange-700 shadow-sm">
                 <Book className="size-3.5" />
                 Your preparation space
-              </span>
-              <h2 className="mt-5 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
+              </span> */}
+              <h2 className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
                 Hello {firstName(profile?.full_name)}!
               </h2>
               <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">

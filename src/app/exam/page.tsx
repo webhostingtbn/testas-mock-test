@@ -171,10 +171,10 @@ export default function ExamPage() {
 
         if (qError) throw qError;
 
-        const formattedPassages = (passagesData || []).map((passage) => {
+        const formattedPassages = (passagesData || []).map((passage: any) => {
           const pQuestions = (questionsData || [])
-            .filter((q) => q.passage_id === passage.id)
-            .map((q) => {
+            .filter((q: any) => q.passage_id === passage.id)
+            .map((q: any) => {
               const content = (q.content as any) || {};
               let qResolvedUrl;
               if (content.image_url) {
@@ -220,48 +220,105 @@ export default function ExamPage() {
 
       if (error || !data) throw error;
 
-      // For figure_sequence, resolve storage image URLs
-      if (section.questionType === 'figure_sequence') {
-        const resolved = data.map((q) => {
-          const content = q.content as { prompt_image?: string; options?: string[] };
+      // Comprehensive storage path resolver for all non-passage questions
+      const resolved = data.map((q: any) => {
+        const content = (q.content as any) || {};
+        const newContent = { ...content };
+
+        // 1. Resolve prompt_image (FigureSequence)
+        if (content.prompt_image) {
           const { data: promptData } = supabase.storage
             .from(STORAGE_BUCKET)
-            .getPublicUrl(content.prompt_image || '');
-            
-          const resolvedOptions = (content.options || []).map((path) => {
+            .getPublicUrl(content.prompt_image);
+          newContent.prompt_image_url = promptData.publicUrl;
+        }
+
+        // 2. Resolve options as image paths (FigureSequence options_urls)
+        if (content.options && Array.isArray(content.options) && section.questionType === 'figure_sequence') {
+          newContent.options_urls = content.options.map((path: string) => {
             const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
             return data.publicUrl;
           });
+        }
 
-          return {
-            ...q,
-            content: {
-              ...content,
-              prompt_image_url: promptData.publicUrl,
-              options_urls: resolvedOptions,
-            },
-          };
-        });
-        setSectionQuestions(resolved);
-      } else if (section.questionType === 'latin_square') {
-        const resolved = data.map((q) => {
-          const content = q.content as { grid_image?: string };
-          const { data: imgData } = supabase.storage
+        // 3. Resolve grid_image (LatinSquare & CompletingPatterns)
+        if (content.grid_image) {
+          const { data: gridData } = supabase.storage
             .from(STORAGE_BUCKET)
-            .getPublicUrl(content.grid_image || '');
-            
-          return {
-            ...q,
-            content: {
-              ...content,
-              grid_image_url: imgData.publicUrl,
-            },
-          };
-        });
-        setSectionQuestions(resolved);
-      } else {
-        setSectionQuestions(data);
-      }
+            .getPublicUrl(content.grid_image);
+          newContent.grid_image_url = gridData.publicUrl;
+        }
+
+        // 4. Resolve options_image (CompletingPatterns)
+        if (content.options_image) {
+          const { data: optionsImgData } = supabase.storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(content.options_image);
+          newContent.options_image_url = optionsImgData.publicUrl;
+        }
+
+        // 5. Resolve question_image (ModuleQuestion)
+        if (content.question_image) {
+          if (!content.question_image.startsWith('http') && !content.question_image.startsWith('/')) {
+            const { data: qImgData } = supabase.storage
+              .from(STORAGE_BUCKET)
+              .getPublicUrl(content.question_image);
+            newContent.question_image = qImgData.publicUrl;
+          }
+        }
+
+        // 6. Resolve image_url (ModuleQuestion / standard)
+        if (content.image_url) {
+          if (!content.image_url.startsWith('http') && !content.image_url.startsWith('/')) {
+            const { data: imgData } = supabase.storage
+              .from(STORAGE_BUCKET)
+              .getPublicUrl(content.image_url);
+            newContent.image_url = imgData.publicUrl;
+          }
+        }
+
+        // 7. Resolve option images inside standard MCQ options (ModuleQuestion options)
+        if (content.options && typeof content.options === 'object') {
+          if (Array.isArray(content.options)) {
+            newContent.options = content.options.map((opt: any) => {
+              if (opt && typeof opt === 'object' && opt.image) {
+                if (!opt.image.startsWith('http') && !opt.image.startsWith('/')) {
+                  const { data: optImgData } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(opt.image);
+                  return { ...opt, image: optImgData.publicUrl };
+                }
+              }
+              return opt;
+            });
+          } else {
+            // Key-value options
+            const updatedOptions: any = {};
+            for (const [key, val] of Object.entries(content.options)) {
+              if (val && typeof val === 'object' && (val as any).image) {
+                const optImage = (val as any).image;
+                if (!optImage.startsWith('http') && !optImage.startsWith('/')) {
+                  const { data: optImgData } = supabase.storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(optImage);
+                  updatedOptions[key] = { ...(val as any), image: optImgData.publicUrl };
+                } else {
+                  updatedOptions[key] = val;
+                }
+              } else {
+                updatedOptions[key] = val;
+              }
+            }
+            newContent.options = updatedOptions;
+          }
+        }
+
+        return {
+          ...q,
+          content: newContent,
+        };
+      });
+      setSectionQuestions(resolved);
     } catch (err) {
       console.error('Failed to load questions:', err);
       // Fallback to mock data
@@ -423,6 +480,32 @@ export default function ExamPage() {
             onAnswer={handleAnswer}
           />
         );
+      case 'completing_patterns':
+      case 'completing patterns':
+        return (
+          <CompletingPatterns
+            question={q}
+            selectedAnswer={currentAnswer as string | null}
+            onAnswer={handleAnswer}
+          />
+        );
+      case 'figure_sequence':
+      case 'figure sequence':
+        return (
+          <FigureSequence
+            question={q}
+            selectedAnswer={currentAnswer as any}
+            onAnswer={handleAnswer}
+          />
+        );
+      case 'math_equation':
+        return (
+          <MathEquation
+            question={q}
+            currentAnswer={currentAnswer as any}
+            onAnswer={handleAnswer}
+          />
+        );
       case 'module_mcq':
       case 'interpreting_texts':
       case 'representation_systems':
@@ -434,15 +517,6 @@ export default function ExamPage() {
             onAnswer={(questionId, val) => setAnswer(section.id, questionId, val)}
           />
         );
-      case 'solving_quantitative':
-      case 'inferring_relationships':
-        return (
-          <ModuleQuestion
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={(optionId) => handleAnswer(optionId)}
-          />
-        );
       case 'numerical_series':
         return (
           <NumericalSeries
@@ -451,8 +525,24 @@ export default function ExamPage() {
             onAnswer={(val) => handleAnswer(val)}
           />
         );
+      case 'solving_quantitative':
+      case 'inferring_relationships':
+      case 'visualising_solids':
+      case 'visualizing_solids':
+      case 'visualising solids':
+      case 'visualizing solids':
+      case 'visualising solids - 2d':
+      case 'visualizing solids - 2d':
+      case 'visualising solids - 3d':
+      case 'visualizing solids - 3d':
       default:
-        return <div className="text-center text-gray-500 py-20">Unknown question type</div>;
+        return (
+          <ModuleQuestion
+            question={q}
+            selectedAnswer={currentAnswer as string | null}
+            onAnswer={(optionId) => handleAnswer(optionId)}
+          />
+        );
     }
   };
 
@@ -498,7 +588,7 @@ export default function ExamPage() {
       {/* Preload all images for the section so switching questions is instantaneous */}
       <div className="hidden" aria-hidden="true">
         {sectionQuestions.map(q => {
-          const url = q.content?.prompt_image_url || q.content?.grid_image_url || q.resolved_image_url;
+          const url = q.content?.prompt_image_url || q.content?.grid_image_url || q.content?.question_image || q.content?.image_url || q.resolved_image_url;
           const opts = q.content?.options_urls || [];
           const childQuestions = q.questions || [];
           return (
