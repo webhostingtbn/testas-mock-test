@@ -850,26 +850,26 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   return (
     <div className="mx-auto w-full max-w-7xl">
       {/* Top Header & Metrics Section Container */}
-      <div className="bg-slate-50/50 border border-slate-200/50 rounded-[32px] p-6 sm:p-8 mb-10 shadow-xs backdrop-blur-sm">
+      <div className="py-6 sm:py-8 mb-10 shadow-xs backdrop-blur-sm">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Card 1: Difficulty Breakdown */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
+          <KniCard className="flex flex-col p-6 bg-emerald-50 border border-emerald-100/70 rounded-[24px] shadow-xs justify-between min-h-[200px]">
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Difficulty Breakdown</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Based on your ratings</p>
+              <p className="text-[11px] text-slate-450 font-medium">Based on your ratings</p>
             </div>
 
             <div className="flex items-center gap-6 my-3">
               {/* Donut Chart */}
               <div className="relative size-24 flex items-center justify-center shrink-0">
                 <svg className="size-full transform -rotate-90" viewBox="0 0 36 36">
-                  {/* Base / Unclassified segment */}
+                  {/* Base / Unclassified segment - white for nice contrast on emerald-50 */}
                   <circle
                     cx="18"
                     cy="18"
                     r="15.915"
                     fill="none"
-                    stroke="#f1f5f9"
+                    stroke="#ffffff"
                     strokeWidth="3.2"
                   />
                   {/* Easy segment */}
@@ -926,21 +926,21 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
               {/* Legend List */}
               <div className="flex-1 flex flex-col gap-2 min-w-0">
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
+                  <div className="flex items-center gap-2 text-slate-650">
                     <span className="size-2 rounded-full bg-[#10b981]" />
                     <span>Easy</span>
                   </div>
                   <span className="text-slate-850 font-bold">{overallStats.totalEasy} rated</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
+                  <div className="flex items-center gap-2 text-slate-650">
                     <span className="size-2 rounded-full bg-[#fbbf24]" />
                     <span>Medium</span>
                   </div>
                   <span className="text-slate-850 font-bold">{overallStats.totalMedium} rated</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-slate-500">
+                  <div className="flex items-center gap-2 text-slate-650">
                     <span className="size-2 rounded-full bg-[#ef4444]" />
                     <span>Hard</span>
                   </div>
@@ -951,10 +951,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           </KniCard>
 
           {/* Card 2: Overall Progress */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
+          <KniCard className="flex flex-col p-6 bg-orange-50 border border-orange-100/70 rounded-[24px] shadow-xs justify-between min-h-[200px]">
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Overall Progress</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Question bank completion</p>
+              <p className="text-[11px] text-slate-450 font-medium">Question bank completion</p>
             </div>
 
             <div className="flex flex-col items-center justify-center my-3 text-center">
@@ -967,27 +967,27 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             </div>
 
             <div>
-              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner mb-1">
+              <div className="w-full h-2 bg-white/70 rounded-full overflow-hidden border border-white/80 shadow-inner mb-1">
                 <div
                   className="h-full bg-gradient-to-r from-orange-500 to-amber-450 rounded-full transition-all duration-500"
                   style={{ width: `${overallProgressPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              <div className="flex justify-between items-center text-[9px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">
                 <span>0 questions</span>
                 <span>{overallStats.totalQuestions} total</span>
               </div>
-              <p className="text-xs font-bold text-slate-500 text-center">
+              <p className="text-xs font-bold text-slate-600 text-center">
                 {overallStats.totalRated} of {overallStats.totalQuestions} questions rated
               </p>
             </div>
           </KniCard>
 
           {/* Card 3: Activity Streak */}
-          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/60 rounded-[24px] shadow-xs justify-between min-h-[200px]">
+          <KniCard className="flex flex-col p-6 bg-amber-50 border border-amber-100/70 rounded-[24px] shadow-xs justify-between min-h-[200px]">
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Activity Streak</h3>
-              <p className="text-[11px] text-slate-400 font-medium">Practice frequency</p>
+              <p className="text-[11px] text-slate-450 font-medium">Practice frequency</p>
             </div>
 
             <div className="my-2.5">
@@ -998,7 +998,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                 <Flame className="size-7 text-orange-500 fill-orange-100 shrink-0" />
               </div>
               <p className="text-sm font-extrabold text-slate-800 mt-1">Day Streak!</p>
-              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Max Streak: {maxStreak} days</p>
+              <p className="text-[10px] font-bold text-slate-500 mt-0.5">Max Streak: {maxStreak} days</p>
             </div>
 
             <div>
@@ -1011,7 +1011,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                         className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           isActive
                             ? 'bg-orange-500 border border-orange-500 text-white shadow-sm shadow-orange-100'
-                            : 'bg-white border border-slate-200 text-slate-400'
+                            : 'bg-white border border-amber-200/50 text-amber-700/60'
                         }`}
                       >
                         {isActive ? (
@@ -1020,18 +1020,19 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                           dayLabel
                         )}
                       </div>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{dayLabel}</span>
+                      <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider">{dayLabel}</span>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-slate-500 text-center uppercase tracking-wider">
                 Checked in {weeklyActiveCount} of 7 days this week
               </p>
             </div>
           </KniCard>
         </div>
       </div>
+
 
       {/* Core Test Section */}
       {coreSubtests.length > 0 && (
