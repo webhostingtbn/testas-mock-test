@@ -178,35 +178,111 @@ export function useDashboardData(session: Session) {
         throw new Error('Failed to load sections from database');
       }
 
-      // Fetch question IDs for all core-test sections in one query
-      const coreSection = dbSections.filter(
-        (s) =>
-          s.question_type !== 'module_mcq' &&
-          s.question_type !== 'interpreting_texts' &&
-          s.question_type !== 'representation_systems' &&
-          s.question_type !== 'linguistic_structures'
-      );
-      const coreSectionIds = coreSection.map(s => s.id);
+      // Fetch the exam format first
+      const { data: examData, error: examFetchError } = await supabase
+        .from('exams')
+        .select('format')
+        .eq('id', EXAM_ID)
+        .single();
+      
+      if (examFetchError || !examData) {
+        throw new Error('Failed to fetch exam format from database');
+      }
+      
+      const isPaper = examData.format === 'Paper';
 
-      const { data: dbQuestions, error: questionsError } = await supabase
-        .from('questions')
-        .select('id, section_id, sort_order')
-        .in('section_id', coreSectionIds)
-        .order('sort_order', { ascending: true });
+      // 1. Separate Core sections
+      const coreSectionsMatched = dbSections.filter((s: any) => {
+        if (isPaper) {
+          return [
+            'solving_quantitative',
+            'inferring_relationships',
+            'completing_patterns',
+            'numerical_series'
+          ].includes(s.question_type);
+        } else {
+          return [
+            'figure_sequence',
+            'math_equation',
+            'latin_square'
+          ].includes(s.question_type);
+        }
+      });
 
-      if (questionsError) throw new Error('Failed to load questions');
+      // 2. Separate Module sections matching user's selected module
+      const moduleSectionsMatched = dbSections.filter((s: any) => {
+        if (!activeModule) return false;
+        const normalizedModule = activeModule.toLowerCase();
+
+        if (isPaper) {
+          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+            return s.question_type === 'sc_1' || s.question_type === 'sc_2';
+          }
+          if (normalizedModule.includes('engin')) {
+            return ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'].includes(s.question_type);
+          }
+          if (normalizedModule.includes('econ')) {
+            return s.question_type === 'econ_1' || s.question_type === 'econ_2';
+          }
+          return false;
+        } else {
+          // Digital format matching
+          if (EXAM_ID === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
+            const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
+            return (
+              ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(s.question_type) &&
+              s.title === targetModuleTitle
+            );
+          } else {
+            const type = s.question_type;
+            if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+              return type === 'representation_systems';
+            }
+            if (normalizedModule.includes('engin')) {
+              return type === 'representation_systems';
+            }
+            if (normalizedModule.includes('econ')) {
+              return type === 'interpreting_texts';
+            }
+            if (normalizedModule.includes('humanities')) {
+              return type === 'interpreting_texts' || type === 'linguistic_structures';
+            }
+            return false;
+          }
+        }
+      });
+
+      const passageSectionTypes = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'];
+      
+      const questionSections = [
+        ...coreSectionsMatched,
+        ...moduleSectionsMatched.filter((s: any) => !passageSectionTypes.includes(s.question_type))
+      ];
+
+      const questionSectionIds = questionSections.map((s: any) => s.id);
+      let dbQuestions: any[] = [];
+      if (questionSectionIds.length > 0) {
+        const { data, error: questionsError } = await supabase
+          .from('questions')
+          .select('id, section_id, sort_order')
+          .in('section_id', questionSectionIds)
+          .order('sort_order', { ascending: true });
+
+        if (questionsError) throw new Error('Failed to load questions from database');
+        dbQuestions = data || [];
+      }
 
       // Group question IDs by section_id
       const questionIdsBySectionId: Record<string, string[]> = {};
-      for (const q of (dbQuestions || [])) {
+      for (const q of dbQuestions) {
         if (!questionIdsBySectionId[q.section_id]) {
           questionIdsBySectionId[q.section_id] = [];
         }
         questionIdsBySectionId[q.section_id].push(q.id);
       }
 
-      // Build real sections array for the exam store
-      const coreSections = coreSection.map(s => ({
+      // Build Core sections
+      const coreSections = coreSectionsMatched.map((s: any) => ({
         id: s.id,
         title: s.title,
         questionType: s.question_type,
@@ -215,68 +291,60 @@ export function useDashboardData(session: Session) {
         questionIds: questionIdsBySectionId[s.id] || [],
       }));
 
-      // Fetch passages for module sections that match the user's selected module
-      const matchedModuleSections = dbSections.filter((s) => {
-        if (!activeModule) return false;
-        const normalizedModule = activeModule.toLowerCase();
-
-        if (EXAM_ID === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
-          // Main Mock Test matching (match by exact title)
-          const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-          return (
-            (s.question_type === 'module_mcq' ||
-              s.question_type === 'interpreting_texts' ||
-              s.question_type === 'representation_systems' ||
-              s.question_type === 'linguistic_structures') &&
-            s.title === targetModuleTitle
-          );
-        } else {
-          // Practice Bank or other exams: match based on subtest-to-module mappings
-          const type = s.question_type;
-          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-            return type === 'representation_systems';
-          }
-          if (normalizedModule.includes('engin')) {
-            return type === 'representation_systems';
-          }
-          if (normalizedModule.includes('econ')) {
-            return type === 'interpreting_texts';
-          }
-          if (normalizedModule.includes('humanities')) {
-            return type === 'interpreting_texts' || type === 'linguistic_structures';
-          }
-          return false;
-        }
-      });
-
+      // Build Module sections
       const moduleSectionObjs = [];
-      for (const mSec of matchedModuleSections) {
-        const { data: dbPassages, error: passagesError } = await supabase
-          .from('passages')
-          .select('id')
-          .eq('section_id', mSec.id)
-          .order('sort_order', { ascending: true });
+      for (const mSec of moduleSectionsMatched) {
+        if (passageSectionTypes.includes(mSec.question_type)) {
+          // Uses passages (Digital module)
+          const { data: dbPassages, error: passagesError } = await supabase
+            .from('passages')
+            .select('id')
+            .eq('section_id', mSec.id)
+            .order('sort_order', { ascending: true });
 
-        if (!passagesError && dbPassages) {
+          if (!passagesError && dbPassages) {
+            moduleSectionObjs.push({
+              id: mSec.id,
+              title: `Module: ${mSec.title}`,
+              questionType: mSec.question_type,
+              durationSeconds: mSec.duration_seconds,
+              questionCount: mSec.question_count,
+              questionIds: dbPassages.map((p: any) => p.id),
+            });
+          }
+        } else {
+          // Uses standard questions (Paper module)
           moduleSectionObjs.push({
             id: mSec.id,
             title: `Module: ${mSec.title}`,
             questionType: mSec.question_type,
             durationSeconds: mSec.duration_seconds,
             questionCount: mSec.question_count,
-            questionIds: dbPassages.map((p) => p.id),
+            questionIds: questionIdsBySectionId[mSec.id] || [],
           });
         }
       }
 
       const allSections = [...coreSections, ...moduleSectionObjs];
 
+      const isModuleSection = (qType: string) => {
+        if (isPaper) {
+          return [
+            'eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3',
+            'econ_1', 'econ_2',
+            'sc_1', 'sc_2'
+          ].includes(qType);
+        } else {
+          return passageSectionTypes.includes(qType);
+        }
+      };
+
       const flowSteps = [];
       for (let i = 0; i < allSections.length; i++) {
         flowSteps.push({ type: 'section' as const, sectionIndex: i });
         if (i < allSections.length - 1) {
-          const currentIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i].questionType);
-          const nextIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i + 1].questionType);
+          const currentIsModule = isModuleSection(allSections[i].questionType);
+          const nextIsModule = isModuleSection(allSections[i + 1].questionType);
 
           const breakDuration = (!currentIsModule && nextIsModule)
             ? BREAK_DURATIONS.LONG
@@ -330,35 +398,111 @@ export function useDashboardData(session: Session) {
         throw new Error('Failed to load sections from database');
       }
 
-      // Fetch question IDs for all core-test sections in one query
-      const coreSection = dbSections.filter(
-        (s) =>
-          s.question_type !== 'module_mcq' &&
-          s.question_type !== 'interpreting_texts' &&
-          s.question_type !== 'representation_systems' &&
-          s.question_type !== 'linguistic_structures'
-      );
-      const coreSectionIds = coreSection.map(s => s.id);
+      // Fetch the exam format first
+      const { data: examData, error: examFetchError } = await supabase
+        .from('exams')
+        .select('format')
+        .eq('id', examId)
+        .single();
+      
+      if (examFetchError || !examData) {
+        throw new Error('Failed to fetch exam format from database');
+      }
+      
+      const isPaper = examData.format === 'Paper';
 
-      const { data: dbQuestions, error: questionsError } = await supabase
-        .from('questions')
-        .select('id, section_id, sort_order')
-        .in('section_id', coreSectionIds)
-        .order('sort_order', { ascending: true });
+      // 1. Separate Core sections
+      const coreSectionsMatched = dbSections.filter((s: any) => {
+        if (isPaper) {
+          return [
+            'solving_quantitative',
+            'inferring_relationships',
+            'completing_patterns',
+            'numerical_series'
+          ].includes(s.question_type);
+        } else {
+          return [
+            'figure_sequence',
+            'math_equation',
+            'latin_square'
+          ].includes(s.question_type);
+        }
+      });
 
-      if (questionsError) throw new Error('Failed to load questions');
+      // 2. Separate Module sections matching user's selected module
+      const moduleSectionsMatched = dbSections.filter((s: any) => {
+        if (!activeModule) return false;
+        const normalizedModule = activeModule.toLowerCase();
+
+        if (isPaper) {
+          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+            return s.question_type === 'sc_1' || s.question_type === 'sc_2';
+          }
+          if (normalizedModule.includes('engin')) {
+            return ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'].includes(s.question_type);
+          }
+          if (normalizedModule.includes('econ')) {
+            return s.question_type === 'econ_1' || s.question_type === 'econ_2';
+          }
+          return false;
+        } else {
+          // Digital format matching
+          if (examId === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
+            const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
+            return (
+              ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(s.question_type) &&
+              s.title === targetModuleTitle
+            );
+          } else {
+            const type = s.question_type;
+            if (normalizedModule.includes('science') || normalizedModule === 'cs') {
+              return type === 'representation_systems';
+            }
+            if (normalizedModule.includes('engin')) {
+              return type === 'representation_systems';
+            }
+            if (normalizedModule.includes('econ')) {
+              return type === 'interpreting_texts';
+            }
+            if (normalizedModule.includes('humanities')) {
+              return type === 'interpreting_texts' || type === 'linguistic_structures';
+            }
+            return false;
+          }
+        }
+      });
+
+      const passageSectionTypes = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'];
+      
+      const questionSections = [
+        ...coreSectionsMatched,
+        ...moduleSectionsMatched.filter((s: any) => !passageSectionTypes.includes(s.question_type))
+      ];
+
+      const questionSectionIds = questionSections.map((s: any) => s.id);
+      let dbQuestions: any[] = [];
+      if (questionSectionIds.length > 0) {
+        const { data, error: questionsError } = await supabase
+          .from('questions')
+          .select('id, section_id, sort_order')
+          .in('section_id', questionSectionIds)
+          .order('sort_order', { ascending: true });
+
+        if (questionsError) throw new Error('Failed to load questions from database');
+        dbQuestions = data || [];
+      }
 
       // Group question IDs by section_id
       const questionIdsBySectionId: Record<string, string[]> = {};
-      for (const q of (dbQuestions || [])) {
+      for (const q of dbQuestions) {
         if (!questionIdsBySectionId[q.section_id]) {
           questionIdsBySectionId[q.section_id] = [];
         }
         questionIdsBySectionId[q.section_id].push(q.id);
       }
 
-      // Build real sections array for the exam store
-      const coreSections = coreSection.map(s => ({
+      // Build Core sections
+      const coreSections = coreSectionsMatched.map((s: any) => ({
         id: s.id,
         title: s.title,
         questionType: s.question_type,
@@ -367,68 +511,60 @@ export function useDashboardData(session: Session) {
         questionIds: questionIdsBySectionId[s.id] || [],
       }));
 
-      // Fetch passages for module sections that match the user's selected module
-      const matchedModuleSections = dbSections.filter((s) => {
-        if (!activeModule) return false;
-        const normalizedModule = activeModule.toLowerCase();
-
-        if (examId === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
-          // Main Mock Test matching (match by exact title)
-          const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-          return (
-            (s.question_type === 'module_mcq' ||
-              s.question_type === 'interpreting_texts' ||
-              s.question_type === 'representation_systems' ||
-              s.question_type === 'linguistic_structures') &&
-            s.title === targetModuleTitle
-          );
-        } else {
-          // Practice Bank or other exams: match based on subtest-to-module mappings
-          const type = s.question_type;
-          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-            return type === 'representation_systems';
-          }
-          if (normalizedModule.includes('engin')) {
-            return type === 'representation_systems';
-          }
-          if (normalizedModule.includes('econ')) {
-            return type === 'interpreting_texts';
-          }
-          if (normalizedModule.includes('humanities')) {
-            return type === 'interpreting_texts' || type === 'linguistic_structures';
-          }
-          return false;
-        }
-      });
-
+      // Build Module sections
       const moduleSectionObjs = [];
-      for (const mSec of matchedModuleSections) {
-        const { data: dbPassages, error: passagesError } = await supabase
-          .from('passages')
-          .select('id')
-          .eq('section_id', mSec.id)
-          .order('sort_order', { ascending: true });
+      for (const mSec of moduleSectionsMatched) {
+        if (passageSectionTypes.includes(mSec.question_type)) {
+          // Uses passages (Digital module)
+          const { data: dbPassages, error: passagesError } = await supabase
+            .from('passages')
+            .select('id')
+            .eq('section_id', mSec.id)
+            .order('sort_order', { ascending: true });
 
-        if (!passagesError && dbPassages) {
+          if (!passagesError && dbPassages) {
+            moduleSectionObjs.push({
+              id: mSec.id,
+              title: `Module: ${mSec.title}`,
+              questionType: mSec.question_type,
+              durationSeconds: mSec.duration_seconds,
+              questionCount: mSec.question_count,
+              questionIds: dbPassages.map((p: any) => p.id),
+            });
+          }
+        } else {
+          // Uses standard questions (Paper module)
           moduleSectionObjs.push({
             id: mSec.id,
             title: `Module: ${mSec.title}`,
             questionType: mSec.question_type,
             durationSeconds: mSec.duration_seconds,
             questionCount: mSec.question_count,
-            questionIds: dbPassages.map((p) => p.id),
+            questionIds: questionIdsBySectionId[mSec.id] || [],
           });
         }
       }
 
       const allSections = [...coreSections, ...moduleSectionObjs];
 
+      const isModuleSection = (qType: string) => {
+        if (isPaper) {
+          return [
+            'eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3',
+            'econ_1', 'econ_2',
+            'sc_1', 'sc_2'
+          ].includes(qType);
+        } else {
+          return passageSectionTypes.includes(qType);
+        }
+      };
+
       const flowSteps = [];
       for (let i = 0; i < allSections.length; i++) {
         flowSteps.push({ type: 'section' as const, sectionIndex: i });
         if (i < allSections.length - 1) {
-          const currentIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i].questionType);
-          const nextIsModule = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(allSections[i + 1].questionType);
+          const currentIsModule = isModuleSection(allSections[i].questionType);
+          const nextIsModule = isModuleSection(allSections[i + 1].questionType);
 
           const breakDuration = (!currentIsModule && nextIsModule)
             ? BREAK_DURATIONS.LONG
