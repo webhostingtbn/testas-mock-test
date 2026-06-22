@@ -850,26 +850,26 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
   return (
     <div className="mx-auto w-full max-w-7xl">
       {/* Top Header & Metrics Section Container */}
-      <div className="py-6 sm:py-8 mb-10 shadow-xs backdrop-blur-sm">
+      <div className="py-6 sm:py-8 mb-10 shadow-xs">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Card 1: Difficulty Breakdown */}
-          <KniCard className="flex flex-col p-6 bg-emerald-600 border border-emerald-500 rounded-[24px] shadow-sm justify-between min-h-[200px] text-white">
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
             <div>
-              <h3 className="text-base font-extrabold text-white">Difficulty Breakdown</h3>
-              <p className="text-[11px] text-emerald-100/90 font-medium">Based on your ratings</p>
+              <h3 className="text-base font-extrabold text-slate-800">Difficulty Breakdown</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Based on your ratings</p>
             </div>
 
             <div className="flex items-center gap-6 my-3">
               {/* Donut Chart */}
               <div className="relative size-24 flex items-center justify-center shrink-0">
                 <svg className="size-full transform -rotate-90" viewBox="0 0 36 36">
-                  {/* Base / Unclassified segment - semi-transparent white */}
+                  {/* Base / Unclassified segment */}
                   <circle
                     cx="18"
                     cy="18"
                     r="15.915"
                     fill="none"
-                    stroke="rgba(255, 255, 255, 0.15)"
+                    stroke="#e2e8f0"
                     strokeWidth="3.2"
                   />
                   {/* Easy segment */}
@@ -879,7 +879,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                       cy="18"
                       r="15.915"
                       fill="none"
-                      stroke="#a7f3d0"
+                      stroke="#10b981"
                       strokeWidth="3.2"
                       strokeDasharray={`${easyPercent} ${100 - easyPercent}`}
                       strokeDashoffset={100}
@@ -892,7 +892,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                       cy="18"
                       r="15.915"
                       fill="none"
-                      stroke="#fde047"
+                      stroke="#fbbf24"
                       strokeWidth="3.2"
                       strokeDasharray={`${mediumPercent} ${100 - mediumPercent}`}
                       strokeDashoffset={100 - easyPercent}
@@ -905,7 +905,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                       cy="18"
                       r="15.915"
                       fill="none"
-                      stroke="#fca5a5"
+                      stroke="#ef4444"
                       strokeWidth="3.2"
                       strokeDasharray={`${hardPercent} ${100 - hardPercent}`}
                       strokeDashoffset={100 - easyPercent - mediumPercent}
@@ -914,10 +914,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                 </svg>
                 {/* Center text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <span className="text-xl font-extrabold text-white leading-none">
+                  <span className="text-xl font-extrabold text-slate-900 leading-none">
                     {overallStats.totalRated}
                   </span>
-                  <span className="text-[9px] font-bold text-emerald-200 mt-1 leading-none">
+                  <span className="text-[9px] font-bold text-slate-400 mt-1 leading-none">
                     / {overallStats.totalQuestions}
                   </span>
                 </div>
@@ -926,79 +926,79 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
               {/* Legend List */}
               <div className="flex-1 flex flex-col gap-2 min-w-0">
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-emerald-100/90">
-                    <span className="size-2 rounded-full bg-[#a7f3d0]" />
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#10b981]" />
                     <span>Easy</span>
                   </div>
-                  <span className="text-white font-bold">{overallStats.totalEasy} rated</span>
+                  <span className="text-slate-800 font-extrabold">{overallStats.totalEasy} rated</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-emerald-100/90">
-                    <span className="size-2 rounded-full bg-[#fde047]" />
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#fbbf24]" />
                     <span>Medium</span>
                   </div>
-                  <span className="text-white font-bold">{overallStats.totalMedium} rated</span>
+                  <span className="text-slate-800 font-extrabold">{overallStats.totalMedium} rated</span>
                 </div>
                 <div className="flex items-center justify-between gap-4 text-xs font-semibold">
-                  <div className="flex items-center gap-2 text-emerald-100/90">
-                    <span className="size-2 rounded-full bg-[#fca5a5]" />
+                  <div className="flex items-center gap-2 text-slate-500">
+                    <span className="size-2 rounded-full bg-[#ef4444]" />
                     <span>Hard</span>
                   </div>
-                  <span className="text-white font-bold">{overallStats.totalHard} rated</span>
+                  <span className="text-slate-800 font-extrabold">{overallStats.totalHard} rated</span>
                 </div>
               </div>
             </div>
           </KniCard>
 
           {/* Card 2: Overall Progress */}
-          <KniCard className="flex flex-col p-6 bg-orange-600 border border-orange-500 rounded-[24px] shadow-sm justify-between min-h-[200px] text-white">
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
             <div>
-              <h3 className="text-base font-extrabold text-white">Overall Progress</h3>
-              <p className="text-[11px] text-orange-100/90 font-medium">Question bank completion</p>
+              <h3 className="text-base font-extrabold text-slate-800">Overall Progress</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Question bank completion</p>
             </div>
 
             <div className="flex flex-col items-center justify-center my-3 text-center">
-              <span className="text-3xl font-extrabold text-white leading-none">
+              <span className="text-3xl font-extrabold text-slate-900 leading-none">
                 {Math.round(overallProgressPercent)}%
               </span>
-              <span className="text-[10px] font-bold text-orange-200 mt-1 uppercase tracking-wider">
+              <span className="text-[10px] font-bold text-slate-450 mt-1 uppercase tracking-wider">
                 Completion Rate
               </span>
             </div>
 
             <div>
-              <div className="w-full h-2 bg-orange-700/60 rounded-full overflow-hidden border border-orange-500/40 shadow-inner mb-1">
+              <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-100 shadow-inner mb-1">
                 <div
-                  className="h-full bg-gradient-to-r from-orange-200 to-white rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-500"
                   style={{ width: `${overallProgressPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between items-center text-[9px] font-bold text-orange-200 uppercase tracking-wider mb-1.5">
+              <div className="flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
                 <span>0 questions</span>
                 <span>{overallStats.totalQuestions} total</span>
               </div>
-              <p className="text-xs font-bold text-orange-100/90 text-center">
+              <p className="text-xs font-bold text-slate-500 text-center">
                 {overallStats.totalRated} of {overallStats.totalQuestions} questions rated
               </p>
             </div>
           </KniCard>
 
           {/* Card 3: Activity Streak */}
-          <KniCard className="flex flex-col p-6 bg-amber-650 border border-amber-600 rounded-[24px] shadow-sm justify-between min-h-[200px] text-white">
+          <KniCard className="flex flex-col p-6 bg-white border border-slate-200/80 rounded-[20px] shadow-xs hover:shadow-sm hover:scale-[1.01] transition-all duration-300 justify-between min-h-[200px]">
             <div>
-              <h3 className="text-base font-extrabold text-white">Activity Streak</h3>
-              <p className="text-[11px] text-amber-100/90 font-medium">Practice frequency</p>
+              <h3 className="text-base font-extrabold text-slate-800">Activity Streak</h3>
+              <p className="text-[11px] text-slate-400 font-medium">Practice frequency</p>
             </div>
 
             <div className="my-2.5">
               <div className="flex items-center gap-1.5 justify-start">
-                <span className="text-3xl font-extrabold text-white leading-none">
+                <span className="text-3xl font-extrabold text-slate-900 leading-none">
                   {currentStreak}
                 </span>
-                <Flame className="size-7 text-white fill-amber-300 shrink-0 animate-pulse" />
+                <Flame className="size-7 text-orange-500 fill-orange-100 shrink-0" />
               </div>
-              <p className="text-sm font-extrabold text-white mt-1">Day Streak!</p>
-              <p className="text-[10px] font-bold text-amber-100/90 mt-0.5">Max Streak: {maxStreak} days</p>
+              <p className="text-sm font-extrabold text-slate-700 mt-1">Day Streak!</p>
+              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Max Streak: {maxStreak} days</p>
             </div>
 
             <div>
@@ -1010,28 +1010,29 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                       <div
                         className={`size-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                           isActive
-                            ? 'bg-white border border-white text-amber-700 shadow-sm'
-                            : 'bg-amber-700/50 border border-amber-600/40 text-amber-200/70'
+                            ? 'bg-orange-500 border border-orange-500 text-white shadow-sm shadow-orange-100'
+                            : 'bg-slate-50 border border-slate-200 text-slate-400'
                         }`}
                       >
                         {isActive ? (
-                          <Check className="size-4 stroke-[3] text-amber-600" />
+                          <Check className="size-4 stroke-[3] text-white" />
                         ) : (
                           dayLabel
                         )}
                       </div>
-                      <span className="text-[9px] font-bold text-amber-200 uppercase tracking-wider">{dayLabel}</span>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{dayLabel}</span>
                     </div>
                   );
                 })}
               </div>
-              <p className="text-[10px] font-bold text-amber-100/90 text-center uppercase tracking-wider">
+              <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-wider">
                 Checked in {weeklyActiveCount} of 7 days this week
               </p>
             </div>
           </KniCard>
         </div>
       </div>
+
 
 
 
