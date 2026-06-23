@@ -198,7 +198,7 @@ export function KniHeader({
 
   return (
     <header className="relative z-20 flex min-h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 md:px-8">
-      <button type="button" onClick={goHome} className="min-w-0 text-left">
+      <button type="button" className="min-w-0 text-left">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
           TestAS Preparation
         </p>
@@ -503,7 +503,7 @@ export function KniShell({
             onViewChange={onViewChange}
             isSidebarExpanded={sidebarExpanded}
           />
-          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5 pb-24 md:p-7 md:pb-7 xl:p-8">
+          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5 pb-24">
             {children}
           </main>
         </section>

@@ -1,14 +1,11 @@
 'use client';
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import { useEffect, useState, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import {
-  ChevronDown, ChevronUp, ShieldAlert,
-  Settings2, Check, X, PenLine, Plus, Upload, Lock, Save, ImagePlus, Flag,
-  Search, Download, Users, CheckCircle2, Clock, Info
-} from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+
 import { KniCard, KniButton, KniBadge } from '@/components/KniPrimitives';
+import { PenLine, CheckCircle2, Info, ShieldAlert, Download, Search, Users, Check, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -924,320 +921,358 @@ export function AdminUsersPanel() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ADMIN CMS PANEL
+// ADMIN CMS PANEL - GUIDELINES FOR IMPORTING QUESTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function AdminCmsPanel() {
-  const [cmsQuestions, setCmsQuestions] = useState<CmsQuestion[]>(INITIAL_CMS_QUESTIONS);
-  const [selectedCmsQuestionId, setSelectedCmsQuestionId] = useState<string>('1');
-  const [cmsForm, setCmsForm] = useState<Omit<CmsQuestion, 'id'>>({
-    subtest: 'Figure Sequences',
-    question: 'Which figure continues the pattern after a 90 degree clockwise rotation?',
-    answer: 'B',
-    explanation: 'The figure rotates by 90 degrees while alternating the shaded segment.',
-    modules: ['CS', 'Engineering'],
-    options: {
-      A: 'The pattern continues with a triangle on top.',
-      B: 'The pattern rotates clockwise 90 degrees.',
-      C: 'The pattern flips vertically.',
-      D: 'The pattern shifts leftward.'
-    }
-  });
-  const [saveState, setSaveState] = useState<'idle' | 'saved'>('idle');
-
-  const loadCmsQuestion = (questionId: string) => {
-    const found = cmsQuestions.find(q => q.id === questionId);
-    if (found) {
-      setSelectedCmsQuestionId(questionId);
-      setCmsForm({
-        subtest: found.subtest,
-        question: found.question,
-        answer: found.answer,
-        explanation: found.explanation,
-        modules: found.modules,
-        options: { ...found.options }
-      });
-    }
-  };
-
-  const handleToggleCmsModule = (module: string) => {
-    setCmsForm(prev => {
-      const exists = prev.modules.includes(module);
-      return {
-        ...prev,
-        modules: exists ? prev.modules.filter(m => m !== module) : [...prev.modules, module]
-      };
-    });
-  };
-
-  const handleSaveCmsQuestion = () => {
-    setSaveState('saved');
-    setCmsQuestions(prev => prev.map(q => q.id === selectedCmsQuestionId ? { id: q.id, ...cmsForm } : q));
-    setTimeout(() => setSaveState('idle'), 2200);
-  };
-
-  const handleCreateNewQuestion = () => {
-    const newId = (Math.max(...cmsQuestions.map(q => parseInt(q.id, 10))) + 1).toString();
-    const newQ: CmsQuestion = {
-      id: newId,
-      subtest: 'Figure Sequences',
-      question: 'New question text here...',
-      answer: 'A',
-      explanation: 'Explanation text here...',
-      modules: ['CS'],
-      options: {
-        A: 'Option A description',
-        B: 'Option B description',
-        C: 'Option C description',
-        D: 'Option D description'
-      }
-    };
-    setCmsQuestions(prev => [...prev, newQ]);
-    setSelectedCmsQuestionId(newId);
-    setCmsForm({
-      subtest: newQ.subtest,
-      question: newQ.question,
-      answer: newQ.answer,
-      explanation: newQ.explanation,
-      modules: newQ.modules,
-      options: { ...newQ.options }
-    });
-  };
-
   return (
     <div className=" mx-auto">
-      <div className="mb-6">
+      <div className="mb-8">
         <p className="text-sm font-medium text-orange-700">Admin CMS</p>
-        <h2 className="text-3xl font-bold text-slate-900 mt-1">Question CMS</h2>
+        <h2 className="text-3xl font-bold text-slate-900 mt-1">Import Questions into Database</h2>
         <p className="text-slate-550 mt-1 text-sm">
-          Edit test banks and preview questions in real time.
+          Use SQL templates to add questions and exams to the TestAS database.
         </p>
       </div>
 
-      <div className="grid w-full gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        {/* CMS Form Editor */}
-        <KniCard className="p-5 md:p-6 bg-white/70">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-orange-700">Question CMS</p>
-              <h3 className="text-2xl font-bold text-slate-950 mt-0.5">Question Editor</h3>
-            </div>
-            <button
-              type="button"
-              onClick={handleCreateNewQuestion}
-              className="grid size-10 place-items-center rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 transition shadow-sm"
-              title="Add new question"
-            >
-              <Plus className="size-5" />
-            </button>
+      {/* Overview Card */}
+      <KniCard className="p-6 mb-6 bg-gradient-to-br from-orange-50 to-white">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-orange-100 rounded-xl shrink-0">
+            <PenLine className="w-6 h-6 text-orange-700" />
           </div>
-
-          <div className="grid gap-4">
-            <label className="grid gap-1.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Question to Edit</span>
-              <div className="relative">
-                <select
-                  value={selectedCmsQuestionId}
-                  onChange={e => loadCmsQuestion(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-orange-200 bg-white pl-4 pr-10 py-3 text-slate-800 font-medium outline-none focus:border-orange-400"
-                >
-                  {cmsQuestions.map(q => (
-                    <option key={q.id} value={q.id}>
-                      Q{q.id} ({q.subtest}) - {q.question.substring(0, 50)}...
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subtest Section</span>
-              <div className="relative">
-                <select
-                  value={cmsForm.subtest}
-                  onChange={e => setCmsForm({ ...cmsForm, subtest: e.target.value })}
-                  className="w-full appearance-none rounded-xl border border-orange-200 bg-white pl-4 pr-10 py-3 text-slate-800 outline-none focus:border-orange-400"
-                >
-                  <option value="Figure Sequences">Figure Sequences</option>
-                  <option value="Mathematical Equations">Mathematical Equations</option>
-                  <option value="Latin Squares">Latin Squares</option>
-                  <option value="Module Test">Module Test</option>
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-              </div>
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Question content</span>
-              <textarea
-                value={cmsForm.question}
-                onChange={e => setCmsForm({ ...cmsForm, question: e.target.value })}
-                className="min-h-24 rounded-xl border border-orange-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-orange-400 text-sm leading-relaxed"
-              />
-            </label>
-
-            <button
-              type="button"
-              className="flex items-center justify-center gap-3 rounded-xl border border-dashed border-orange-300 bg-orange-500/5 px-4 py-6 text-orange-800 hover:bg-orange-500/10 transition"
-            >
-              <Upload className="size-5" />
-              <span className="text-xs font-semibold">Drag & drop diagram image (Optional)</span>
-            </button>
-
-            <div className="grid gap-3">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Answer options</span>
-              {(['A', 'B', 'C', 'D'] as const).map(letter => (
-                <div key={letter} className="flex gap-2 items-center">
-                  <button
-                    type="button"
-                    onClick={() => setCmsForm({ ...cmsForm, answer: letter })}
-                    className={`w-12 h-11 shrink-0 rounded-xl border font-bold flex items-center justify-center transition ${
-                      cmsForm.answer === letter
-                        ? 'border-emerald-300 bg-emerald-500/15 text-emerald-800 shadow-sm'
-                        : 'border-orange-200 bg-white text-slate-500 hover:bg-orange-50'
-                    }`}
-                  >
-                    {letter}
-                  </button>
-                  <input
-                    type="text"
-                    value={cmsForm.options[letter]}
-                    onChange={e => setCmsForm({
-                      ...cmsForm,
-                      options: {
-                        ...cmsForm.options,
-                        [letter]: e.target.value
-                      }
-                    })}
-                    placeholder={`Description for Option ${letter}`}
-                    className="w-full h-11 rounded-xl border border-orange-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-orange-400"
-                  />
-                </div>
-              ))}
-            </div>
-
-            <label className="grid gap-1.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Explanation</span>
-              <textarea
-                value={cmsForm.explanation}
-                onChange={e => setCmsForm({ ...cmsForm, explanation: e.target.value })}
-                className="min-h-20 rounded-xl border border-orange-200 bg-white px-4 py-3 text-slate-800 outline-none focus:border-orange-400 text-sm leading-relaxed"
-              />
-            </label>
-
-            <div className="grid gap-1.5">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Modules Restricted</span>
-              <div className="flex flex-wrap gap-2">
-                {['CS', 'Economics', 'Engineering'].map(module => {
-                  const active = cmsForm.modules.includes(module);
-                  return (
-                    <button
-                      key={module}
-                      type="button"
-                      onClick={() => handleToggleCmsModule(module)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition flex items-center gap-1 ${
-                        active
-                          ? 'border-orange-300 bg-orange-600/10 text-orange-850 shadow-xs'
-                          : 'border-orange-200 bg-white text-slate-400 hover:text-slate-700'
-                      }`}
-                    >
-                      {active && <Lock className="size-3" />}
-                      {module}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-orange-100">
-              <button
-                type="button"
-                onClick={() => {
-                  const found = cmsQuestions.find(q => q.id === selectedCmsQuestionId);
-                  if (found) {
-                    setCmsForm({
-                      subtest: found.subtest,
-                      question: found.question,
-                      answer: found.answer,
-                      explanation: found.explanation,
-                      modules: found.modules,
-                      options: { ...found.options }
-                    });
-                  }
-                }}
-                className="h-11 px-5 rounded-xl border border-orange-300 font-semibold text-slate-600 hover:bg-orange-50 transition text-sm shadow-xs"
-              >
-                Reset Form
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveCmsQuestion}
-                className="h-11 px-6 inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 font-semibold text-white shadow-lg shadow-orange-500/25 hover:bg-orange-500 transition text-sm"
-              >
-                <Save className="size-4" />
-                <span>{saveState === 'saved' ? 'Saved Successfully' : 'Save Question'}</span>
-              </button>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">How to Import Questions</h3>
+            <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+              The CMS system uses SQL templates to import questions and exams directly into the database.
+              This approach ensures data consistency and allows for version-controlled question management.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800">
+                Step 1: Select Template
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800">
+                Step 2: Fill Values
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800">
+                Step 3: Generate SQL
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800">
+                Step 4: Run in Supabase
+              </span>
             </div>
           </div>
-        </KniCard>
+        </div>
+      </KniCard>
 
-        {/* CMS Live Preview Column */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Step-by-Step Guide */}
         <div className="space-y-6">
-          <KniCard className="p-5 md:p-6 bg-white/70">
-            <div className="mb-6 flex items-center justify-between pb-3 border-b border-orange-100">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Question Live Preview</p>
-                <h4 className="text-xl font-bold text-slate-900 mt-1">{cmsForm.subtest}</h4>
+          <KniCard className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-sm">
+                1
               </div>
-              <ImagePlus className="size-6 text-orange-600" />
+              <h3 className="text-lg font-bold text-slate-900">Find the Right Template</h3>
             </div>
-
-            {/* Live Preview UI Panel wrapper */}
-            <div className="rounded-3xl border border-orange-200 bg-orange-50/50 p-5 shadow-inner">
-              <span className="text-[10px] uppercase font-bold text-slate-450 tracking-widest">Question Canvas</span>
-              
-              {/* Stem */}
-              <h5 className="mt-2 text-lg font-bold leading-snug text-slate-800">
-                {cmsForm.question || 'Enter question stem above...'}
-              </h5>
-
-              {/* Diagram area preview */}
-              <div className="my-5 grid min-h-40 place-items-center rounded-2xl border border-dashed border-orange-200 bg-orange-50/70 text-xs font-medium text-slate-400">
-                <span>No Diagram Uploaded</span>
+            <p className="text-sm text-slate-600 mb-4">
+              Navigate to <code className="px-2 py-1 rounded bg-slate-100 text-slate-700 font-mono text-xs">src/lib/cms/templates/</code>
+              and choose a template based on your question type:
+            </p>
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-orange-700 mb-2 uppercase">Core Digital Questions</p>
+                <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                  <li><code className="text-slate-800">figure_sequence.json</code> - Visual sequence completion</li>
+                  <li><code className="text-slate-800">math_equation.json</code> - Solve systems of equations</li>
+                  <li><code className="text-slate-800">latin_square.json</code> - 5x5 grid puzzle</li>
+                </ul>
               </div>
-
-              {/* Options List */}
-              <div className="grid gap-3">
-                {(['A', 'B', 'C', 'D'] as const).map(letter => {
-                  const isCorrect = cmsForm.answer === letter;
-                  return (
-                    <div
-                      key={letter}
-                      className={`rounded-2xl border px-4 py-3 flex justify-between items-center text-sm font-semibold transition ${
-                        isCorrect
-                          ? 'border-emerald-300 bg-emerald-500/10 text-emerald-800 shadow-sm'
-                          : 'border-orange-100 bg-white text-slate-600'
-                      }`}
-                    >
-                      <span>{letter}. {cmsForm.options[letter] || `Option ${letter} description`}</span>
-                      {isCorrect && <Check className="size-4 text-emerald-700" />}
-                    </div>
-                  );
-                })}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-orange-700 mb-2 uppercase">Module Digital Questions</p>
+                <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                  <li><code className="text-slate-800">module_mcq.json</code> - Multiple choice with passage</li>
+                  <li><code className="text-slate-800">interpreting_texts.json</code> - Text interpretation</li>
+                </ul>
               </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-orange-700 mb-2 uppercase">Complete Exam Template</p>
+                <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside">
+                  <li><code className="text-slate-800">exam_template.json</code> - Full exam with sections</li>
+                </ul>
+              </div>
+            </div>
+          </KniCard>
 
-              {/* Explanation Preview */}
-              {cmsForm.explanation && (
-                <div className="mt-5 rounded-2xl border border-orange-200/50 bg-orange-600/5 p-4 text-xs leading-relaxed text-orange-850">
-                  <p className="font-bold mb-1 uppercase tracking-wider text-[10px]">Explanation:</p>
-                  <p>{cmsForm.explanation}</p>
-                </div>
-              )}
+          <KniCard className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-sm">
+                2
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Fill in Your Values</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Copy the template JSON and replace placeholder values:
+            </p>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto">
+              <pre className="text-xs text-slate-300 font-mono leading-relaxed">
+{`{
+  "id": "generate-uuid-v4",           // Replace with new UUID or use gen_random_uuid()
+  "section_id": "your-section-id",   // Get from sections table
+  "sort_order": 1,
+  "question_type": "figure_sequence",
+  "content": {
+    "sequence_images": ["url1", "url2"],
+    "answer_options": ["opt1", "opt2"]
+  },
+  "correct_answer": {
+    "image1": 1
+  }
+}`}
+              </pre>
+            </div>
+            <div className="mt-4 p-3 rounded-lg bg-amber-50 border border-amber-100">
+              <p className="text-xs text-amber-800">
+                <span className="font-semibold">Note:</span> Use <code className="font-mono bg-amber-100 px-1 rounded">gen_random_uuid()</code> for new IDs to avoid conflicts.
+              </p>
+            </div>
+          </KniCard>
+
+          <KniCard className="p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-sm">
+                3
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Generate SQL</h3>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Use the SQL Generator or write SQL manually:
+            </p>
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700 mb-2">Method: SQL Generator (TypeScript)</p>
+                <pre className="text-xs text-slate-600 font-mono bg-white p-2 rounded border border-slate-200">
+{`import { generateSQLFromJSON } from '@/lib/cms/sql-generator';
+const sql = generateSQLFromJSON(yourQuestionJSON);
+console.log(sql);`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <p className="text-xs font-semibold text-slate-700 mb-2">Method: Direct SQL</p>
+                <pre className="text-xs text-slate-600 font-mono bg-white p-2 rounded border border-slate-200">
+{`INSERT INTO public.questions (id, section_id, sort_order, question_type, content, correct_answer)
+VALUES (
+  gen_random_uuid(),
+  'SECTION_UUID',
+  1,
+  'figure_sequence',
+  '{"sequence_images": [...], "answer_options": [...]}',
+  '{"image1": 1}'
+);`}
+                </pre>
+              </div>
+            </div>
+          </KniCard>
+        </div>
+
+        {/* Database Reference & Quick Tips */}
+        <div className="space-y-6">
+          <KniCard className="p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              Database Schema
+            </h3>
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-white border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">exams Table</p>
+                <pre className="text-[10px] text-slate-600 font-mono leading-relaxed overflow-x-auto">
+{`id UUID PRIMARY KEY
+title TEXT NOT NULL
+format TEXT NOT NULL DEFAULT 'Digital'
+is_active BOOLEAN DEFAULT TRUE
+retry_number SMALLINT`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-xl bg-white border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">sections Table</p>
+                <pre className="text-[10px] text-slate-600 font-mono leading-relaxed overflow-x-auto">
+{`id UUID PRIMARY KEY
+exam_id UUID REFERENCES exams(id)
+title TEXT NOT NULL
+question_type TEXT NOT NULL
+duration_seconds INTEGER
+question_count INTEGER`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-xl bg-white border border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">questions Table</p>
+                <pre className="text-[10px] text-slate-600 font-mono leading-relaxed overflow-x-auto">
+{`id UUID PRIMARY KEY
+section_id UUID REFERENCES sections(id)
+question_type TEXT NOT NULL
+content JSONB NOT NULL
+correct_answer JSONB NOT NULL`}
+                </pre>
+              </div>
+            </div>
+          </KniCard>
+
+          <KniCard className="p-6">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Info className="w-5 h-5 text-blue-600" />
+              Common Operations
+            </h3>
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-800 mb-1">Get Section ID</p>
+                <pre className="text-[10px] text-blue-700 font-mono bg-white p-2 rounded border border-blue-200">
+{`SELECT id FROM public.sections WHERE title = 'Core - Figure Sequences';`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-800 mb-1">Add Multiple Questions</p>
+                <pre className="text-[10px] text-blue-700 font-mono bg-white p-2 rounded border border-blue-200">
+{`INSERT INTO public.questions (...) VALUES (section_id, ...);
+INSERT INTO public.questions (...) VALUES (section_id, ...);`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-800 mb-1">Update Question</p>
+                <pre className="text-[10px] text-blue-700 font-mono bg-white p-2 rounded border border-blue-200">
+{`UPDATE public.questions SET content = {...}
+WHERE id = 'question-uuid';`}
+                </pre>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+                <p className="text-xs font-semibold text-blue-800 mb-1">Activate Exam</p>
+                <pre className="text-[10px] text-blue-700 font-mono bg-white p-2 rounded border border-blue-200">
+{`-- Deactivate others first
+UPDATE public.exams SET is_active = FALSE WHERE format = 'Digital';
+-- Activate target
+UPDATE public.exams SET is_active = TRUE WHERE id = 'exam-uuid';`}
+                </pre>
+              </div>
+            </div>
+          </KniCard>
+
+          <KniCard className="p-6 bg-rose-50/50">
+            <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-rose-600" />
+              Troubleshooting
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-rose-800 mb-1">Foreign Key Violation</p>
+                <p className="text-xs text-rose-700">
+                  Make sure the section_id exists before inserting questions.
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-rose-800 mb-1">Invalid JSONB Input</p>
+                <p className="text-xs text-rose-700">
+                  Escape single quotes: <code className="font-mono bg-rose-100 px-1 rounded">''</code>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-rose-800 mb-1">UUID Already Exists</p>
+                <p className="text-xs text-rose-700">
+                  Use <code className="font-mono bg-rose-100 px-1 rounded">gen_random_uuid()</code> instead of hard-coded IDs.
+                </p>
+              </div>
             </div>
           </KniCard>
         </div>
       </div>
+
+      {/* Quick SQL Template Box */}
+      <KniCard className="p-6 mt-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Ready-to-Use SQL Snippets</h3>
+        <div className="space-y-4">
+          <div className="group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Figure Sequence Question</span>
+              <button className="text-xs text-orange-600 font-medium hover:text-orange-700">
+                Copy to Clipboard
+              </button>
+            </div>
+            <pre className="text-xs font-mono bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto">
+{`INSERT INTO public.questions (id, section_id, sort_order, question_type, content, correct_answer)
+VALUES (
+  gen_random_uuid(),
+  (SELECT id FROM public.sections WHERE title = 'Core - Figure Sequences' LIMIT 1),
+  1,
+  'figure_sequence',
+  '{
+    "sequence_images": ["image1_url", "image2_url", "image3_url"],
+    "answer_options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_option": 1
+  }'::jsonb,
+  '{
+    "image1": 1,
+    "image2": 2
+  }'::jsonb
+);`}
+            </pre>
+          </div>
+          <div className="group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Math Equation Question</span>
+              <button className="text-xs text-orange-600 font-medium hover:text-orange-700">
+                Copy to Clipboard
+              </button>
+            </div>
+            <pre className="text-xs font-mono bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto">
+{`INSERT INTO public.questions (id, section_id, sort_order, question_type, content, correct_answer)
+VALUES (
+  gen_random_uuid(),
+  (SELECT id FROM public.sections WHERE title = 'Core - Mathematical Equations' LIMIT 1),
+  1,
+  'math_equation',
+  '{
+    "equations": ["A + B = 10", "A - B = 4"],
+    "variables": ["A", "B"]
+  }'::jsonb,
+  '{
+    "A": 7,
+    "B": 3
+  }'::jsonb
+);`}
+            </pre>
+          </div>
+          <div className="group">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Complete Exam with Sections</span>
+              <button className="text-xs text-orange-600 font-medium hover:text-orange-700">
+                Copy to Clipboard
+              </button>
+            </div>
+            <pre className="text-xs font-mono bg-slate-900 text-slate-300 p-4 rounded-xl overflow-x-auto">
+{`-- First, create the exam
+INSERT INTO public.exams (id, title, format, is_active)
+VALUES (gen_random_uuid(), 'TestAS Practice Exam 1', 'Digital', true);
+
+-- Get the exam ID
+SELECT id FROM public.exams WHERE title = 'TestAS Practice Exam 1';
+
+-- Create sections (repeat for each section)
+INSERT INTO public.sections (id, exam_id, title, question_type, duration_seconds, question_count, sort_order)
+VALUES (
+  gen_random_uuid(),
+  'EXAM_ID_HERE',
+  'Core - Figure Sequences',
+  'figure_sequence',
+  1200,
+  15,
+  1
+);
+
+-- Then add questions to each section
+INSERT INTO public.questions (id, section_id, sort_order, question_type, content, correct_answer)
+VALUES (gen_random_uuid(), 'SECTION_ID_HERE', 1, 'figure_sequence', ..., ...);`}
+            </pre>
+          </div>
+        </div>
+      </KniCard>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, CheckCircle2, AlertCircle, Smile, Meh, Frown } from 'lucide-react';
-import { KniButton, KniCard, KniBadge } from '@/components/KniPrimitives';
+import { KniButton, KniBadge } from '@/components/KniPrimitives';
 import FigureSequence from '@/components/question-types/FigureSequence';
 import MathEquation from '@/components/question-types/MathEquation';
 import LatinSquare from '@/components/question-types/LatinSquare';
@@ -295,11 +295,13 @@ export default function PracticeSession({
       case 'solving_quantitative':
       case 'inferring_relationships':
       default:
+        const isCoreType = ['solving_quantitative', 'inferring_relationships'].includes(type);
         return (
           <ModuleQuestion
             question={q}
             selectedAnswer={currentAnswer}
             onAnswer={handleAnswerChange}
+            isSplitLayout={!isCoreType}
           />
         );
     }
@@ -314,8 +316,8 @@ export default function PracticeSession({
   ];
 
   return (
-    <div className=" mx-auto flex flex-col h-full pb-24">
-      <SecurityOverlay />
+    <div className="mx-auto flex min-h-full flex-col">
+      {/* <SecurityOverlay /> */}
       <WatermarkOverlay email={userEmail} fullName={userFullName} />
       {/* Practice Header Card */}
       <div className="bg-white/80 border border-orange-100/60 rounded-2xl mb-6 shadow-sm p-4 backdrop-blur-md">
@@ -430,44 +432,18 @@ export default function PracticeSession({
       </div>
 
       {/* Main split question pane */}
-      <div className="mx-auto w-full">
+      <div className="mx-auto flex min-h-[34rem] w-full flex-col lg:h-[calc(100dvh-340px)] lg:max-h-[56rem]">
         {/* Question area */}
-        <div className="bg-white border border-orange-100/60 rounded-2xl p-5 shadow-xs">
+        <div className="bg-white border border-orange-100/60 rounded-2xl p-5 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
           {renderQuestion()}
         </div>
       </div>
 
-      {/* Feedback Area */}
-      {isCurrentAnswered && (
-        <div className="max-w-5xl mx-auto w-full mt-6 px-1">
-          <KniCard className={`p-4 border ${isCorrect ? 'border-emerald-250 bg-emerald-50/70' : 'border-rose-200 bg-rose-50/70'}`}>
-            <div className="flex items-start gap-3">
-              {isCorrect ? (
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              )}
-              <div>
-                <h4 className={`text-sm font-bold ${isCorrect ? 'text-emerald-800' : 'text-rose-800'}`}>
-                  {isCorrect ? 'Correct Answer!' : 'Incorrect Answer'}
-                </h4>
-                <p className="mt-0.5 text-xs text-slate-650 leading-relaxed">
-                  {isCorrect 
-                    ? 'Great job! You have solved this question successfully. Keep it up!' 
-                    : 'Review the question and try again. Your rating has been synced.'
-                  }
-                </p>
-              </div>
-            </div>
-          </KniCard>
-        </div>
-      )}
-
       {/* Navigation Footer */}
-      <div className="absolute inset-x-0 bottom-0 bg-white border-t border-slate-200 shadow-xs py-3 z-30">
-        <div className=" mx-auto px-6 flex items-center justify-between gap-4">
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="mx-auto grid grid-cols-2 items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
           {/* Left: Previous Button */}
-          <div className="flex-1 flex justify-start">
+          <div className="order-2 flex justify-start md:order-1">
             <KniButton
               onClick={() => setCurrentIndex((idx) => Math.max(0, idx - 1))}
               disabled={currentIndex === 0 || !isCurrentRated}
@@ -481,7 +457,24 @@ export default function PracticeSession({
           </div>
 
           {/* Middle: Rating Smiley Buttons */}
-          <div className="flex px-2 items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-100">
+          <div className="order-1 col-span-2 flex flex-wrap items-center justify-center gap-1.5 rounded-xl border border-slate-100 bg-slate-50 p-1 md:order-2 md:col-span-1 md:flex-nowrap md:px-2">
+            {isCurrentAnswered && (
+              <span
+                title={isCorrect ? 'Correct answer' : 'Review the question and try again'}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-bold ${
+                  isCorrect
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-rose-200 bg-rose-50 text-rose-700'
+                }`}
+              >
+                {isCorrect ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <AlertCircle className="size-4" />
+                )}
+                {isCorrect ? 'Correct' : 'Incorrect'}
+              </span>
+            )}
             <div className="text-sm mr-1 font-semibold">
               {isTimeExpired ? (
                 <div className="text-[10px] text-rose-500 leading-tight max-w-[125px] text-center sm:text-left animate-fade-in">
@@ -519,7 +512,7 @@ export default function PracticeSession({
           </div>
 
           {/* Right: Next Button */}
-          <div className="flex-1 flex justify-end">
+          <div className="order-3 flex justify-end">
             <KniButton
               onClick={() => setCurrentIndex((idx) => Math.min(questions.length - 1, idx + 1))}
               disabled={currentIndex === questions.length - 1 || !canNavigateNext}

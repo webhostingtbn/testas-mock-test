@@ -16,13 +16,10 @@ export const BREAK_DURATIONS = {
   LONG: 30 * 60,    // 30 minutes between core test and module test
 } as const;
 
-/** Number of questions per section */
-export const QUESTIONS_PER_SECTION = {
-  FIGURE_SEQUENCE: 20,
-  MATH_EQUATION: 20,
-  LATIN_SQUARE: 20,
-  MODULE_TEST: 20,  // Variable: 5-20
-} as const;
+export const BREAK_DURATION_TIME_OF_TEST = {
+  'digital': BREAK_DURATIONS.SHORT * 3 + BREAK_DURATIONS.LONG,
+  'paper': BREAK_DURATIONS.SHORT * 4 + BREAK_DURATIONS.LONG,
+}
 
 /** Major display labels */
 export const MAJOR_LABELS: Record<string, string> = {
@@ -97,3 +94,70 @@ export const THEME_COLORS = {
   WHITE: '#FFFFFF',
   BG_LIGHT: '#F5F5F5',
 } as const;
+
+/** Core question types by format */
+export const CORE_QUESTION_TYPES: Record<'Paper' | 'Digital', string[]> = {
+  Paper: [
+    'solving_quantitative',
+    'inferring_relationships',
+    'completing_patterns',
+    'numerical_series'
+  ],
+  Digital: [
+    'figure_sequence',
+    'math_equation',
+    'latin_square'
+  ]
+};
+
+/** Paper module question types by category */
+export const PAPER_MODULE_QUESTION_TYPES: Record<'science' | 'engineering' | 'economics', string[]> = {
+  science: ['sc_1', 'sc_2'],
+  engineering: ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'],
+  economics: ['econ_1', 'econ_2']
+};
+
+/** Normalizes the user's module name to a standard category */
+export function getModuleCategory(activeModule: string | null): 'science' | 'engineering' | 'economics' | null {
+  if (!activeModule) return null;
+  const lower = activeModule.toLowerCase();
+  if (lower.includes('science') || lower === 'cs') {
+    return 'science';
+  }
+  if (lower.includes('engin')) {
+    return 'engineering';
+  }
+  if (lower.includes('econ')) {
+    return 'economics';
+  }
+  return null;
+}
+
+/** Centralized helper to filter core and module sections based on format and active module */
+export function filterSections(
+  sections: any[],
+  isPaper: boolean,
+  activeModule: string | null
+): { coreSections: any[]; moduleSections: any[] } {
+  // 1. Separate Core sections
+  const coreTypes = CORE_QUESTION_TYPES[isPaper ? 'Paper' : 'Digital'];
+  const coreSections = sections.filter((s: any) => coreTypes.includes(s.question_type));
+
+  // 2. Separate Module sections
+  const moduleSections = sections.filter((s: any) => {
+    if (!activeModule) return false;
+
+    if (isPaper) {
+      const category = getModuleCategory(activeModule);
+      if (!category) return false;
+      const allowedTypes = PAPER_MODULE_QUESTION_TYPES[category];
+      return allowedTypes.includes(s.question_type);
+    } else {
+      // For Digital, all module sections are grouped under the user's selected module title
+      const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
+      return s.title === targetModuleTitle;
+    }
+  });
+
+  return { coreSections, moduleSections };
+}

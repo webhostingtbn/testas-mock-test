@@ -39,14 +39,14 @@ export default function NumericalSeries({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full min-h-0 space-y-4">
       {/* Prompt / Title */}
-      <div className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="text-sm font-semibold text-slate-500 uppercase tracking-wider flex-none">
         {prompt}
       </div>
 
       {/* Main Container */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 gap-6 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar pb-12 lg:pb-0">
         {/* Sequence Display Card */}
         <div className="bg-white rounded-2xl border border-orange-100 p-4 shadow-sm flex flex-col items-center justify-center min-h-48">
           <div className="flex flex-wrap gap-3 items-start justify-center py-6 px-4 w-full">

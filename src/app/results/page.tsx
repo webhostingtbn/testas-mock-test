@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,14 +13,21 @@ import {
   Info,
 } from "lucide-react";
 import { KniCard, KniButton, KniBackground } from "@/components/KniPrimitives";
+import {
+  calculateSectionResults,
+  aggregateGlobalStats,
+  buildDetailedResults,
+  getIncorrectOrUnansweredQuestionIds,
+  type SectionResult,
+} from "@/lib/scoring";
 
 export default function ResultsPage() {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
-  
+
   // State for calculated stats
-  const [sectionResults, setSectionResults] = useState<any[]>([]);
+  const [sectionResults, setSectionResults] = useState<SectionResult[]>([]);
   const [totalCorrect, setTotalCorrect] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [totalAnswered, setTotalAnswered] = useState(0);
@@ -45,28 +52,6 @@ export default function ResultsPage() {
   useEffect(() => {
     if (!hydrated || !userExamId || !currentExamId) return;
 
-    // Helper for deep equality
-    const isDeepEqual = (a: any, b: any): boolean => {
-      if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
-        const keys1 = Object.keys(a);
-        const keys2 = Object.keys(b);
-        if (keys1.length !== keys2.length) return false;
-        for (const key of keys1) {
-            if (a[key] !== b[key]) return false;
-        }
-        return true;
-      }
-      return a === b;
-    };
-
-    const formatAns = (a: any) => {
-      if (a && typeof a === 'object') {
-        if ('image1' in a && 'image2' in a) return [a.image1, a.image2];
-        if ('A' in a && 'B' in a) return [a.A, a.B];
-      }
-      return a !== undefined ? a : null;
-    };
-
     // Only process if sections are loaded
     if (sections.length === 0) return;
 
@@ -83,98 +68,20 @@ export default function ResultsPage() {
 
         if (error) throw error;
 
-        // 2. Build map of correct answers and types
-        const questionsMap = (questionsData || []).reduce(
-          (acc: Record<string, { correct: any; type: string }>, q) => {
-            acc[q.id] = { correct: q.correct_answer, type: q.question_type };
-            return acc;
-          },
-          {}
+        // 2. Use Scorer module for calculations
+        const calculatedResults = calculateSectionResults(
+          sections,
+          answers,
+          questionsData || []
         );
 
-        // 3. Process section by section
-        const calculatedResults = sections.map((section) => {
-          const sectionAnswers = answers[section.id] || {};
-          let correctCount = 0;
-          let answeredCount = 0;
-
-          // Evaluate child question keys
-          const actualQuestionIds = (questionsData || [])
-            .filter((q) => q.section_id === section.id)
-            .map((q) => q.id);
-
-          const actualTotalQuestions = actualQuestionIds.length;
-
-          // Check each real question in the section
-          actualQuestionIds.forEach((qId) => {
-            const ans = sectionAnswers[qId];
-            const qInfo = questionsMap[qId];
-            const correctAns = qInfo?.correct;
-            const qType = qInfo?.type;
-
-            if (ans !== null && ans !== undefined) {
-              answeredCount++;
-            }
-
-            if (
-              ans !== null &&
-              ans !== undefined &&
-              correctAns !== undefined
-            ) {
-              let isCorrect = false;
-              if (qType === 'numerical_series') {
-                const getDistinctCharsSorted = (str: string) => {
-                  return Array.from(new Set(String(str).replace(/\s+/g, '').split(''))).sort().join('');
-                };
-                isCorrect = getDistinctCharsSorted(String(ans)) === getDistinctCharsSorted(String(correctAns));
-              } else {
-                isCorrect = isDeepEqual(formatAns(ans), formatAns(correctAns));
-              }
-
-              if (isCorrect) {
-                correctCount++;
-              }
-            }
-          });
-
-          const percentage =
-            actualTotalQuestions > 0
-              ? Math.round((correctCount / actualTotalQuestions) * 100)
-              : 0;
-
-          return {
-            id: section.id,
-            title: section.title,
-            type: section.questionType,
-            totalQuestions: actualTotalQuestions,
-            actualQuestionIds: actualQuestionIds,
-            answeredCount,
-            correctCount,
-            percentage,
-          };
-        });
-
-        // 4. Calculate globals
-        const totalC = calculatedResults.reduce(
-          (sum, s) => sum + s.correctCount,
-          0
-        );
-        const totalQ = calculatedResults.reduce(
-          (sum, s) => sum + s.totalQuestions,
-          0
-        );
-        const totalA = calculatedResults.reduce(
-          (sum, s) => sum + s.answeredCount,
-          0
-        );
-        const overallPct =
-          totalQ > 0 ? Math.round((totalC / totalQ) * 100) : 0;
+        const globalStats = aggregateGlobalStats(calculatedResults);
 
         setSectionResults(calculatedResults);
-        setTotalCorrect(totalC);
-        setTotalQuestions(totalQ);
-        setTotalAnswered(totalA);
-        setOverallPercentage(overallPct);
+        setTotalCorrect(globalStats.totalCorrect);
+        setTotalQuestions(globalStats.totalQuestions);
+        setTotalAnswered(globalStats.totalAnswered);
+        setOverallPercentage(globalStats.overallPercentage);
         setIsCalculated(true);
 
         // Get user_id from user_exams first to associate practice difficulties
@@ -187,72 +94,28 @@ export default function ResultsPage() {
         if (userExamError) throw userExamError;
         const userId = userExamData?.user_id;
 
-        const incorrectOrUnansweredQuestionIds: string[] = [];
+        // 3. Build detailed answers for DB persistence
+        const detailedAnswersByTitle = buildDetailedResults(
+          calculatedResults,
+          answers,
+          questionsData || []
+        );
 
-        // 5. Format detailed answers for jsonb
-        const detailedAnswersByTitle = calculatedResults.reduce((acc, result) => {
-          const sectionAnswers = answers[result.id] || {};
-
-          const formattedAnswers = result.actualQuestionIds.map(
-            (qId: string) => {
-              const ans = sectionAnswers[qId];
-              const qInfo = questionsMap[qId];
-              const correctAns = qInfo?.correct;
-              const qType = qInfo?.type;
-              const formattedUserAns = formatAns(ans);
-              const formattedCorrectAns = formatAns(correctAns);
-              
-              let isCorrect = false;
-              if (qType === 'numerical_series') {
-                const getDistinctCharsSorted = (str: string) => {
-                  return Array.from(new Set(String(str).replace(/\s+/g, '').split(''))).sort().join('');
-                };
-                isCorrect = getDistinctCharsSorted(String(ans)) === getDistinctCharsSorted(String(correctAns));
-              } else {
-                isCorrect =
-                  ans !== null &&
-                  ans !== undefined &&
-                  correctAns !== undefined &&
-                  isDeepEqual(formattedUserAns, formattedCorrectAns);
-              }
-
-              if (!isCorrect) {
-                incorrectOrUnansweredQuestionIds.push(qId);
-              }
-
-              return {
-                question_id: qId,
-                user_answer: formattedUserAns,
-                correct_answer: formattedCorrectAns,
-                is_correct: isCorrect,
-              };
-            }
-          );
-
-          acc[result.title] = {
-            score: result.correctCount,
-            max_score: result.totalQuestions,
-            type: result.type,
-            answers: formattedAnswers,
-          };
-          return acc;
-        }, {} as Record<string, unknown>);
-
-        // 6. Save results
+        // 4. Save results
         await supabase
           .from("user_exams")
           .update({
             status: "completed",
-            total_score: totalC,
-            max_score: totalQ,
+            total_score: globalStats.totalCorrect,
+            max_score: globalStats.totalQuestions,
             detailed_results: detailedAnswersByTitle,
           })
           .eq("id", userExamId);
 
-        // 7. Upsert manual ratings and default incorrect/unanswered to 'hard' in user_question_practices
+        // 5. Upsert manual ratings and default incorrect/unanswered to 'hard' in user_question_practices
         if (userId) {
           const manualRatings: { question_id: string; difficulty: 'easy' | 'medium' | 'hard' }[] = [];
-          
+
           sections.forEach((section) => {
             const sectionRatings = ratings[section.id] || {};
             Object.entries(sectionRatings).forEach(([qId, difficulty]) => {
@@ -266,7 +129,18 @@ export default function ResultsPage() {
           });
 
           const manuallyRatedQuestionIds = new Set(manualRatings.map(mr => mr.question_id));
-          const autoHardQuestionIds = incorrectOrUnansweredQuestionIds.filter(qId => !manuallyRatedQuestionIds.has(qId));
+
+          // Get incorrect/unanswered question IDs from Scorer module
+          const allIncorrectOrUnanswered = getIncorrectOrUnansweredQuestionIds(
+            calculatedResults,
+            answers,
+            questionsData || []
+          );
+
+          // Auto-hard: incorrect/unanswered questions that don't have manual ratings
+          const autoHardQuestionIds = allIncorrectOrUnanswered.filter(
+            qId => !manuallyRatedQuestionIds.has(qId)
+          );
 
           const upsertData = [
             ...manualRatings.map(({ question_id, difficulty }) => ({
@@ -298,7 +172,7 @@ export default function ResultsPage() {
         console.error("Failed to process and save exam history", err);
       }
     };
-    
+
     processResults();
   }, [hydrated, userExamId, currentExamId, supabase, sections, answers]);
 

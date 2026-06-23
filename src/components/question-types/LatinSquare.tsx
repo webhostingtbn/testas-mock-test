@@ -33,28 +33,28 @@ export default function LatinSquare({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full min-h-0 space-y-4">
       {/* Question label */}
-      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex-none">
         Find the missing letter
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
+      <div className="flex flex-col lg:flex-row gap-8 items-stretch justify-center flex-1 min-h-0">
         {/* Left: The grid image */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-center w-full max-w-2xl">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-center w-full max-w-2xl flex-1 min-h-0 overflow-hidden">
           <img
             src={imageUrl}
             alt="Latin square puzzle"
-            className="max-w-full max-h-[400px] object-contain block ring-1 ring-gray-100 rounded-lg"
+            className="max-w-full max-h-full object-contain block ring-1 ring-gray-100 rounded-lg"
           />
         </div>
 
         {/* Right: Answer options */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm w-full lg:w-auto">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm w-full lg:w-auto flex-none flex flex-col justify-center">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex-none">
             Select Answer
           </h3>
-          <div className="grid grid-cols-5 lg:grid-cols-2 gap-3 place-items-center">
+          <div className="grid grid-cols-5 lg:grid-cols-2 gap-3 place-items-center flex-none">
             {options.map((letter) => {
               const isSelected = selectedAnswer === letter;
 

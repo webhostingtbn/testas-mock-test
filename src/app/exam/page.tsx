@@ -1,5 +1,4 @@
 'use client';
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -9,21 +8,15 @@ import { createClient } from '@/lib/supabase/client';
 import ExamTopBar from '@/components/exam/ExamTopBar';
 import ExamBottomBar from '@/components/exam/ExamBottomBar';
 import BreakScreen from '@/components/exam/BreakScreen';
-import FigureSequence from '@/components/question-types/FigureSequence';
-import MathEquation from '@/components/question-types/MathEquation';
-import LatinSquare from '@/components/question-types/LatinSquare';
-import CompletingPatterns from '@/components/question-types/CompletingPatterns';
-import ModuleMCQ from '@/components/question-types/ModuleMCQ';
-import ModuleQuestion from '@/components/question-types/ModuleQuestion';
-import NumericalSeries from '@/components/question-types/NumericalSeries';
 import { getMockQuestions } from '@/lib/mock-data';
 import RatingWidget from '@/components/exam/RatingWidget';
 import SecurityOverlay from '@/components/exam/SecurityOverlay';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
-
-const STORAGE_BUCKET = 'ExamDataset';
+import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
+import { ImageService } from '@/lib/services/image-service';
 
 export default function ExamPage() {
+  const imageService = new ImageService();
   const router = useRouter();
   const { data: session } = useSession();
   const supabase = createClient();
@@ -171,30 +164,21 @@ export default function ExamPage() {
 
         if (qError) throw qError;
 
-        const formattedPassages = (passagesData || []).map((passage: any) => {
+        const formattedPassages = (passagesData || []).map(async (passage: any) => {
           const pQuestions = (questionsData || [])
             .filter((q: any) => q.passage_id === passage.id)
-            .map((q: any) => {
+            .map(async (q: any) => {
               const content = (q.content as any) || {};
-              let qResolvedUrl;
-              if (content.image_url) {
-                const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(content.image_url);
-                qResolvedUrl = data.publicUrl;
-              }
               return {
                 ...q,
                 content: {
                   ...content,
-                  resolved_image_url: qResolvedUrl,
+                  resolved_image_url: content.image_url ? await imageService.resolveImageUrl(content.image_url) : undefined,
                 },
               };
             });
-          
-          let resolvedUrl;
-          if (passage.image_url) {
-             const { data: imgData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(passage.image_url);
-             resolvedUrl = imgData.publicUrl;
-          }
+
+          const resolvedUrl = passage.image_url ? await imageService.resolveImageUrl(passage.image_url) : undefined;
 
           return {
              id: passage.id,
@@ -220,104 +204,8 @@ export default function ExamPage() {
 
       if (error || !data) throw error;
 
-      // Comprehensive storage path resolver for all non-passage questions
-      const resolved = data.map((q: any) => {
-        const content = (q.content as any) || {};
-        const newContent = { ...content };
-
-        // 1. Resolve prompt_image (FigureSequence)
-        if (content.prompt_image) {
-          const { data: promptData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(content.prompt_image);
-          newContent.prompt_image_url = promptData.publicUrl;
-        }
-
-        // 2. Resolve options as image paths (FigureSequence options_urls)
-        if (content.options && Array.isArray(content.options) && section.questionType === 'figure_sequence') {
-          newContent.options_urls = content.options.map((path: string) => {
-            const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path);
-            return data.publicUrl;
-          });
-        }
-
-        // 3. Resolve grid_image (LatinSquare & CompletingPatterns)
-        if (content.grid_image) {
-          const { data: gridData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(content.grid_image);
-          newContent.grid_image_url = gridData.publicUrl;
-        }
-
-        // 4. Resolve options_image (CompletingPatterns)
-        if (content.options_image) {
-          const { data: optionsImgData } = supabase.storage
-            .from(STORAGE_BUCKET)
-            .getPublicUrl(content.options_image);
-          newContent.options_image_url = optionsImgData.publicUrl;
-        }
-
-        // 5. Resolve question_image (ModuleQuestion)
-        if (content.question_image) {
-          if (!content.question_image.startsWith('http') && !content.question_image.startsWith('/')) {
-            const { data: qImgData } = supabase.storage
-              .from(STORAGE_BUCKET)
-              .getPublicUrl(content.question_image);
-            newContent.question_image = qImgData.publicUrl;
-          }
-        }
-
-        // 6. Resolve image_url (ModuleQuestion / standard)
-        if (content.image_url) {
-          if (!content.image_url.startsWith('http') && !content.image_url.startsWith('/')) {
-            const { data: imgData } = supabase.storage
-              .from(STORAGE_BUCKET)
-              .getPublicUrl(content.image_url);
-            newContent.image_url = imgData.publicUrl;
-          }
-        }
-
-        // 7. Resolve option images inside standard MCQ options (ModuleQuestion options)
-        if (content.options && typeof content.options === 'object') {
-          if (Array.isArray(content.options)) {
-            newContent.options = content.options.map((opt: any) => {
-              if (opt && typeof opt === 'object' && opt.image) {
-                if (!opt.image.startsWith('http') && !opt.image.startsWith('/')) {
-                  const { data: optImgData } = supabase.storage
-                    .from(STORAGE_BUCKET)
-                    .getPublicUrl(opt.image);
-                  return { ...opt, image: optImgData.publicUrl };
-                }
-              }
-              return opt;
-            });
-          } else {
-            // Key-value options
-            const updatedOptions: any = {};
-            for (const [key, val] of Object.entries(content.options)) {
-              if (val && typeof val === 'object' && (val as any).image) {
-                const optImage = (val as any).image;
-                if (!optImage.startsWith('http') && !optImage.startsWith('/')) {
-                  const { data: optImgData } = supabase.storage
-                    .from(STORAGE_BUCKET)
-                    .getPublicUrl(optImage);
-                  updatedOptions[key] = { ...(val as any), image: optImgData.publicUrl };
-                } else {
-                  updatedOptions[key] = val;
-                }
-              } else {
-                updatedOptions[key] = val;
-              }
-            }
-            newContent.options = updatedOptions;
-          }
-        }
-
-        return {
-          ...q,
-          content: newContent,
-        };
-      });
+      // Use ImageService to resolve all image paths to full URLs
+      const resolved = await imageService.resolveQuestionImageUrls(data);
       setSectionQuestions(resolved);
     } catch (err) {
       console.error('Failed to load questions:', err);
@@ -443,107 +331,46 @@ export default function ExamPage() {
     advanceFlowStep();
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const q = currentQuestion as any;
+  // Build QuestionData object for the renderer
+  const buildQuestionData = (): QuestionData => {
+    const q = currentQuestion as QuestionData;
+    return {
+      id: q.id,
+      sectionId: section.id,
+      sortOrder: q.sortOrder || 0,
+      questionType: section.questionType,
+      content: q.content,
+      isPassage: q.isPassage || false,
+      questions: q.questions || undefined,
+    };
+  };
 
   const renderQuestion = () => {
-    switch (section.questionType) {
-      case 'figure_sequence':
-        return (
-          <FigureSequence
-            question={q}
-            selectedAnswer={currentAnswer as { image1: number | null; image2: number | null } | null}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'completing_patterns':
-        return (
-          <CompletingPatterns
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'math_equation':
-        return (
-          <MathEquation
-            question={q}
-            currentAnswer={currentAnswer as Record<string, number> | null}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'latin_square':
-        return (
-          <LatinSquare
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'completing_patterns':
-      case 'completing patterns':
-        return (
-          <CompletingPatterns
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'figure_sequence':
-      case 'figure sequence':
-        return (
-          <FigureSequence
-            question={q}
-            selectedAnswer={currentAnswer as any}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'math_equation':
-        return (
-          <MathEquation
-            question={q}
-            currentAnswer={currentAnswer as any}
-            onAnswer={handleAnswer}
-          />
-        );
-      case 'module_mcq':
-      case 'interpreting_texts':
-      case 'representation_systems':
-      case 'linguistic_structures':
-        return (
-          <ModuleMCQ
-            passage={q}
-            selectedAnswers={answers[section.id] as Record<string, string> || {}}
-            onAnswer={(questionId, val) => setAnswer(section.id, questionId, val)}
-          />
-        );
-      case 'numerical_series':
-        return (
-          <NumericalSeries
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={(val) => handleAnswer(val)}
-          />
-        );
-      case 'solving_quantitative':
-      case 'inferring_relationships':
-      case 'visualising_solids':
-      case 'visualizing_solids':
-      case 'visualising solids':
-      case 'visualizing solids':
-      case 'visualising solids - 2d':
-      case 'visualizing solids - 2d':
-      case 'visualising solids - 3d':
-      case 'visualizing solids - 3d':
-      default:
-        return (
-          <ModuleQuestion
-            question={q}
-            selectedAnswer={currentAnswer as string | null}
-            onAnswer={(optionId) => handleAnswer(optionId)}
-          />
-        );
+    const questionData = buildQuestionData();
+
+    // Handle Module MCQ passages specially - pass the full passage structure
+    if (questionData.isPassage) {
+      return questionRendererFactory.render(questionData, {
+        selectedAnswer: null,
+        selectedAnswers: answers[section.id] as Record<string, string> || {},
+        onAnswer: (val: unknown) => {
+          // For passage-based questions, val is { [questionId]: answer }
+          if (typeof val === 'object' && val !== null) {
+            const entries = Object.entries(val);
+            if (entries.length > 0) {
+              const [questionId, answer] = entries[0];
+              setAnswer(section.id, questionId, answer);
+            }
+          }
+        },
+        passage: questionData,
+      });
     }
+
+    return questionRendererFactory.render(questionData, {
+      selectedAnswer: currentAnswer,
+      onAnswer: handleAnswer,
+    });
   };
 
   // Build answered question indices for the top bar
@@ -568,7 +395,7 @@ export default function ExamPage() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-50 text-slate-800 overflow-hidden" style={{ fontSize: `${fontSize}px` }}>
-      <SecurityOverlay />
+      {/* <SecurityOverlay /> */}
       {userProfile && (
         <WatermarkOverlay 
           email={userProfile.email} 
@@ -606,8 +433,8 @@ export default function ExamPage() {
       </div>
 
       <main className="flex-1 min-h-0 flex overflow-hidden bg-slate-50">
-        <div className="flex-1 overflow-y-auto w-full px-6 py-4 text-slate-800 pb-24">
-          <div className="mx-auto">
+        <div className="flex-1 flex flex-col min-h-0 w-full px-6 py-4 text-slate-800 pb-12 lg:pb-0 overflow-y-auto lg:overflow-hidden">
+          <div className="flex-1 min-h-0 w-full flex flex-col">
             {renderQuestion()}
           </div>
         </div>

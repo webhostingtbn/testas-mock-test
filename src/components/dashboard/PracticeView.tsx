@@ -303,7 +303,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       const ratingMap: Record<string, 'easy' | 'medium' | 'hard'> = {};
       const dateSet = new Set<string>();
       if (rData) {
-        rData.forEach((row) => {
+        rData.forEach((row : any) => {
           ratingMap[row.question_id] = row.difficulty as 'easy' | 'medium' | 'hard';
           if (row.updated_at) {
             const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
@@ -343,9 +343,33 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     });
 
     const total = subtestQuestions.length;
+    // Questions remaining to be rated at each difficulty level
+    // These represent questions that could be rated as that difficulty
+    const totalHard = subtestQuestions.length; // All questions could potentially be rated hard
+    const totalMedium = subtestQuestions.length; // All questions could potentially be rated medium
 
-    return { easy, medium, hard, unclassified, total };
+    return { easy, medium, hard, unclassified, total, totalEasy: total, totalMedium, totalHard };
   };
+
+    const recommendedSubtest = useMemo(() => {
+    if (filteredSubtests.length === 0) return null;
+
+    let bestSubtest = filteredSubtests[0];
+    let maxHardCount = -1;
+
+    filteredSubtests.forEach((sub) => {
+      const counts = getSubtestCounts(sub.id);
+      if (counts.hard > maxHardCount) {
+        maxHardCount = counts.hard;
+        bestSubtest = sub;
+      }
+    });
+
+    return bestSubtest;
+  }, [filteredSubtests, getSubtestCounts]);
+
+  const practiceSubtest = recommendedSubtest || filteredSubtests[0];
+
 
   const getQuestionIdsForFolder = (subtest: SubtestType, folder: string) => {
     const matchedSections = getMatchedSections(subtest);
@@ -704,6 +728,15 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     ? (overallStats.totalRated / overallStats.totalQuestions) * 100
     : 0;
 
+  const totalQuestions = overallStats.totalQuestions || 1;
+  const totalEasyQs = Math.floor(totalQuestions * 0.3) || 1;
+  const totalMediumQs = Math.floor(totalQuestions * 0.5) || 1;
+  const totalHardQs = (totalQuestions - totalEasyQs - totalMediumQs) || 1;
+
+  const easyRatio = Math.min(overallStats.totalEasy / totalEasyQs, 1);
+  const mediumRatio = Math.min(overallStats.totalMedium / totalMediumQs, 1);
+  const hardRatio = Math.min(overallStats.totalHard / totalHardQs, 1);
+
   const selectedActivity = filteredSubtests.length > 0
     ? filteredSubtests[0]
     : { label: 'Start your first practice session', percentage: 0, total: 0, correct: 0 };
@@ -805,26 +838,23 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <h3 className="truncate text-base font-black text-slate-950">
-                  {filteredSubtests.length > 0
-                    ? filteredSubtests[0].title
+                  {practiceSubtest
+                    ? practiceSubtest.title
                     : 'Start your first practice session'}
                 </h3>
                 <span className="text-xs font-semibold text-slate-400">
                   {overallStats.totalRated > 0
-                    ? `${overallStats.totalEasy + overallStats.totalMedium + overallStats.totalHard}/${overallStats.totalQuestions} questions rated`
+                    ? `Still ${overallStats.totalHard} hard questions to practice`
                     : 'Ready for your first session'}
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="grid size-12 place-items-center rounded-full border-4 border-orange-100 text-xs font-black text-orange-700">
-                {(selectedSubtestPercent || overallProgressPercent).toFixed(2)}%
-              </div>
               <KniButton
-                onClick={() => setSelectedSubtestId(filteredSubtests[0]?.id)}
+                onClick={() => practiceSubtest && setSelectedSubtest(practiceSubtest.id)}
                 className="h-11 px-5 text-sm"
               >
-                Continue
+                Practice
                 <ChevronRight className="size-4" />
               </KniButton>
             </div>
@@ -842,7 +872,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                 </h2>
               </div>
 
-              <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-orange-300 focus-within:text-orange-600">
+              {/* <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-orange-300 focus-within:text-orange-600">
                 <Search className="size-4" />
                 <span className="sr-only">Search practice areas</span>
                 <input
@@ -851,7 +881,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                   placeholder="Find a practice area"
                   className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 sm:w-44"
                 />
-              </label>
+              </label> */}
             </div>
 
             <KniCard className="overflow-hidden p-0">
@@ -878,21 +908,28 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                       'grid size-11 shrink-0 place-items-center rounded-full',
                       selected ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-650',
                     )}>
-                      {percent >= 70
-                        ? <Check className="size-5" />
-                        : <Icon className="size-5" />}
+                      <Icon className="size-5" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <div>
                           <p className="text-sm font-black text-slate-900">{sub.title}</p>
-                          <p className="mt-1 text-xs font-medium text-slate-400">
-                            {counts.total > 0
-                              ? `${counts.easy + counts.medium + counts.hard} rated from ${counts.total} questions`
-                              : 'No activity yet'}
-                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            {counts.total > 0 ? (
+                              <>
+                                <span className="flex items-center gap-1 text-xs font-medium">
+                                  <span className="text-rose-500">{counts.hard} HARD</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="text-amber-500">{counts.medium} MEDIUM</span>
+                                  <span className="text-slate-300">|</span>
+                                  <span className="text-slate-400">{counts.unclassified} unrated</span>
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xs font-medium text-slate-400">No activity yet</span>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-sm font-black text-slate-950">{percent}%</span>
                       </div>
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-slate-300" />
@@ -925,35 +962,132 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
               </div>
             </div>
 
-            <div className="mt-5 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  Easy
-                </div>
-                <span className="text-sm font-black text-slate-950">{overallStats.totalEasy} questions</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                  <span className="size-2 rounded-full bg-amber-400" />
-                  Medium
-                </div>
-                <span className="text-sm font-black text-slate-950">{overallStats.totalMedium} questions</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                  <span className="size-2 rounded-full bg-rose-500" />
-                  Hard
-                </div>
-                <span className="text-sm font-black text-slate-950">{overallStats.totalHard} questions</span>
-              </div>
-            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 my-5">
+              {/* Donut Chart */}
+              <div className="relative size-32 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
+                <svg className="size-full" viewBox="0 0 36 36">
+                  {/* Easy background track (Bottom-left) */}
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.915"
+                    fill="none"
+                    stroke="#e2f9fd"
+                    strokeWidth="2.8"
+                    strokeDasharray="28 72"
+                    transform="rotate(69.6, 18, 18)"
+                  />
+                  {/* Easy progress track */}
+                  {overallStats.totalEasy > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#06b6d4"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${easyRatio * 28} 100`}
+                      transform="rotate(69.6, 18, 18)"
+                    />
+                  )}
 
-            <div className="mt-5">
-              <KniProgress value={overallProgressPercent} className="h-3" />
-              <p className="mt-3 text-xs font-medium text-slate-400">
-                {overallStats.totalRated} of {overallStats.totalQuestions} questions rated
-              </p>
+                  {/* Medium background track (Top-left) */}
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.915"
+                    fill="none"
+                    stroke="#fef3c7"
+                    strokeWidth="2.8"
+                    strokeDasharray="28 72"
+                    transform="rotate(189.6, 18, 18)"
+                  />
+                  {/* Medium progress track */}
+                  {overallStats.totalMedium > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${mediumRatio * 28} 100`}
+                      transform="rotate(189.6, 18, 18)"
+                    />
+                  )}
+
+                  {/* Hard background track (Right) */}
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15.915"
+                    fill="none"
+                    stroke="#ffe4e6"
+                    strokeWidth="2.8"
+                    strokeDasharray="28 72"
+                    transform="rotate(-50.4, 18, 18)"
+                  />
+                  {/* Hard progress track */}
+                  {overallStats.totalHard > 0 && (
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="15.915"
+                      fill="none"
+                      stroke="#ef4444"
+                      strokeWidth="2.8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${hardRatio * 28} 100`}
+                      transform="rotate(-50.4, 18, 18)"
+                    />
+                  )}
+                </svg>
+                {/* Center text */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <div className="flex items-baseline justify-center">
+                    <span className="text-2xl font-extrabold text-slate-900 leading-none">
+                      {overallStats.totalRated}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400 leading-none ml-0.5">
+                      /{overallStats.totalQuestions}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider leading-none">
+                    <span className="text-emerald-500 font-extrabold text-xs">✓</span>
+                    <span>Solved</span>
+                  </div>
+                  <div className="mt-2 text-[9px] font-semibold text-slate-400 leading-none">
+                    {overallStats.totalUnclassified} Attempting
+                  </div>
+                </div>
+              </div>
+
+              {/* Stacked Legend Boxes */}
+              <div className="flex-1 flex flex-col gap-2.5 w-full sm:w-40 shrink-0">
+                {/* Easy Box */}
+                <div className="bg-cyan-50/30 border border-cyan-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
+                  <span className="text-[10px] font-bold text-[#06b6d4] uppercase tracking-wider">Easy</span>
+                  <span className="text-sm font-black text-slate-800 mt-0.5">
+                    {overallStats.totalEasy}/{totalEasyQs}
+                  </span>
+                </div>
+                {/* Medium Box */}
+                <div className="bg-amber-50/20 border border-amber-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
+                  <span className="text-[10px] font-bold text-[#f59e0b] uppercase tracking-wider">Med.</span>
+                  <span className="text-sm font-black text-slate-800 mt-0.5">
+                    {overallStats.totalMedium}/{totalMediumQs}
+                  </span>
+                </div>
+                {/* Hard Box */}
+                <div className="bg-rose-50/20 border border-rose-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
+                  <span className="text-[10px] font-bold text-[#ef4444] uppercase tracking-wider">Hard</span>
+                  <span className="text-sm font-black text-slate-800 mt-0.5">
+                    {overallStats.totalHard}/{totalHardQs}
+                  </span>
+                </div>
+              </div>
             </div>
           </KniCard>
 

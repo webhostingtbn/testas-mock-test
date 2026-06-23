@@ -165,6 +165,7 @@ export default function DashboardClient({ session }: { session: Session }) {
           onStartExam={data.handleStartExam}
           exams={data.exams}
           selectedExam={data.selectedExam}
+          selectedExamDetails={data.selectedExamDetails}
           onSelectExam={data.setSelectedExam}
           getExamAttemptInfo={data.getExamAttemptInfo}
           radarStats={data.computeRadarStats()}

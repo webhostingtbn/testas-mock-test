@@ -84,13 +84,13 @@ export default function MathEquation({
   );
 
   return (
-    <div className="space-y-6" onKeyDown={handleKeyDown} tabIndex={0}>
+    <div className="flex flex-col h-full min-h-0 space-y-4" onKeyDown={handleKeyDown} tabIndex={0}>
       {/* Question label */}
-      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex-none">
         Solve the equations
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar pb-12 lg:pb-0">
         {/* Left column: Equations */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">

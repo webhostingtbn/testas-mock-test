@@ -5,10 +5,16 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useExamStore } from '@/lib/store/exam-store';
-import { BREAK_DURATIONS, MODULE_TEST_LABELS } from '@/lib/constants';
+import {
+  BREAK_DURATIONS,
+  BREAK_DURATION_TIME_OF_TEST,
+  MODULE_TEST_LABELS,
+  filterSections,
+} from '@/lib/constants';
 import type { Profile, ModuleTestType, Exam } from '@/lib/types';
 import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
+import { useExamOrchestrator } from '@/lib/exam/orchestrator';
 
 export function useDashboardData(session: Session) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -22,7 +28,8 @@ export function useDashboardData(session: Session) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { startExam, resetExam } = useExamStore();
+  const { startExam: storeStartExam, resetExam } = useExamStore();
+  const orchestrator = useExamOrchestrator();
   // We'll calculate active module based on either URL param or profile
   const [activeModule, setActiveModule] = useState<ModuleTestType | null>(null);
 
@@ -35,6 +42,12 @@ export function useDashboardData(session: Session) {
   const [isSubmittingConfig, setIsSubmittingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
   const [selectedApprovedModule, setSelectedApprovedModule] = useState<ModuleTestType | null>(null);
+  const [selectedExamDetails, setSelectedExamDetails] = useState<{
+    sectionsCount: number;
+    questionsCount: number;
+    totalDurationMinutes: number;
+    isLoading: boolean;
+  } | null>(null);
 
   // --------------- Effects ---------------
 
@@ -155,227 +168,88 @@ export function useDashboardData(session: Session) {
     }
   }, [profile, searchParams]);
 
+  useEffect(() => {
+    let active = true;
+    const currentExam = selectedExam;
+    if (!currentExam) {
+      setSelectedExamDetails(null);
+      return;
+    }
+
+    async function fetchDetails() {
+      if (!currentExam) return;
+      setSelectedExamDetails({
+        sectionsCount: 0,
+        questionsCount: 0,
+        totalDurationMinutes: 0,
+        isLoading: true
+      });
+
+      try {
+        const { data: dbSections, error } = await supabase
+          .from('sections')
+          .select('id, title, question_type, duration_seconds, question_count, sort_order')
+          .eq('exam_id', currentExam.id)
+          .order('sort_order', { ascending: true });
+
+        if (!active) return;
+
+        if (error || !dbSections || dbSections.length === 0) {
+          setSelectedExamDetails({
+            sectionsCount: 0,
+            questionsCount: 0,
+            totalDurationMinutes: 0,
+            isLoading: false
+          });
+          return;
+        }
+
+        const isPaper = currentExam.format === 'Paper';
+        const { coreSections: coreSectionsMatched, moduleSections: moduleSectionsMatched } = filterSections(dbSections, isPaper, activeModule);
+        const allMatchedSections = [...coreSectionsMatched, ...moduleSectionsMatched];
+        const sectionsCount = allMatchedSections.length;
+        const questionsCount = allMatchedSections.reduce((sum, s) => sum + (s.question_count || 0), 0);
+        const totalDurationSeconds = allMatchedSections.reduce((sum, s) => sum + (s.duration_seconds || 0), 0);
+        const totalDurationMinutes = Math.round(totalDurationSeconds / 60) + Math.round((isPaper ? BREAK_DURATION_TIME_OF_TEST.paper : BREAK_DURATION_TIME_OF_TEST.digital) / 60);
+
+        setSelectedExamDetails({
+          sectionsCount,
+          questionsCount,
+          totalDurationMinutes,
+          isLoading: false
+        });
+      } catch (err) {
+        console.error('Error loading selected exam details:', err);
+        if (active) {
+          setSelectedExamDetails({
+            sectionsCount: 0,
+            questionsCount: 0,
+            totalDurationMinutes: 0,
+            isLoading: false
+          });
+        }
+      }
+    }
+
+    fetchDetails();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedExam, activeModule, supabase]);
+
   // --------------- Actions ---------------
 
   const handleStartExam = async () => {
-    if (!activeExamId) {
+    if (!activeExamId || !profile) {
       return;
     }
 
     setIsStarting(true);
 
     try {
-      const EXAM_ID = activeExamId;
-
-      // Fetch real sections from Supabase, ordered by sort_order
-      const { data: dbSections, error: sectionsError } = await supabase
-        .from('sections')
-        .select('id, title, question_type, duration_seconds, question_count, sort_order')
-        .eq('exam_id', EXAM_ID)
-        .order('sort_order', { ascending: true });
-
-      if (sectionsError || !dbSections || dbSections.length === 0) {
-        throw new Error('Failed to load sections from database');
-      }
-
-      // Fetch the exam format first
-      const { data: examData, error: examFetchError } = await supabase
-        .from('exams')
-        .select('format')
-        .eq('id', EXAM_ID)
-        .single();
-      
-      if (examFetchError || !examData) {
-        throw new Error('Failed to fetch exam format from database');
-      }
-      
-      const isPaper = examData.format === 'Paper';
-
-      // 1. Separate Core sections
-      const coreSectionsMatched = dbSections.filter((s: any) => {
-        if (isPaper) {
-          return [
-            'solving_quantitative',
-            'inferring_relationships',
-            'completing_patterns',
-            'numerical_series'
-          ].includes(s.question_type);
-        } else {
-          return [
-            'figure_sequence',
-            'math_equation',
-            'latin_square'
-          ].includes(s.question_type);
-        }
-      });
-
-      // 2. Separate Module sections matching user's selected module
-      const moduleSectionsMatched = dbSections.filter((s: any) => {
-        if (!activeModule) return false;
-        const normalizedModule = activeModule.toLowerCase();
-
-        if (isPaper) {
-          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-            return s.question_type === 'sc_1' || s.question_type === 'sc_2';
-          }
-          if (normalizedModule.includes('engin')) {
-            return ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'].includes(s.question_type);
-          }
-          if (normalizedModule.includes('econ')) {
-            return s.question_type === 'econ_1' || s.question_type === 'econ_2';
-          }
-          return false;
-        } else {
-          // Digital format matching
-          if (EXAM_ID === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
-            const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-            return (
-              ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(s.question_type) &&
-              s.title === targetModuleTitle
-            );
-          } else {
-            const type = s.question_type;
-            if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-              return type === 'representation_systems';
-            }
-            if (normalizedModule.includes('engin')) {
-              return type === 'representation_systems';
-            }
-            if (normalizedModule.includes('econ')) {
-              return type === 'interpreting_texts';
-            }
-            if (normalizedModule.includes('humanities')) {
-              return type === 'interpreting_texts' || type === 'linguistic_structures';
-            }
-            return false;
-          }
-        }
-      });
-
-      const passageSectionTypes = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'];
-      
-      const questionSections = [
-        ...coreSectionsMatched,
-        ...moduleSectionsMatched.filter((s: any) => !passageSectionTypes.includes(s.question_type))
-      ];
-
-      const questionSectionIds = questionSections.map((s: any) => s.id);
-      let dbQuestions: any[] = [];
-      if (questionSectionIds.length > 0) {
-        const { data, error: questionsError } = await supabase
-          .from('questions')
-          .select('id, section_id, sort_order')
-          .in('section_id', questionSectionIds)
-          .order('sort_order', { ascending: true });
-
-        if (questionsError) throw new Error('Failed to load questions from database');
-        dbQuestions = data || [];
-      }
-
-      // Group question IDs by section_id
-      const questionIdsBySectionId: Record<string, string[]> = {};
-      for (const q of dbQuestions) {
-        if (!questionIdsBySectionId[q.section_id]) {
-          questionIdsBySectionId[q.section_id] = [];
-        }
-        questionIdsBySectionId[q.section_id].push(q.id);
-      }
-
-      // Build Core sections
-      const coreSections = coreSectionsMatched.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        questionType: s.question_type,
-        durationSeconds: s.duration_seconds,
-        questionCount: s.question_count,
-        questionIds: questionIdsBySectionId[s.id] || [],
-      }));
-
-      // Build Module sections
-      const moduleSectionObjs = [];
-      for (const mSec of moduleSectionsMatched) {
-        if (passageSectionTypes.includes(mSec.question_type)) {
-          // Uses passages (Digital module)
-          const { data: dbPassages, error: passagesError } = await supabase
-            .from('passages')
-            .select('id')
-            .eq('section_id', mSec.id)
-            .order('sort_order', { ascending: true });
-
-          if (!passagesError && dbPassages) {
-            moduleSectionObjs.push({
-              id: mSec.id,
-              title: `Module: ${mSec.title}`,
-              questionType: mSec.question_type,
-              durationSeconds: mSec.duration_seconds,
-              questionCount: mSec.question_count,
-              questionIds: dbPassages.map((p: any) => p.id),
-            });
-          }
-        } else {
-          // Uses standard questions (Paper module)
-          moduleSectionObjs.push({
-            id: mSec.id,
-            title: `Module: ${mSec.title}`,
-            questionType: mSec.question_type,
-            durationSeconds: mSec.duration_seconds,
-            questionCount: mSec.question_count,
-            questionIds: questionIdsBySectionId[mSec.id] || [],
-          });
-        }
-      }
-
-      const allSections = [...coreSections, ...moduleSectionObjs];
-
-      const isModuleSection = (qType: string) => {
-        if (isPaper) {
-          return [
-            'eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3',
-            'econ_1', 'econ_2',
-            'sc_1', 'sc_2'
-          ].includes(qType);
-        } else {
-          return passageSectionTypes.includes(qType);
-        }
-      };
-
-      const flowSteps = [];
-      for (let i = 0; i < allSections.length; i++) {
-        flowSteps.push({ type: 'section' as const, sectionIndex: i });
-        if (i < allSections.length - 1) {
-          const currentIsModule = isModuleSection(allSections[i].questionType);
-          const nextIsModule = isModuleSection(allSections[i + 1].questionType);
-
-          const breakDuration = (!currentIsModule && nextIsModule)
-            ? BREAK_DURATIONS.LONG
-            : BREAK_DURATIONS.SHORT;
-
-          flowSteps.push({ type: 'break' as const, breakDuration });
-        }
-      }
-
-      // Initialize a real exam session in user_exams
-      const { data: userExam, error: userExamError } = await supabase
-        .from('user_exams')
-        .insert({
-          user_id: profile?.id,
-          exam_id: EXAM_ID,
-          status: 'in_progress',
-        })
-        .select()
-        .single();
-
-      if (userExamError || !userExam) {
-        throw new Error('Failed to create the exam session in database');
-      }
-
-      startExam({
-        examId: EXAM_ID,
-        userExamId: userExam.id,
-        sections: allSections,
-        flowSteps,
-      });
-
+      const format = profile.format as 'Digital' | 'Paper';
+      await orchestrator.startExam(activeExamId, activeModule, format, profile.id);
       router.push('/exam');
     } catch (err) {
       console.error('Error starting exam:', err);
@@ -387,200 +261,7 @@ export function useDashboardData(session: Session) {
     setIsStarting(true);
 
     try {
-      // Fetch real sections from Supabase, ordered by sort_order
-      const { data: dbSections, error: sectionsError } = await supabase
-        .from('sections')
-        .select('id, title, question_type, duration_seconds, question_count, sort_order')
-        .eq('exam_id', examId)
-        .order('sort_order', { ascending: true });
-
-      if (sectionsError || !dbSections || dbSections.length === 0) {
-        throw new Error('Failed to load sections from database');
-      }
-
-      // Fetch the exam format first
-      const { data: examData, error: examFetchError } = await supabase
-        .from('exams')
-        .select('format')
-        .eq('id', examId)
-        .single();
-      
-      if (examFetchError || !examData) {
-        throw new Error('Failed to fetch exam format from database');
-      }
-      
-      const isPaper = examData.format === 'Paper';
-
-      // 1. Separate Core sections
-      const coreSectionsMatched = dbSections.filter((s: any) => {
-        if (isPaper) {
-          return [
-            'solving_quantitative',
-            'inferring_relationships',
-            'completing_patterns',
-            'numerical_series'
-          ].includes(s.question_type);
-        } else {
-          return [
-            'figure_sequence',
-            'math_equation',
-            'latin_square'
-          ].includes(s.question_type);
-        }
-      });
-
-      // 2. Separate Module sections matching user's selected module
-      const moduleSectionsMatched = dbSections.filter((s: any) => {
-        if (!activeModule) return false;
-        const normalizedModule = activeModule.toLowerCase();
-
-        if (isPaper) {
-          if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-            return s.question_type === 'sc_1' || s.question_type === 'sc_2';
-          }
-          if (normalizedModule.includes('engin')) {
-            return ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'].includes(s.question_type);
-          }
-          if (normalizedModule.includes('econ')) {
-            return s.question_type === 'econ_1' || s.question_type === 'econ_2';
-          }
-          return false;
-        } else {
-          // Digital format matching
-          if (examId === '118ec3ca-b52e-4069-b5dd-eaca31339932') {
-            const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-            return (
-              ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'].includes(s.question_type) &&
-              s.title === targetModuleTitle
-            );
-          } else {
-            const type = s.question_type;
-            if (normalizedModule.includes('science') || normalizedModule === 'cs') {
-              return type === 'representation_systems';
-            }
-            if (normalizedModule.includes('engin')) {
-              return type === 'representation_systems';
-            }
-            if (normalizedModule.includes('econ')) {
-              return type === 'interpreting_texts';
-            }
-            if (normalizedModule.includes('humanities')) {
-              return type === 'interpreting_texts' || type === 'linguistic_structures';
-            }
-            return false;
-          }
-        }
-      });
-
-      const passageSectionTypes = ['module_mcq', 'interpreting_texts', 'representation_systems', 'linguistic_structures'];
-      
-      const questionSections = [
-        ...coreSectionsMatched,
-        ...moduleSectionsMatched.filter((s: any) => !passageSectionTypes.includes(s.question_type))
-      ];
-
-      const questionSectionIds = questionSections.map((s: any) => s.id);
-      let dbQuestions: any[] = [];
-      if (questionSectionIds.length > 0) {
-        const { data, error: questionsError } = await supabase
-          .from('questions')
-          .select('id, section_id, sort_order')
-          .in('section_id', questionSectionIds)
-          .order('sort_order', { ascending: true });
-
-        if (questionsError) throw new Error('Failed to load questions from database');
-        dbQuestions = data || [];
-      }
-
-      // Group question IDs by section_id
-      const questionIdsBySectionId: Record<string, string[]> = {};
-      for (const q of dbQuestions) {
-        if (!questionIdsBySectionId[q.section_id]) {
-          questionIdsBySectionId[q.section_id] = [];
-        }
-        questionIdsBySectionId[q.section_id].push(q.id);
-      }
-
-      // Build Core sections
-      const coreSections = coreSectionsMatched.map((s: any) => ({
-        id: s.id,
-        title: s.title,
-        questionType: s.question_type,
-        durationSeconds: s.duration_seconds,
-        questionCount: s.question_count,
-        questionIds: questionIdsBySectionId[s.id] || [],
-      }));
-
-      // Build Module sections
-      const moduleSectionObjs = [];
-      for (const mSec of moduleSectionsMatched) {
-        if (passageSectionTypes.includes(mSec.question_type)) {
-          // Uses passages (Digital module)
-          const { data: dbPassages, error: passagesError } = await supabase
-            .from('passages')
-            .select('id')
-            .eq('section_id', mSec.id)
-            .order('sort_order', { ascending: true });
-
-          if (!passagesError && dbPassages) {
-            moduleSectionObjs.push({
-              id: mSec.id,
-              title: `Module: ${mSec.title}`,
-              questionType: mSec.question_type,
-              durationSeconds: mSec.duration_seconds,
-              questionCount: mSec.question_count,
-              questionIds: dbPassages.map((p: any) => p.id),
-            });
-          }
-        } else {
-          // Uses standard questions (Paper module)
-          moduleSectionObjs.push({
-            id: mSec.id,
-            title: `Module: ${mSec.title}`,
-            questionType: mSec.question_type,
-            durationSeconds: mSec.duration_seconds,
-            questionCount: mSec.question_count,
-            questionIds: questionIdsBySectionId[mSec.id] || [],
-          });
-        }
-      }
-
-      const allSections = [...coreSections, ...moduleSectionObjs];
-
-      const isModuleSection = (qType: string) => {
-        if (isPaper) {
-          return [
-            'eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3',
-            'econ_1', 'econ_2',
-            'sc_1', 'sc_2'
-          ].includes(qType);
-        } else {
-          return passageSectionTypes.includes(qType);
-        }
-      };
-
-      const flowSteps = [];
-      for (let i = 0; i < allSections.length; i++) {
-        flowSteps.push({ type: 'section' as const, sectionIndex: i });
-        if (i < allSections.length - 1) {
-          const currentIsModule = isModuleSection(allSections[i].questionType);
-          const nextIsModule = isModuleSection(allSections[i + 1].questionType);
-
-          const breakDuration = (!currentIsModule && nextIsModule)
-            ? BREAK_DURATIONS.LONG
-            : BREAK_DURATIONS.SHORT;
-
-          flowSteps.push({ type: 'break' as const, breakDuration });
-        }
-      }
-
-      startExam({
-        examId,
-        userExamId,
-        sections: allSections,
-        flowSteps,
-      });
-
+      await orchestrator.resumeExam(userExamId, activeModule, profile?.id);
       router.push('/exam');
     } catch (err) {
       console.error('Error resuming exam:', err);
@@ -875,6 +556,7 @@ export function useDashboardData(session: Session) {
     pastExams,
     exams,
     selectedExam,
+    selectedExamDetails,
     setSelectedExam,
     activeExamId,
     examLimit,
