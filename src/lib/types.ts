@@ -58,6 +58,7 @@ export interface Exam {
   is_active: boolean;
   retry_number?: number | null;
   created_at: string;
+  sections?: { duration_seconds: number; question_count: number }[];
 }
 
 export interface UserQuestionPractice {

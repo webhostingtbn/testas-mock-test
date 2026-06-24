@@ -26,9 +26,10 @@ import PracticeSession from './PracticeSession';
 interface PracticeViewProps {
   profile: Profile | null;
   activeModule: ModuleTestType | null;
+  onBackNavigation?: (nav: { label: string; onBack: () => void } | undefined) => void;
 }
 
-export function PracticeView({ profile, activeModule }: PracticeViewProps) {
+export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
@@ -112,11 +113,41 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
   // Navigation State inside SPA
   const [selectedSubtest, setSelectedSubtest] = useState<SubtestType | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState<'easy' | 'medium' | 'hard' | 'unclassified' | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<'easy' | 'medium' | 'hard' | null>(null);
   const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubtestId, setSelectedSubtestId] = useState<string | null>(null);
+
+  const handleBackToPractice = useCallback(() => {
+    setSelectedSubtest(null);
+  }, []);
+
+  // Synchronize back navigation in the header
+  useEffect(() => {
+    if (!onBackNavigation) return;
+
+    if (selectedSubtest && selectedFolder) {
+      onBackNavigation({
+        label: 'Back to Folders',
+        onBack: () => {
+          setSelectedFolder(null);
+          setPracticeQuestions([]);
+        }
+      });
+    } else if (selectedSubtest) {
+      onBackNavigation({
+        label: 'Back to Practice',
+        onBack: handleBackToPractice
+      });
+    } else {
+      onBackNavigation(undefined);
+    }
+
+    return () => {
+      onBackNavigation(undefined);
+    };
+  }, [selectedSubtest, selectedFolder, onBackNavigation, handleBackToPractice]);
 
   const getModuleTitle = (mod: string | null) => {
     if (!mod) return '';
@@ -265,14 +296,46 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     return baseSubtests;
   }, [activeModule, isPaper]);
 
+  // Only count rated questions (unrated questions are hidden in practice)
+  const getSubtestCounts = (subtest: SubtestType) => {
+    const matchedSections = getMatchedSections(subtest);
+    const matchedSectionIds = new Set(matchedSections.map(s => s.id));
+    const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
+
+    let easy = 0;
+    let medium = 0;
+    let hard = 0;
+
+    subtestQuestions.forEach((q) => {
+      const rating = userRatings[q.id];
+      if (rating === 'easy') easy++;
+      else if (rating === 'medium') medium++;
+      else if (rating === 'hard') hard++;
+      // unrated questions are not counted
+    });
+
+    const total = easy + medium + hard; // Only total rated questions
+
+    return { easy, medium, hard, total };
+  };
+
   const filteredSubtests = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    if (!normalizedQuery) return subtests;
-    return subtests.filter(sub =>
-      sub.title.toLowerCase().includes(normalizedQuery) ||
-      sub.description.toLowerCase().includes(normalizedQuery)
-    );
-  }, [searchQuery, subtests]);
+    let result = subtests;
+    if (normalizedQuery) {
+      result = subtests.filter(sub =>
+        sub.title.toLowerCase().includes(normalizedQuery) ||
+        sub.description.toLowerCase().includes(normalizedQuery)
+      );
+    }
+    // Sort by hard count desc, then medium count desc
+    return result.sort((a, b) => {
+      const countsA = getSubtestCounts(a.id);
+      const countsB = getSubtestCounts(b.id);
+      if (countsB.hard !== countsA.hard) return countsB.hard - countsA.hard;
+      return countsB.medium - countsA.medium;
+    });
+  }, [searchQuery, subtests, getSubtestCounts]);
 
   const selectedSubtestData = useMemo(() => {
     return subtests.find(s => s.id === selectedSubtestId) ?? subtests[0];
@@ -324,53 +387,10 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     loadPracticeData();
   }, [loadPracticeData]);
 
-  const getSubtestCounts = (subtest: SubtestType) => {
-    const matchedSections = getMatchedSections(subtest);
-    const matchedSectionIds = new Set(matchedSections.map(s => s.id));
-    const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
-
-    let easy = 0;
-    let medium = 0;
-    let hard = 0;
-    let unclassified = 0;
-
-    subtestQuestions.forEach((q) => {
-      const rating = userRatings[q.id];
-      if (rating === 'easy') easy++;
-      else if (rating === 'medium') medium++;
-      else if (rating === 'hard') hard++;
-      else unclassified++;
-    });
-
-    const total = subtestQuestions.length;
-    // Questions remaining to be rated at each difficulty level
-    // These represent questions that could be rated as that difficulty
-    const totalHard = subtestQuestions.length; // All questions could potentially be rated hard
-    const totalMedium = subtestQuestions.length; // All questions could potentially be rated medium
-
-    return { easy, medium, hard, unclassified, total, totalEasy: total, totalMedium, totalHard };
-  };
-
-    const recommendedSubtest = useMemo(() => {
-    if (filteredSubtests.length === 0) return null;
-
-    let bestSubtest = filteredSubtests[0];
-    let maxHardCount = -1;
-
-    filteredSubtests.forEach((sub) => {
-      const counts = getSubtestCounts(sub.id);
-      if (counts.hard > maxHardCount) {
-        maxHardCount = counts.hard;
-        bestSubtest = sub;
-      }
-    });
-
-    return bestSubtest;
-  }, [filteredSubtests, getSubtestCounts]);
-
-  const practiceSubtest = recommendedSubtest || filteredSubtests[0];
+  const practiceSubtest = filteredSubtests[0] ?? null;
 
 
+  // Only show rated questions in practice - hide unrated questions completely
   const getQuestionIdsForFolder = (subtest: SubtestType, folder: string) => {
     const matchedSections = getMatchedSections(subtest);
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
@@ -379,17 +399,24 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     return subtestQuestions
       .filter((q) => {
         const rating = userRatings[q.id];
-        if (folder === 'unclassified') return !rating;
+        // Only show questions that have been rated (not undefined/null)
+        if (!rating) return false;
         return rating === folder;
       })
       .map((q) => q.id);
   };
 
-  const startPracticeSession = async (subtest: SubtestType, folder: 'easy' | 'medium' | 'hard' | 'unclassified') => {
+  const startPracticeSession = async (subtest: SubtestType, folder: 'easy' | 'medium' | 'hard') => {
     setIsLoadingSession(true);
     setSelectedFolder(folder);
     try {
       const targetIds = getQuestionIdsForFolder(subtest, folder);
+
+      // Check if there are no rated questions for this folder
+      if (targetIds.length === 0) {
+        setPracticeQuestions([]);
+        return;
+      }
 
       const isSubjectSubtest = [
         'module_mcq',
@@ -420,8 +447,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
         const formattedPassages = (passagesData || []).map((passage: any) => {
           const pQuestions = (questionsData || [])
-            .filter((q) => q.passage_id === passage.id)
-            .map((q) => {
+            .filter((q : any) => q.passage_id === passage.id)
+            .map((q: any) => {
               const content = q.content || {};
               let qResolvedUrl;
               if (content.image_url) {
@@ -457,8 +484,8 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
 
         // Load standalone questions without passages
         const standaloneQuestions = (questionsData || [])
-          .filter((q) => !q.passage_id)
-          .map((q) => {
+          .filter((q: any) => !q.passage_id)
+          .map((q: any) => {
             const content = q.content || {};
             let qResolvedUrl;
             if (content.image_url) {
@@ -486,40 +513,28 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           return aOrder - bOrder;
         });
 
-        const allCombinedWithNumbers = allCombined.map((item, index) => ({
-          ...item,
-          display_number: index + 1,
-          total_subtest_questions: allCombined.length,
-        }));
-
-        const combined = allCombinedWithNumbers.filter((item: any) => {
+        // Filter only rated questions (questions in targetIds are already rated)
+        const combined = allCombined.filter((item: any) => {
+          let questionId: string | undefined;
           if (item.isPassage) {
             if (item.questions.length === 0) return false;
-            const firstQId = item.questions[0].id;
-            const rating = userRatings[firstQId];
-            if (folder === 'unclassified') return !rating;
-            return rating === folder;
+            questionId = item.questions[0].id;
           } else {
-            const rating = userRatings[item.id];
-            if (folder === 'unclassified') return !rating;
-            return rating === folder;
+            questionId = item.id;
           }
+          // Only include if question is in our rated targetIds
+          return questionId && targetIds.includes(questionId);
         });
 
         setPracticeQuestions(combined);
       } else {
-        if (targetIds.length === 0) {
-          setPracticeQuestions([]);
-          return;
-        }
-
         const { data: questionsData } = await supabase
           .from('questions')
           .select('id, section_id, sort_order, question_type, content, correct_answer')
           .in('id', targetIds)
           .order('sort_order', { ascending: true });
 
-        const resolved = (questionsData || []).map((q) => {
+        const resolved = (questionsData || []).map((q: any) => {
           if (subtest === 'figure_sequence') {
             const content = q.content as any;
             const { data: promptData } = supabase.storage
@@ -616,6 +631,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         onExit={handleExitPracticeSession}
         onQuestionRated={loadPracticeData}
         isPaper={isPaper}
+        isPracticeOnly={true}
       />
     );
   }
@@ -649,7 +665,7 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       <PracticeFolderView
         subtestTitle={subtestTitles[selectedSubtest]}
         counts={counts}
-        onBack={() => setSelectedSubtest(null)}
+        onBack={handleBackToPractice}
         onSelectFolder={(folder) => startPracticeSession(selectedSubtest, folder)}
       />
     );
@@ -668,13 +684,11 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
     let totalEasy = 0;
     let totalMedium = 0;
     let totalHard = 0;
-    let totalUnclassified = 0;
 
     let activeModuleTotal = 0;
     let activeModuleEasy = 0;
     let activeModuleMedium = 0;
     let activeModuleHard = 0;
-    let activeModuleUnclassified = 0;
 
     subtests.forEach((sub) => {
       const counts = getSubtestCounts(sub.id);
@@ -683,7 +697,6 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       totalEasy += counts.easy;
       totalMedium += counts.medium;
       totalHard += counts.hard;
-      totalUnclassified += counts.unclassified;
 
       const isModuleSub = ![
         'figure_sequence',
@@ -699,7 +712,6 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
         activeModuleEasy += counts.easy;
         activeModuleMedium += counts.medium;
         activeModuleHard += counts.hard;
-        activeModuleUnclassified += counts.unclassified;
       }
     });
 
@@ -711,13 +723,11 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
       totalEasy,
       totalMedium,
       totalHard,
-      totalUnclassified,
       totalRated,
       activeModuleTotal,
       activeModuleEasy,
       activeModuleMedium,
       activeModuleHard,
-      activeModuleUnclassified,
       activeModuleRated,
     };
   };
@@ -922,11 +932,11 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
                                   <span className="text-slate-300">|</span>
                                   <span className="text-amber-500">{counts.medium} MEDIUM</span>
                                   <span className="text-slate-300">|</span>
-                                  <span className="text-slate-400">{counts.unclassified} unrated</span>
+                                  <span className="text-emerald-500">{counts.easy} EASY</span>
                                 </span>
                               </>
                             ) : (
-                              <span className="text-xs font-medium text-slate-400">No activity yet</span>
+                              <span className="text-xs font-medium text-slate-400">No rated questions</span>
                             )}
                           </div>
                         </div>
@@ -945,176 +955,9 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
           </section>
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-6">
-          {/* Difficulty Breakdown Card */}
-          <KniCard className="p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-                  Difficulty Breakdown
-                </p>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  Based on your ratings
-                </h2>
-              </div>
-              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
-                <Target className="size-5" />
-              </div>
-            </div>
+        <aside className="flex min-w-0 flex-col gap-4">
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 my-5">
-              {/* Donut Chart */}
-              <div className="relative size-32 flex items-center justify-center shrink-0 mx-auto sm:mx-0">
-                <svg className="size-full" viewBox="0 0 36 36">
-                  {/* Easy background track (Bottom-left) */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.915"
-                    fill="none"
-                    stroke="#e2f9fd"
-                    strokeWidth="2.8"
-                    strokeDasharray="28 72"
-                    transform="rotate(69.6, 18, 18)"
-                  />
-                  {/* Easy progress track */}
-                  {overallStats.totalEasy > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#06b6d4"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${easyRatio * 28} 100`}
-                      transform="rotate(69.6, 18, 18)"
-                    />
-                  )}
-
-                  {/* Medium background track (Top-left) */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.915"
-                    fill="none"
-                    stroke="#fef3c7"
-                    strokeWidth="2.8"
-                    strokeDasharray="28 72"
-                    transform="rotate(189.6, 18, 18)"
-                  />
-                  {/* Medium progress track */}
-                  {overallStats.totalMedium > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#f59e0b"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${mediumRatio * 28} 100`}
-                      transform="rotate(189.6, 18, 18)"
-                    />
-                  )}
-
-                  {/* Hard background track (Right) */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.915"
-                    fill="none"
-                    stroke="#ffe4e6"
-                    strokeWidth="2.8"
-                    strokeDasharray="28 72"
-                    transform="rotate(-50.4, 18, 18)"
-                  />
-                  {/* Hard progress track */}
-                  {overallStats.totalHard > 0 && (
-                    <circle
-                      cx="18"
-                      cy="18"
-                      r="15.915"
-                      fill="none"
-                      stroke="#ef4444"
-                      strokeWidth="2.8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${hardRatio * 28} 100`}
-                      transform="rotate(-50.4, 18, 18)"
-                    />
-                  )}
-                </svg>
-                {/* Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <div className="flex items-baseline justify-center">
-                    <span className="text-2xl font-extrabold text-slate-900 leading-none">
-                      {overallStats.totalRated}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400 leading-none ml-0.5">
-                      /{overallStats.totalQuestions}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-center gap-0.5 text-[9px] font-bold text-slate-500 uppercase tracking-wider leading-none">
-                    <span className="text-emerald-500 font-extrabold text-xs">✓</span>
-                    <span>Solved</span>
-                  </div>
-                  <div className="mt-2 text-[9px] font-semibold text-slate-400 leading-none">
-                    {overallStats.totalUnclassified} Attempting
-                  </div>
-                </div>
-              </div>
-
-              {/* Stacked Legend Boxes */}
-              <div className="flex-1 flex flex-col gap-2.5 w-full sm:w-40 shrink-0">
-                {/* Easy Box */}
-                <div className="bg-cyan-50/30 border border-cyan-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] font-bold text-[#06b6d4] uppercase tracking-wider">Easy</span>
-                  <span className="text-sm font-black text-slate-800 mt-0.5">
-                    {overallStats.totalEasy}/{totalEasyQs}
-                  </span>
-                </div>
-                {/* Medium Box */}
-                <div className="bg-amber-50/20 border border-amber-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] font-bold text-[#f59e0b] uppercase tracking-wider">Med.</span>
-                  <span className="text-sm font-black text-slate-800 mt-0.5">
-                    {overallStats.totalMedium}/{totalMediumQs}
-                  </span>
-                </div>
-                {/* Hard Box */}
-                <div className="bg-rose-50/20 border border-rose-100/50 rounded-2xl py-2 px-4 flex flex-col items-center justify-center text-center">
-                  <span className="text-[10px] font-bold text-[#ef4444] uppercase tracking-wider">Hard</span>
-                  <span className="text-sm font-black text-slate-800 mt-0.5">
-                    {overallStats.totalHard}/{totalHardQs}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </KniCard>
-
-          {/* Overall Progress Card */}
-          <KniCard className="p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  Overall Progress
-                </p>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  {Math.round(overallProgressPercent)}% completion
-                </h2>
-              </div>
-              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
-                <Check className="size-5" />
-              </div>
-            </div>
-
-            <KniProgress value={overallProgressPercent} className="mt-5 h-3" />
-
-            <div className="mt-5 text-sm text-slate-500">
-              You have rated {overallStats.totalRated} out of {overallStats.totalQuestions} questions.
-            </div>
-          </KniCard>
-
-          {/* Activity Streak Card */}
+                    {/* Activity Streak Card */}
           <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -1142,6 +985,109 @@ export function PracticeView({ profile, activeModule }: PracticeViewProps) {
             <p className="mt-1 text-sm text-slate-500">
               Max Streak: {maxStreak} days
             </p>
+          </KniCard>
+
+          {/* Difficulty Breakdown Card */}
+          <KniCard className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
+                  Difficulty Breakdown
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+                  Based on your ratings
+                </h2>
+              </div>
+              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Target className="size-5" />
+              </div>
+            </div>
+
+            {/* Vertical Bar Chart */}
+            <div className="mt-5 flex items-end justify-between gap-4 sm:gap-8 h-48">
+              {/* Get max count for scaling */}
+              {(() => {
+                const maxCount = overallStats.totalEasy + overallStats.totalMedium + overallStats.totalHard;
+                const easyHeight = Math.floor(Math.max((overallStats.totalEasy / maxCount) * 100, 1));
+                const mediumHeight = Math.floor(Math.max((overallStats.totalMedium / maxCount) * 100, 1));
+                const hardHeight = Math.floor(Math.max((overallStats.totalHard / maxCount) * 100, 1));
+
+                return (
+                  <>
+                    {/* Easy Bar */}
+                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
+                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
+                        <div
+                          className="w-full bg-cyan-500 hover:bg-cyan-600 transition-all duration-500 rounded-t-lg"
+                          style={{
+                            height: `${Math.max(easyHeight, 4)}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">Easy</span>
+                      <span className="text-sm font-black text-slate-900">
+                        {overallStats.totalEasy}
+                      </span>
+                    </div>
+
+                    {/* Medium Bar */}
+                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
+                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
+                        <div
+                          className="w-full bg-amber-500 hover:bg-amber-600 transition-all duration-500 rounded-t-lg"
+                          style={{
+                            height: `${Math.max(mediumHeight, 4)}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">Medium</span>
+                      <span className="text-sm font-black text-slate-900">
+                        {overallStats.totalMedium}
+                      </span>
+                    </div>
+
+                    {/* Hard Bar */}
+                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
+                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
+                        <div
+                          className="w-full bg-rose-500 hover:bg-rose-600 transition-all duration-500 rounded-t-lg"
+                          style={{
+                            height: `${Math.max(hardHeight, 4)}%`
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">Hard</span>
+                      <span className="text-sm font-black text-slate-900">
+                        {overallStats.totalHard}
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </KniCard>
+
+          {/* Overall Progress Card */}
+          <KniCard className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Overall Progress
+                </p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
+                  {Math.round(overallProgressPercent)}% completion
+                </h2>
+              </div>
+              <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
+                <Check className="size-5" />
+              </div>
+            </div>
+
+            <KniProgress value={overallProgressPercent} className="mt-5 h-3" />
+
+            <div className="mt-5 text-sm text-slate-500">
+              You have rated {overallStats.totalRated} out of {overallStats.totalQuestions} questions.
+            </div>
           </KniCard>
         </aside>
       </div>

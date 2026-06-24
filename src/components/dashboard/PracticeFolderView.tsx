@@ -1,6 +1,6 @@
 'use client';
 
-import { Smile, Meh, Frown, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Smile, Meh, Frown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
 
 interface PracticeFolderViewProps {
@@ -9,10 +9,9 @@ interface PracticeFolderViewProps {
     easy: number;
     medium: number;
     hard: number;
-    unclassified: number;
   };
   onBack: () => void;
-  onSelectFolder: (folder: 'easy' | 'medium' | 'hard' | 'unclassified') => void;
+  onSelectFolder: (folder: 'easy' | 'medium' | 'hard') => void;
 }
 
 export default function PracticeFolderView({
@@ -21,6 +20,7 @@ export default function PracticeFolderView({
   onBack,
   onSelectFolder,
 }: PracticeFolderViewProps) {
+  // Only show rated questions in practice - unclassified folder removed
   const folders = [
     {
       id: 'easy' as const,
@@ -52,37 +52,19 @@ export default function PracticeFolderView({
       iconColor: 'bg-rose-100 text-rose-700',
       badgeColor: 'bg-rose-500/10 text-rose-750 border-rose-300/35',
     },
-    {
-      id: 'unclassified' as const,
-      label: 'Unclassified',
-      labelVi: 'Chưa phân loại',
-      icon: HelpCircle,
-      count: counts.unclassified,
-      color: 'bg-slate-50/60 text-slate-700 border-slate-250 hover:border-slate-350',
-      iconColor: 'bg-slate-100 text-slate-600',
-      badgeColor: 'bg-slate-500/10 text-slate-700 border-slate-300/35',
-    },
   ];
 
   return (
     <div className="mx-auto w-full">
-      <button
-        onClick={onBack}
-        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-semibold mb-6 cursor-pointer transition"
-      >
-        <ChevronLeft className="size-4" />
-        Back to Practice Center
-      </button>
-
       <div className="mb-8">
-        <p className="text-sm font-medium text-orange-700">Subtest Bins</p>
+        <p className="text-sm font-medium text-orange-700">Practice Folders</p>
         <h2 className="mt-1 text-3xl font-bold text-slate-900">{subtestTitle}</h2>
         <p className="mt-2 text-slate-500">
-          Select a difficulty folder below to practice questions. Questions will move automatically as you rate them.
+          Select a difficulty folder to practice. Only rated questions appear here.
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-3 lg:grid-cols-3">
         {folders.map((folder) => {
           const Icon = folder.icon;
           const isEmpty = folder.count === 0;
@@ -101,7 +83,7 @@ export default function PracticeFolderView({
                     {folder.count} Question{folder.count === 1 ? '' : 's'}
                   </span>
                 </div>
-                
+
                 <h3 className="mt-6 text-lg font-bold text-slate-900 leading-tight">{folder.label}</h3>
                 <p className="mt-1 text-xs text-slate-400 font-medium">{folder.labelVi}</p>
               </div>
@@ -113,7 +95,7 @@ export default function PracticeFolderView({
                 variant={folder.id === 'hard' ? 'danger' : 'primary'}
                 className="mt-6 w-full h-10 text-xs font-semibold rounded-xl flex items-center justify-center gap-1 hover:scale-102 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:shadow-none"
               >
-                {isEmpty ? 'No Questions Available' : 'Start Practice'}
+                {isEmpty ? 'No Questions' : 'Start Practice'}
                 {!isEmpty && <ChevronRight className="size-4" />}
               </KniButton>
             </KniCard>

@@ -1,14 +1,12 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useExamStore } from '@/lib/store/exam-store';
 import {
-  BREAK_DURATIONS,
   BREAK_DURATION_TIME_OF_TEST,
-  MODULE_TEST_LABELS,
   filterSections,
 } from '@/lib/constants';
 import type { Profile, ModuleTestType, Exam } from '@/lib/types';
@@ -16,25 +14,43 @@ import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
 
+interface PastExam {
+  exam_id: string;
+  total_score: number | null;
+  max_score: number | null;
+  exams?: { format?: string };
+  detailed_results?: unknown;
+}
+
 export function useDashboardData(session: Session) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStarting, setIsStarting] = useState(false);
   const [exams, setExams] = useState<Exam[]>([]);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
-  const [pastExams, setPastExams] = useState<any[]>([]);
-  const [isStructureOpen, setIsStructureOpen] = useState(true);
+  const [pastExams, setPastExams] = useState<PastExam[]>([]);
   const [examLimit, setExamLimit] = useState<number | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const { startExam: storeStartExam, resetExam } = useExamStore();
+  const { resetExam } = useExamStore();
   const orchestrator = useExamOrchestrator();
   // We'll calculate active module based on either URL param or profile
   const [activeModule, setActiveModule] = useState<ModuleTestType | null>(null);
+  const activeExamId = selectedExam?.id || null;
 
   // View state for SPA navigation — managed here so the orchestrator stays slim
   const [briefingChecklist, setBriefingChecklist] = useState<string[]>([]);
+
+  // Per-exam history and stats
+  const [selectedTestHistory, setSelectedTestHistory] = useState<PastExam[]>([]);
+  const [selectedTestRadarStats, setSelectedTestRadarStats] = useState<{
+    key: string;
+    label: string;
+    correct: number;
+    total: number;
+    percentage: number;
+  }[]>([]);
 
   // Setup state for new users
   const [selectedModule, setSelectedModule] = useState<ModuleTestType | null>(null);
@@ -112,12 +128,12 @@ export function useDashboardData(session: Session) {
           console.warn('Could not load past exams:', e);
         }
 
-        // Fetch all active exams
+        // Fetch all exams for user's format (no longer need is_active = true)
+        // Admins see all exams, regular users see exams matching their format
         try {
           const { data: examsData } = await supabase
             .from('exams')
-            .select('*')
-            .eq('is_active', true)
+            .select('*, sections(duration_seconds, question_count)')
             .eq('format', userFormat)
             .order('created_at', { ascending: true });
 
@@ -257,7 +273,7 @@ export function useDashboardData(session: Session) {
     }
   };
 
-  const handleResumeExam = async (userExamId: string, examId: string) => {
+  const handleResumeExam = async (userExamId: string) => {
     setIsStarting(true);
 
     try {
@@ -301,8 +317,8 @@ export function useDashboardData(session: Session) {
         module_test: selectedModule,
         format: selectedFormat
       } : null);
-    } catch (err: any) {
-      setConfigError(err.message || 'Failed to save configuration.');
+    } catch (err: unknown) {
+      setConfigError(err instanceof Error ? err.message : 'Failed to save configuration.');
     } finally {
       setIsSubmittingConfig(false);
     }
@@ -337,7 +353,6 @@ export function useDashboardData(session: Session) {
   // --------------- Derived state ---------------
 
   const isAdmin = profile?.role === 'admin';
-  const activeExamId = selectedExam?.id || null;
   const hasActiveExam = !!activeExamId;
 
   const getExamAttemptInfo = (exam: Exam) => {
@@ -429,15 +444,15 @@ export function useDashboardData(session: Session) {
     }
 
     // Helper to safely extract score from detailed section data
-    const getScore = (sectionData: any, sectionTitle: string): number => {
+    const getScore = (sectionData: unknown, sectionTitle: string): number => {
       if (!sectionData) return 0;
       if (Array.isArray(sectionData)) {
         // Legacy array of answers: count the correct ones
-        return sectionData.filter((ans: any) => ans && (ans.is_correct === true || ans.correct === true)).length;
+        return sectionData.filter((ans: { is_correct?: boolean; correct?: boolean }) => ans && (ans.is_correct === true || ans.correct === true)).length;
       }
       if (typeof sectionData !== 'object') return 0;
-      
-      const s = sectionData.score;
+
+      const s = (sectionData as { score?: number | string }).score;
       if (typeof s === 'number') return s;
       if (typeof s === 'string') {
         const p = parseInt(s, 10);
@@ -445,36 +460,37 @@ export function useDashboardData(session: Session) {
       }
       if (typeof s === 'object' && s !== null) {
         // Nested detailedAnswersByTitle object due to some legacy bug
-        if (s[sectionTitle] && typeof s[sectionTitle].score === 'number') {
-          return s[sectionTitle].score;
+        const scoreObj = s as Record<string, { score?: number }>;
+        if (scoreObj[sectionTitle] && typeof scoreObj[sectionTitle].score === 'number') {
+          return scoreObj[sectionTitle].score;
         }
         const titleLower = sectionTitle.toLowerCase();
-        const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
-        if (matchedKey && s[matchedKey] && typeof s[matchedKey].score === 'number') {
-          return s[matchedKey].score;
+        const matchedKey = Object.keys(scoreObj).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
+        if (matchedKey && scoreObj[matchedKey] && typeof scoreObj[matchedKey].score === 'number') {
+          return scoreObj[matchedKey].score;
         }
       }
       return 0;
     };
 
     // Helper to safely extract max_score from detailed section data
-    const getMaxScore = (sectionData: any, sectionTitle: string): number => {
+    const getMaxScore = (sectionData: unknown, sectionTitle: string): number => {
       if (!sectionData) return 0;
       if (Array.isArray(sectionData)) {
         // Legacy array of answers: length of the array
         return sectionData.length;
       }
       if (typeof sectionData !== 'object') return 0;
-      
-      const ms = sectionData.max_score;
+
+      const ms = (sectionData as { max_score?: number | string }).max_score;
       if (typeof ms === 'number') return ms;
       if (typeof ms === 'string') {
         const p = parseInt(ms, 10);
         return isNaN(p) ? 0 : p;
       }
-      if (typeof sectionData.score === 'object' && sectionData.score !== null) {
+      if (typeof (sectionData as { score?: unknown }).score === 'object' && (sectionData as { score: unknown }).score !== null) {
         // Nested detailedAnswersByTitle object
-        const s = sectionData.score;
+        const s = (sectionData as { score: Record<string, { max_score?: number }> }).score;
         if (s[sectionTitle] && typeof s[sectionTitle].max_score === 'number') {
           return s[sectionTitle].max_score;
         }
@@ -489,19 +505,19 @@ export function useDashboardData(session: Session) {
 
     // 2. Populate stats from past exams
     pastExams.forEach((attempt) => {
-      const examFormat = attempt.exams?.format || 'Digital';
+      const examFormat = (attempt as { exams?: { format?: string }; detailed_results?: unknown }).exams?.format || 'Digital';
       if (examFormat !== selectedFormat) return;
 
-      const detailed = attempt.detailed_results;
+      const detailed = (attempt as { detailed_results?: unknown }).detailed_results;
       if (!detailed || typeof detailed !== 'object') return;
 
-      Object.entries(detailed).forEach(([sectionTitle, sectionData]: [string, any]) => {
+      Object.entries(detailed as Record<string, unknown>).forEach(([sectionTitle, sectionData]: [string, unknown]) => {
         if (!sectionData) return;
 
         const titleLower = sectionTitle.toLowerCase();
         
         // Find which category matches this section title
-        const matchedEntry = Object.entries(categories).find(([key, cat]) => {
+        const matchedEntry = Object.entries(categories).find(([, cat]) => {
           return cat.matchKeywords.some(keyword => titleLower.includes(keyword));
         });
 
@@ -511,7 +527,10 @@ export function useDashboardData(session: Session) {
           categories[key].total += getMaxScore(sectionData, sectionTitle);
         } else {
           // Fallback matching by type
-          let type = typeof sectionData === 'object' && sectionData !== null && !Array.isArray(sectionData) ? sectionData.type : undefined;
+          let type: string | undefined = undefined;
+          if (typeof sectionData === 'object' && sectionData !== null && !Array.isArray(sectionData)) {
+            type = (sectionData as { type?: string }).type;
+          }
           if (type) {
             if (isPaper) {
               if (type === 'figure_sequence') type = 'completing_patterns';
@@ -544,6 +563,198 @@ export function useDashboardData(session: Session) {
     });
   };
 
+  // Per-exam history tracking
+  const getTestHistory = useCallback((examId: string) => {
+    return pastExams.filter((pe) => pe.exam_id === examId);
+  }, [pastExams]);
+
+  // Per-exam radar stats computation
+  const computeRadarStatsForExam = useCallback((examId: string, formatOverride?: 'Digital' | 'Paper') => {
+    // Get exam format from the selected exam if not provided
+    const examFormat = selectedExam?.format || formatOverride || profile?.format || 'Digital';
+    const isPaper = examFormat === 'Paper';
+    const activeMod = activeModule || profile?.module_test || '';
+    const activeModLower = activeMod.toLowerCase();
+
+    // 1. Define categories based on format and active module
+    const categories: Record<string, { correct: number; total: number; label: string; matchKeywords: string[] }> = {};
+
+    if (isPaper) {
+      // Core Paper subtests
+      categories['solving_quantitative'] = { correct: 0, total: 0, label: 'Solving Quantitative Problems', matchKeywords: ['solving quantitative problems', 'solving quantitative', 'math equations', 'math equation'] };
+      categories['inferring_relationships'] = { correct: 0, total: 0, label: 'Inferring Relationships', matchKeywords: ['inferring relationships', 'inferring relation', 'latin squares', 'latin square'] };
+      categories['completing_patterns'] = { correct: 0, total: 0, label: 'Completing Patterns', matchKeywords: ['completing patterns', 'completing pattern', 'figure sequences', 'figure sequence'] };
+      categories['numerical_series'] = { correct: 0, total: 0, label: 'Continuing Numerical Series', matchKeywords: ['continuing numerical series', 'numerical series'] };
+
+      // Subject Module Paper subtests
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        categories['sc_1'] = { correct: 0, total: 0, label: 'Analysing Scientific Relationships', matchKeywords: ['analysing scientific relationships', 'scientific relationships', 'quantitative problems', 'quantitative problem'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
+      } else if (activeModLower.includes('econ')) {
+        categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
+        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+      } else if (activeModLower.includes('eng')) {
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_2_2d'] = { correct: 0, total: 0, label: 'Visualising Solids (2D)', matchKeywords: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'] };
+        categories['eng_2_3d'] = { correct: 0, total: 0, label: 'Visualising Solids (3D)', matchKeywords: ['visualising solids - 3d', 'visualizing solids - 3d', 'solids - 3d', 'visualizing solids 3d'] };
+        categories['eng_3'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
+      } else {
+        // Fallback generic subject module
+        categories['module_mcq'] = { correct: 0, total: 0, label: 'Subject Module', matchKeywords: ['module', 'subject'] };
+      }
+    } else {
+      // Core Digital subtests
+      categories['figure_sequence'] = { correct: 0, total: 0, label: 'Figure Sequences', matchKeywords: ['figure sequences', 'figure sequence', 'figural sequence', 'completing patterns', 'completing pattern'] };
+      categories['math_equation'] = { correct: 0, total: 0, label: 'Math Equations', matchKeywords: ['math equations', 'math equation', 'mathematical equation', 'solving quantitative problems', 'solving quantitative'] };
+      categories['latin_square'] = { correct: 0, total: 0, label: 'Latin Squares', matchKeywords: ['latin squares', 'latin square', 'inferring relationships', 'inferring relation'] };
+
+      // Subject Module Digital subtests
+      if (activeModLower.includes('science') || activeModLower === 'cs') {
+        categories['quantitative'] = { correct: 0, total: 0, label: 'Quantitative Problems', matchKeywords: ['quantitative problems', 'quantitative problem', 'analysing scientific relationships', 'scientific relationships'] };
+        categories['text'] = { correct: 0, total: 0, label: 'Text Completion', matchKeywords: ['text completion', 'text completions', 'understanding formal depictions', 'formal depictions'] };
+      } else if (activeModLower.includes('econ')) {
+        categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
+        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+      } else if (activeModLower.includes('eng')) {
+        categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
+        categories['eng_2'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
+      } else {
+        // Fallback generic subject module
+        categories['module_mcq'] = { correct: 0, total: 0, label: 'Subject Module', matchKeywords: ['module', 'subject'] };
+      }
+    }
+
+    // Helper to safely extract score from detailed section data
+    const getScore = (sectionData: any, sectionTitle: string): number => {
+      if (!sectionData) return 0;
+      if (Array.isArray(sectionData)) {
+        return sectionData.filter((ans: { is_correct?: boolean; correct?: boolean }) => ans && (ans.is_correct === true || ans.correct === true)).length;
+      }
+      if (typeof sectionData !== 'object') return 0;
+
+      const s = (sectionData as { score?: number | string }).score;
+      if (typeof s === 'number') return s;
+      if (typeof s === 'string') {
+        const p = parseInt(s, 10);
+        return isNaN(p) ? 0 : p;
+      }
+      if (typeof s === 'object' && s !== null) {
+        const scoreObj = s as Record<string, { score?: number }>;
+        if (scoreObj[sectionTitle] && typeof scoreObj[sectionTitle].score === 'number') {
+          return scoreObj[sectionTitle].score;
+        }
+        const titleLower = sectionTitle.toLowerCase();
+        const matchedKey = Object.keys(scoreObj).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
+        if (matchedKey && scoreObj[matchedKey] && typeof scoreObj[matchedKey].score === 'number') {
+          return scoreObj[matchedKey].score;
+        }
+      }
+      return 0;
+    };
+
+    const getMaxScore = (sectionData: any, sectionTitle: string): number => {
+      if (!sectionData) return 0;
+      if (Array.isArray(sectionData)) {
+        return sectionData.length;
+      }
+      if (typeof sectionData !== 'object') return 0;
+
+      const ms = (sectionData as { max_score?: number | string }).max_score;
+      if (typeof ms === 'number') return ms;
+      if (typeof ms === 'string') {
+        const p = parseInt(ms, 10);
+        return isNaN(p) ? 0 : p;
+      }
+      if (typeof (sectionData as { score?: any }).score === 'object' && (sectionData as { score: any }).score !== null) {
+        const s = (sectionData as { score: Record<string, { max_score?: number }> }).score;
+        if (s[sectionTitle] && typeof s[sectionTitle].max_score === 'number') {
+          return s[sectionTitle].max_score;
+        }
+        const titleLower = sectionTitle.toLowerCase();
+        const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
+        if (matchedKey && s[matchedKey] && typeof s[matchedKey].max_score === 'number') {
+          return s[matchedKey].max_score;
+        }
+      }
+      return 0;
+    };
+
+    // 2. Populate stats from past exams for this specific test
+    pastExams.forEach((attempt) => {
+      if (attempt.exam_id !== examId) return;
+
+      const attemptFormat = (attempt as { exams?: { format?: string }; detailed_results?: any }).exams?.format || 'Digital';
+      if (attemptFormat !== examFormat) return;
+
+      const detailed = (attempt as { detailed_results?: any }).detailed_results;
+      if (!detailed || typeof detailed !== 'object') return;
+
+      Object.entries(detailed as Record<string, any>).forEach(([sectionTitle, sectionData]: [string, any]) => {
+        if (!sectionData) return;
+
+        const titleLower = sectionTitle.toLowerCase();
+
+        // Find which category matches this section title
+        const matchedEntry = Object.entries(categories).find(([, cat]) => {
+          return cat.matchKeywords.some(keyword => titleLower.includes(keyword));
+        });
+
+        if (matchedEntry) {
+          const key = matchedEntry[0];
+          categories[key].correct += getScore(sectionData, sectionTitle);
+          categories[key].total += getMaxScore(sectionData, sectionTitle);
+        } else {
+          // Fallback matching by type
+          let type: string | undefined = undefined;
+          if (typeof sectionData === 'object' && sectionData !== null && !Array.isArray(sectionData)) {
+            type = (sectionData as { type?: string }).type;
+          }
+          if (type) {
+            if (isPaper) {
+              if (type === 'figure_sequence') type = 'completing_patterns';
+              else if (type === 'math_equation') type = 'solving_quantitative';
+              else if (type === 'latin_square') type = 'inferring_relationships';
+            } else {
+              if (type === 'completing_patterns') type = 'figure_sequence';
+              else if (type === 'solving_quantitative') type = 'math_equation';
+              else if (type === 'inferring_relationships') type = 'latin_square';
+            }
+            if (categories[type]) {
+              categories[type].correct += getScore(sectionData, sectionTitle);
+              categories[type].total += getMaxScore(sectionData, sectionTitle);
+            }
+          }
+        }
+      });
+    });
+
+    // 3. Return array of stats
+    return Object.entries(categories).map(([key, data]) => {
+      const pct = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+      return {
+        key,
+        label: data.label,
+        correct: data.correct,
+        total: data.total,
+        percentage: pct,
+      };
+    });
+  }, [selectedExam, profile, activeModule, pastExams]);
+
+  // Update selected test history when exam changes
+  useEffect(() => {
+    if (selectedExam) {
+      const history = getTestHistory(selectedExam.id);
+      setSelectedTestHistory(history);
+
+      const stats = computeRadarStatsForExam(selectedExam.id);
+      setSelectedTestRadarStats(stats);
+    } else {
+      setSelectedTestHistory([]);
+      setSelectedTestRadarStats([]);
+    }
+  }, [selectedExam, getTestHistory, computeRadarStatsForExam]);
+
   const selectedExamAttemptInfo = selectedExam ? getExamAttemptInfo(selectedExam) : null;
   const isAttemptLimitReached = selectedExamAttemptInfo ? selectedExamAttemptInfo.limitReached : false;
   const isEligible = hasActiveExam && !isAttemptLimitReached;
@@ -568,6 +779,12 @@ export function useDashboardData(session: Session) {
     getExamAttemptInfo,
     computeRadarStats,
     handleResumeExam,
+
+    // Per-exam history and stats
+    selectedTestHistory,
+    selectedTestRadarStats,
+    getTestHistory,
+    computeRadarStatsForExam,
 
     // Gate-screen config state
     selectedModule,

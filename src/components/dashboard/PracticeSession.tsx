@@ -25,6 +25,7 @@ interface PracticeSessionProps {
   onExit: () => void;
   onQuestionRated: () => void; // Trigger list reload on ratings change
   isPaper?: boolean;
+  isPracticeOnly?: boolean; // When true, show ratings as readonly - practice only for exam-rated questions
 }
 
 const QUESTION_TIME_LIMITS: Record<string, number> = {
@@ -67,6 +68,7 @@ export default function PracticeSession({
   onExit,
   onQuestionRated,
   isPaper = false,
+  isPracticeOnly = false,
 }: PracticeSessionProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, any>>({});
@@ -130,7 +132,12 @@ export default function PracticeSession({
 
   const currentQuestion = questions[currentIndex];
   const currentAnswer = answers[currentQuestion.id] ?? null;
-  const currentRating = ratings[currentQuestion.id] ?? (folderId !== 'unclassified' ? folderId : null);
+
+  // In practice-only mode, the folder itself represents the rating (from exam)
+  // Otherwise, use stored ratings
+  const currentRating = isPracticeOnly
+    ? folderId
+    : ratings[currentQuestion.id] ?? (folderId !== 'unclassified' ? folderId : null);
 
   const isCurrentRated = currentRating !== null;
   const isCurrentAnswered = currentQuestion.isPassage && currentQuestion.questions
@@ -475,40 +482,64 @@ export default function PracticeSession({
                 {isCorrect ? 'Correct' : 'Incorrect'}
               </span>
             )}
-            <div className="text-sm mr-1 font-semibold">
-              {isTimeExpired ? (
-                <div className="text-[10px] text-rose-500 leading-tight max-w-[125px] text-center sm:text-left animate-fade-in">
-                  Time limit exceeded. Easy disabled.
-                </div>
-              ) : (
-                <div>Rate again</div>
-              )}
-            </div>
-            {ratingOptions.map((opt) => {
-              const isActive = currentRating === opt.id;
-              const Icon = opt.icon;
-              const isEasyDisabled = opt.id === 'easy' && isTimeExpired;
-
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  disabled={isEasyDisabled}
-                  onClick={() => !isEasyDisabled && handleRatingChange(opt.id)}
-                  title={isEasyDisabled ? `Time limit (${limit}s) exceeded. Easy rating disabled.` : opt.title}
-                  className={`p-2 flex gap-1 rounded-lg border transition-all duration-150 ${
-                    isEasyDisabled
-                      ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40'
-                      : isActive 
-                        ? `${opt.activeClass} shadow-xs scale-105 cursor-pointer` 
-                        : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 cursor-pointer'
+            {/* Practice-only mode: show current rating as readonly */}
+            {isPracticeOnly && currentRating ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-slate-500">Current rating:</span>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-bold ${
+                    currentRating === 'easy'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : currentRating === 'medium'
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-rose-200 bg-rose-50 text-rose-700'
                   }`}
                 >
-                  {opt.title}
-                  <Icon className="w-5 h-5 shrink-0" />
-                </button>
-              );
-            })}
+                  {currentRating === 'easy' && <Smile className="w-4 h-4" />}
+                  {currentRating === 'medium' && <Meh className="w-4 h-4" />}
+                  {currentRating === 'hard' && <Frown className="w-4 h-4" />}
+                  {currentRating.charAt(0).toUpperCase() + currentRating.slice(1)}
+                </span>
+              </div>
+            ) : (
+              <>
+                {/* Rating mode: allow changing ratings */}
+                <div className="text-sm mr-1 font-semibold">
+                  {isTimeExpired ? (
+                    <div className="text-[10px] text-rose-500 leading-tight max-w-[125px] text-center sm:text-left animate-fade-in">
+                      Time limit exceeded. Easy disabled.
+                    </div>
+                  ) : (
+                    <div>Rate again</div>
+                  )}
+                </div>
+                {ratingOptions.map((opt) => {
+                  const isActive = currentRating === opt.id;
+                  const Icon = opt.icon;
+                  const isEasyDisabled = opt.id === 'easy' && isTimeExpired;
+
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={isEasyDisabled}
+                      onClick={() => !isEasyDisabled && handleRatingChange(opt.id)}
+                      title={isEasyDisabled ? `Time limit (${limit}s) exceeded. Easy rating disabled.` : opt.title}
+                      className={`p-2 flex gap-1 rounded-lg border transition-all duration-150 ${
+                        isEasyDisabled
+                          ? 'bg-slate-100 border-slate-200 text-slate-300 cursor-not-allowed opacity-40'
+                          : isActive
+                            ? `${opt.activeClass} shadow-xs scale-105 cursor-pointer`
+                            : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 cursor-pointer'
+                      }`}
+                    >
+                      {opt.title}
+                      <Icon className="w-5 h-5 shrink-0" />
+                    </button>
+                  );
+                })}
+              </>
+            )}
           </div>
 
           {/* Right: Next Button */}

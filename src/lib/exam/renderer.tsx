@@ -313,11 +313,18 @@ class ModuleQuestionRenderer implements QuestionRenderer {
     const selectedAnswer = props.selectedAnswer as string | null;
     const isCoreSection = ['solving_quantitative', 'inferring_relationships'].includes(question.questionType);
 
+    // Ensure required fields are always defined with fallbacks
+    const contentWithFallbacks = {
+      ...question.content,
+      question_text: question.content.question_text || '',
+      options: question.content.options || {},
+    };
+
     return (
       <ModuleQuestion
         question={{
           id: question.id,
-          content: question.content,
+          content: contentWithFallbacks,
         }}
         selectedAnswer={selectedAnswer}
         onAnswer={(optionId: string) => props.onAnswer(optionId)}

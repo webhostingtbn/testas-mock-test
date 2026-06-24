@@ -1,16 +1,33 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   ChevronLeft, ChevronDown, ChevronUp, FileText, Calendar,
   BarChart2, AlertCircle
 } from 'lucide-react';
-import { KniCard } from '@/components/KniPrimitives';
+import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import type { Profile, Exam } from '@/lib/types';
+
+interface AnswerData {
+  question_id: string;
+  is_correct: boolean;
+}
+
+// ExamAttempt matches the PastExam type from useDashboardData
+interface ExamAttempt {
+  id?: string;
+  created_at?: string;
+  total_score: number | null;
+  max_score: number | null;
+  status?: string;
+  exams?: Exam;
+  detailed_results?: Record<string, any>;
+}
 
 interface ReviewViewProps {
-  profile: any;
+  profile: Profile | null;
   attempt: any;
   pastExams: any[];
   onBack: () => void;
@@ -125,195 +142,258 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
 
   // Calculate progression over time (chronological sorted list of completed attempts)
   const completedAttempts = [...pastExams]
-    .filter(e => e.status === 'completed' && e.exams?.id === attempt?.exams?.id)
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    .filter(e => e.status === 'completed' && e.exams?.id === attempt?.exams?.id && e.created_at)
+    .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
 
-  const dateCompletedStr = new Date(attempt.created_at).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const dateCompletedStr = attempt.created_at
+    ? new Date(attempt.created_at).toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Date unavailable';
 
-  const overallPercentage = attempt.max_score > 0 ? Math.round((attempt.total_score / attempt.max_score) * 100) : 0;
+  const overallPercentage = attempt.max_score && attempt.total_score && attempt.max_score > 0
+    ? Math.round(((attempt.total_score as number) / attempt.max_score) * 100)
+    : 0;
 
   return (
-    <div className="mx-auto w-full  pb-10">
-      <button 
-        onClick={onBack} 
-        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-semibold mb-5 cursor-pointer transition shrink-0"
-      >
-        <ChevronLeft className="size-4" />
-        Back to Dashboard
-      </button>
+    <div className="mx-auto w-full pb-10">
 
-      <div className="mb-4">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-orange-700">Exam Review</p>
-        <h2 className="mt-0.5 text-2xl font-bold text-slate-900 md:text-3xl">
+
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="grid size-8 place-items-center rounded-full bg-orange-100 text-orange-600">
+            <FileText className="size-4" />
+          </div>
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">
+            Exam Review
+          </span>
+        </div>
+        <h2 className="text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
           {attempt.exams?.title || 'Mock Test'} Review
         </h2>
-        <p className="text-slate-500 text-xs mt-1">Format: {profile?.format || 'Digital'} • Completed on {dateCompletedStr}</p>
+        <p className="text-sm text-slate-500 mt-2">
+          Format: <span className="font-medium text-slate-700">{profile?.format || 'Digital'}</span> • Completed on {dateCompletedStr}
+        </p>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6 items-stretch">
-        {/* Score Card */}
-        <KniCard className="p-5 flex flex-col justify-between">
+      {/* Score Summary Card */}
+      <KniCard className="p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Score Summary</span>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-4xl font-extrabold text-slate-900">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">
+              Score Summary
+            </p>
+            <div className="flex items-baseline gap-3">
+              <span className="text-5xl font-black tracking-tight text-slate-950">
                 {attempt.total_score ?? 0}
               </span>
-              <span className="text-slate-400 text-lg">/ {attempt.max_score ?? 0}</span>
-              <span className="text-xs font-semibold px-2 py-0.5 bg-orange-100 text-orange-750 rounded-md ml-2">
+              <span className="text-lg text-slate-400 font-medium">/ {attempt.max_score ?? 0}</span>
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold',
+                  overallPercentage >= 80
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : overallPercentage >= 50
+                      ? 'border-amber-200 bg-amber-50 text-amber-700'
+                      : 'border-rose-200 bg-rose-50 text-rose-700'
+                )}
+              >
                 {overallPercentage}%
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-2">
-              You correctly answered {attempt.total_score} questions out of {attempt.max_score} total questions.
+            <p className="text-sm text-slate-500 mt-3">
+              You correctly answered <span className="font-bold text-slate-900">{attempt.total_score}</span> questions out of <span className="font-bold text-slate-900">{attempt.max_score}</span> total questions.
             </p>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-400">
-            <Calendar className="size-3.5" />
-            <span>Finished in official mock conditions</span>
+          <div className="flex items-center gap-3 min-w-[180px]">
+            <div className="flex-1">
+              <KniProgress
+                value={overallPercentage}
+                className="mb-2"
+              />
+              <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
+                Performance
+              </span>
+            </div>
+            <div className="w-px h-10 bg-slate-100 md:block hidden" />
+            <div className="flex flex-col gap-1 min-w-[120px]">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <Calendar className="size-3.5" />
+                <span className="font-medium">Completed</span>
+              </div>
+              <span className="text-xs text-slate-400">
+                Official mock conditions
+              </span>
+            </div>
           </div>
-        </KniCard>
+        </div>
+      </KniCard>
 
         {/* Progression Chart Card */}
-        <KniCard className="p-5 col-span-1 md:col-span-1 lg:col-span-2 flex flex-col justify-between">
+      <KniCard className="p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Score Progression over time</span>
-              <BarChart2 className="size-4 text-orange-600" />
-            </div>
-            {completedAttempts.length > 0 ? (
-              <div className="h-32 flex items-end justify-start gap-4 md:gap-6 mt-4 w-full overflow-x-auto pb-1 custom-scrollbar">
-                {completedAttempts.map((past, idx) => {
-                  const pastPct = past.max_score > 0 ? Math.round((past.total_score / past.max_score) * 100) : 0;
-                  const isCurrent = past.id === attempt.id;
-                  
-                  return (
-                    <div key={past.id} className="flex flex-col items-center flex-1 min-w-[50px] group relative">
-                      {/* Tooltip on Hover */}
-                      <div className="absolute bottom-full mb-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[9px] font-bold rounded px-1.5 py-0.5 whitespace-nowrap pointer-events-none z-10">
-                        {past.total_score}/{past.max_score} ({pastPct}%)
-                      </div>
-
-                      {/* The Bar */}
-                      <div className="w-full relative rounded-t-md overflow-hidden bg-slate-100 flex items-end h-[100px]">
-                        <div 
-                          style={{ height: `${pastPct}%` }}
-                          className={`w-full rounded-t-md transition-all duration-300 ${
-                            isCurrent
-                              ? 'bg-gradient-to-t from-orange-600 to-amber-400 shadow-md shadow-orange-500/20'
-                              : 'bg-slate-300 group-hover:bg-slate-400'
-                          }`}
-                        />
-                      </div>
-                      <span className={`text-[10px] mt-1.5 font-bold ${isCurrent ? 'text-orange-700 font-extrabold' : 'text-slate-400'}`}>
-                        {isCurrent ? 'Current' : `Attempt ${idx + 1}`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-32 flex items-center justify-center text-xs text-slate-400">
-                No progress history available.
-              </div>
-            )}
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600 mb-1">
+              Score Progression
+            </p>
+            <h3 className="text-lg font-black tracking-tight text-slate-950">
+              Over time
+            </h3>
           </div>
-        </KniCard>
-      </div>
+          <div className="grid size-9 place-items-center rounded-full bg-orange-50 text-orange-600">
+            <BarChart2 className="size-4.5" />
+          </div>
+        </div>
+        {completedAttempts.length > 0 ? (
+          <div className="h-40 flex items-end justify-start gap-3 md:gap-4 w-full overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
+            {completedAttempts.map((past, idx) => {
+              const pastPct = past.max_score && past.total_score && past.max_score > 0
+                ? Math.round(((past.total_score as number) / past.max_score) * 100)
+                : 0;
+              const isCurrent = past.id === attempt.id;
+
+              return (
+                <div key={past.id} className="flex flex-col items-center flex-1 min-w-[60px] group relative">
+                  {/* Tooltip on Hover */}
+                  <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold rounded-lg px-2 py-1 whitespace-nowrap pointer-events-none z-10 shadow-lg">
+                    {past.total_score}/{past.max_score} ({pastPct}%)
+                  </div>
+
+                  {/* The Bar */}
+                  <div className="w-full relative rounded-t-xl overflow-hidden bg-slate-100 flex items-end h-[80px] transition-all duration-300 group-hover:shadow-md">
+                    <div
+                      style={{ height: `${pastPct}%` }}
+                      className={`w-full rounded-t-xl transition-all duration-300 ${
+                        isCurrent
+                          ? 'bg-gradient-to-t from-orange-600 to-amber-400 shadow-orange-500/20'
+                          : 'bg-slate-300 group-hover:bg-slate-400'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-[10px] mt-2 font-bold ${isCurrent ? 'text-orange-700 font-extrabold' : 'text-slate-400'}`}>
+                    {isCurrent ? 'Current' : `#${idx + 1}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="h-40 flex items-center justify-center text-sm text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+            <div className="flex items-center gap-2">
+              <BarChart2 className="size-4" />
+              <span>No progress history available</span>
+            </div>
+          </div>
+        )}
+      </KniCard>
 
       {/* Sections Accordion */}
-      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 shrink-0">Subtest Reviews</h3>
-      <div className="space-y-3">
-        {sectionsList.map((section) => {
-          const isExpanded = expandedSections[section.title] || false;
-          
-          const sectionAnswers = section.answers || [];
-          const correct = section.score ?? 0;
-          const total = section.max_score ?? 0;
-          const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="grid size-8 place-items-center rounded-full bg-orange-100 text-orange-600">
+            <FileText className="size-4" />
+          </div>
+          <h3 className="text-base font-black tracking-tight text-slate-950">
+            Subtest Reviews
+          </h3>
+        </div>
 
-          return (
-            <div key={section.title} className="bg-white rounded-2xl border border-orange-100/60 overflow-hidden">
-              {/* Accordion Trigger Header */}
-              <button
-                onClick={() => toggleSection(section.title)}
-                className="w-full flex flex-col md:flex-row md:items-center justify-between p-4 text-left hover:bg-orange-50/10 cursor-pointer select-none transition"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`grid size-9 place-items-center rounded-xl bg-orange-100 text-orange-700`}>
-                    <FileText className="size-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800">
-                      {section.title}
-                    </h4>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                      {MODULE_TEST_LABELS[section.type] || 'Core Subtest'}
-                    </span>
-                  </div>
-                </div>
+        <div className="space-y-3">
+          {sectionsList.map((section) => {
+            const isExpanded = expandedSections[section.title] || false;
 
-                <div className="flex items-center justify-between md:justify-end gap-5 mt-3 md:mt-0">
-                  <div className="text-right">
-                    <span className="text-sm font-extrabold text-slate-900">
-                      {correct} / {total} correct
-                    </span>
-                    <div className="mt-1 w-24 h-1 rounded-full bg-slate-100 overflow-hidden">
-                      <div 
-                        className="h-full bg-orange-500 rounded-full" 
-                        style={{ width: `${pct}%` }} 
-                      />
+            const sectionAnswers = section.answers || [];
+            const correct = section.score ?? 0;
+            const total = section.max_score ?? 0;
+            const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+            return (
+              <KniCard key={section.title} className="p-0 overflow-hidden">
+                {/* Accordion Trigger Header */}
+                <button
+                  onClick={() => toggleSection(section.title)}
+                  className="w-full flex flex-col md:flex-row md:items-center justify-between p-4 text-left hover:bg-orange-50/50 cursor-pointer select-none transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-9 place-items-center rounded-xl bg-orange-100 text-orange-600">
+                      <FileText className="size-4.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-black tracking-tight text-slate-950">
+                        {section.title}
+                      </h4>
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        {MODULE_TEST_LABELS[section.type] || 'Core Subtest'}
+                      </span>
                     </div>
                   </div>
-                  {isExpanded ? (
-                    <ChevronUp className="size-4.5 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="size-4.5 text-slate-400" />
-                  )}
-                </div>
-              </button>
 
-              {/* Accordion Content */}
-              {isExpanded && (
-                <div className="border-t border-slate-100 bg-slate-50/30 p-4 md:p-6">
-                  {sectionAnswers.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-400 flex items-center justify-center gap-1.5">
-                      <AlertCircle className="size-4" />
-                      Detailed question indicators are not available for this subtest.
+                  <div className="flex items-center justify-between md:justify-end gap-5 mt-3 md:mt-0">
+                    <div className="flex items-center gap-3 min-w-[140px]">
+                      <div className="flex-1">
+                        <KniProgress value={pct} />
+                        <div className="flex items-center justify-between text-[10px] font-bold mt-1">
+                          <span className="text-slate-500">Score</span>
+                          <span className="text-slate-900">{correct} / {total}</span>
+                        </div>
+                      </div>
+                      <div className="w-px h-8 bg-slate-100 hidden md:block" />
+                      <div className="text-right min-w-[80px]">
+                        <span className="text-sm font-black text-slate-900 block">
+                          {pct}%
+                        </span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                          {pct >= 80 ? 'Excellent' : pct >= 50 ? 'Good' : 'Needs Work'}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2.5">
-                      {sectionAnswers.map((ans: any, idx: number) => {
-                        const correct = ans.is_correct === true;
-                        return (
-                          <div 
-                            key={ans.question_id || idx}
-                            className={`flex flex-col items-center justify-center h-11 rounded-xl border text-xs font-bold transition-all duration-200 ${
-                              correct
-                                ? 'bg-emerald-50/70 border-emerald-250 text-emerald-700'
-                                : 'bg-rose-50/70 border-rose-250 text-rose-700'
-                            }`}
-                            title={`Question ${idx + 1}: ${correct ? 'Correct' : 'Incorrect'}`}
-                          >
-                            <span className="text-[9px] text-slate-400 font-semibold block leading-none mb-0.5">Q{idx + 1}</span>
-                            <span className="leading-none text-xs">{correct ? '✓' : '✗'}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                    {isExpanded ? (
+                      <ChevronUp className="size-4.5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="size-4.5 text-slate-400" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Accordion Content */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 md:p-6">
+                    {sectionAnswers.length === 0 ? (
+                      <div className="text-center py-6 text-sm text-slate-500 flex items-center justify-center gap-2 bg-slate-100/50 rounded-lg">
+                        <AlertCircle className="size-4" />
+                        <span>Detailed question indicators are not available for this subtest.</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                        {sectionAnswers.map((ans: AnswerData, idx: number) => {
+                          const isCorrect = ans.is_correct === true;
+                          return (
+                            <div
+                              key={ans.question_id || idx}
+                              className={`flex flex-col items-center justify-center h-10 rounded-lg border text-[10px] font-bold transition-all duration-200 ${
+                                isCorrect
+                                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-700'
+                                  : 'bg-rose-50/80 border-rose-200 text-rose-700'
+                              }`}
+                              title={`Question ${idx + 1}: ${isCorrect ? 'Correct' : 'Incorrect'}`}
+                            >
+                              <span className="text-[9px] text-slate-400 font-semibold block leading-none mb-0.5">Q{idx + 1}</span>
+                              <span className="leading-none text-xs">{isCorrect ? '✓' : '✗'}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </KniCard>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

@@ -1,13 +1,16 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { useState, useEffect } from 'react';
 import {
   ClipboardCheck, Check, X, Timer, FileText, ShieldCheck,
-  Wifi, Volume2, Maximize2, Calculator, ChevronRight, ChevronLeft, FilePenLine, Laptop
+  Wifi, Volume2, Maximize2, Calculator, ChevronRight, ChevronLeft, FilePenLine, Laptop,
+  ArrowLeft
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
 import type { Profile, ModuleTestType } from '@/lib/types';
+import { TestSelectionView } from './TestSelectionView';
 
 interface MockTestViewProps {
   profile: Profile | null;
@@ -45,7 +48,11 @@ interface MockTestViewProps {
     total: number;
     percentage: number;
   }[];
+  selectedTestHistory: any[];
   onViewChange: (view: any) => void;
+  onBackNavigation?: (nav: { label: string; onBack: () => void } | undefined) => void;
+  onReviewAttempt: (attempt: any) => void;
+  onResumeAttempt: (attempt: any) => void;
 }
 
 export function MockTestView({
@@ -66,53 +73,57 @@ export function MockTestView({
   onSelectExam,
   getExamAttemptInfo,
   radarStats,
+  selectedTestHistory,
   onViewChange,
+  onBackNavigation,
+  onReviewAttempt,
+  onResumeAttempt,
 }: MockTestViewProps) {
+  const [showSelection, setShowSelection] = useState(true);
 
-  // View 1: If no exam is selected for briefing (meaning no active exams are configured)
-  if (!selectedExam) {
+  // Synchronize back navigation in the header
+  useEffect(() => {
+    if (!onBackNavigation) return;
+
+    if (!showSelection) {
+      onBackNavigation({
+        label: 'Back to Tests',
+        onBack: () => setShowSelection(true)
+      });
+    } else {
+      onBackNavigation(undefined);
+    }
+
+    return () => {
+      onBackNavigation(undefined);
+    };
+  }, [showSelection, onBackNavigation]);
+
+  // View 1: Test selection screen (shown when no exam selected or user clicks "Change Test")
+  if (showSelection) {
     return (
-      <div className="mx-auto w-full max-w-[1480px]">
-        <div className="mb-8">
-          <p className="text-sm font-medium text-orange-700">Mock Test Center</p>
-          <h2 className="mt-1 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">Simulate the real exam</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500 max-w-2xl">
-            Test your skills under real-time constraints.
-          </p>
-        </div>
-
-        <KniCard className="p-8 border border-dashed border-orange-100/50 flex flex-col items-center justify-center text-center bg-orange-50/10 rounded-2xl py-16">
-          <Timer className="size-10 text-orange-300 mb-3" />
-          <h4 className="text-base font-black text-slate-900">No active mock exams available</h4>
-          <p className="text-xs text-slate-500 mt-1.5 max-w-sm leading-relaxed">
-            There is currently no active mock test configured in the system. Please check back later or contact an administrator.
-          </p>
-          <KniButton
-            onClick={() => onViewChange('dashboard')}
-            className="mt-5 h-11 px-5 text-sm font-semibold"
-          >
-            Go Back to Dashboard
-            <ChevronRight className="size-4" />
-          </KniButton>
-        </KniCard>
-      </div>
+      <TestSelectionView
+        exams={exams}
+        selectedExam={selectedExam}
+        onSelectExam={onSelectExam}
+        pastExams={pastExams}
+        selectedTestHistory={selectedTestHistory}
+        radarStats={radarStats}
+        selectedExamDetails={selectedExamDetails}
+        getExamAttemptInfo={getExamAttemptInfo}
+        onStartBriefing={() => setShowSelection(false)}
+        onReviewAttempt={onReviewAttempt}
+        onResumeAttempt={onResumeAttempt}
+      />
     );
   }
 
-  // View 2: If an exam is selected, show briefing checklist
+  // View 2: Briefing view with history and radar chart for selected exam
   const selectedAttemptInfo = getExamAttemptInfo(selectedExam);
   const isAttemptLimitReached = selectedAttemptInfo.limitReached;
 
   return (
-    <div className="mx-auto w-full max-w-[1480px]">
-      {/* <button
-        onClick={() => onViewChange('dashboard')}
-        className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 text-sm font-black mb-6 cursor-pointer transition"
-      >
-        <ChevronLeft className="size-4" />
-        Back to Dashboard
-      </button> */}
-
+    <div className="mx-auto w-full">
       <div className="grid gap-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
         <section className="flex min-w-0 flex-col gap-6">
           <KniCard className="overflow-hidden p-0">
@@ -211,6 +222,18 @@ export function MockTestView({
         </section>
 
         <aside className="flex min-w-0 flex-col gap-6">
+          {/* Change Test Button */}
+          <div className="flex justify-center">
+            <KniButton
+              variant="secondary"
+              onClick={() => setShowSelection(true)}
+              className="h-10 px-4 text-xs font-semibold rounded-xl"
+            >
+              <ArrowLeft className="size-3.5 mr-1.5" />
+              Select a Different Test
+            </KniButton>
+          </div>
+
           <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -271,6 +294,8 @@ export function MockTestView({
               </div>
             </div>
           </KniCard>
+
+
 
           <KniCard className="p-5 sm:p-6">
             <div className={`rounded-2xl border p-4 ${isEligible ? 'border-emerald-200 bg-emerald-50/70' : 'border-rose-200 bg-rose-50/70'}`}>

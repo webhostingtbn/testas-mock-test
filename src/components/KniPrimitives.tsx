@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Bell,
   BookOpen,
+  ChevronLeft,
   LayoutDashboard,
   LogOut,
   PenLine,
@@ -158,8 +159,8 @@ const VIEW_LABELS: Record<DashboardView, string> = {
 function getNavigation(isAdmin?: boolean): AppNavItem[] {
   const nav: AppNavItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { id: 'practice', icon: BookOpen, label: 'Practice' },
     { id: 'mock', icon: Timer, label: 'Mock Test' },
+    { id: 'practice', icon: BookOpen, label: 'Practice' }
   ];
 
   if (isAdmin) {
@@ -180,6 +181,8 @@ export function KniHeader({
   onLogout,
   activeView = 'dashboard',
   onViewChange,
+  onBack,
+  parentViewLabel,
 }: {
   email?: string;
   avatarUrl?: string | null;
@@ -188,6 +191,8 @@ export function KniHeader({
   activeView?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
   isSidebarExpanded?: boolean;
+  onBack?: () => void;
+  parentViewLabel?: string;
 }) {
   const [imageError, setImageError] = useState(false);
   const router = useRouter();
@@ -196,16 +201,31 @@ export function KniHeader({
     else router.push('/dashboard');
   };
 
+  console.log("parentViewLabel", parentViewLabel);
+
   return (
     <header className="relative z-20 flex min-h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 md:px-8">
-      <button type="button" className="min-w-0 text-left">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
-          TestAS Preparation
-        </p>
-        <h1 className="mt-1 truncate text-lg font-black tracking-tight text-slate-950">
-          {VIEW_LABELS[activeView]}
+      <div className="flex gap-4 items-center">
+        {parentViewLabel ? (
+            <div className="transition-opacity duration-200 ease-in-out animate-in fade-in slide-in-from-left-2 fill-mode-forwards">
+              <button
+                type="button"
+                onClick={onBack}
+                className="mb-2 w-8 h-8 justify-center rounded-full flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+            </div>
+          ) : null}
+        <div className="min-w-0 text-left">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
+            TestAS Preparation
+          </p>
+          <h1 className="mt-1 truncate text-lg font-black tracking-tight text-slate-950">
+            {VIEW_LABELS[activeView]}
         </h1>
-      </button>
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 md:gap-3">
         <button
@@ -451,6 +471,7 @@ export function KniShell({
   isAdmin,
   activeView = 'dashboard',
   onViewChange,
+  backNavigation,
 }: {
   children: ReactNode;
   email?: string;
@@ -460,6 +481,7 @@ export function KniShell({
   isAdmin?: boolean;
   activeView?: DashboardView;
   onViewChange?: (view: DashboardView) => void;
+  backNavigation?: { label: string; onBack: () => void };
 }) {
   const [sidebarExpanded, setSidebarExpanded] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -502,8 +524,10 @@ export function KniShell({
             activeView={activeView}
             onViewChange={onViewChange}
             isSidebarExpanded={sidebarExpanded}
+            onBack={backNavigation?.onBack}
+            parentViewLabel={backNavigation?.label}
           />
-          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5 pb-24">
+          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5">
             {children}
           </main>
         </section>

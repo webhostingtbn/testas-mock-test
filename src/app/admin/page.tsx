@@ -307,7 +307,7 @@ export default function AdminPage() {
 
         if (fetchError) throw fetchError;
 
-        const formattedUsers = (allUsers || []).map(u => ({
+        const formattedUsers = (allUsers || []).map((u : any) => ({
           ...u,
           user_exams: (u.user_exams || []).sort(
             (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -340,39 +340,14 @@ export default function AdminPage() {
       const targetExam = exams.find(e => e.id === examId);
       const examFormat = targetExam?.format || 'Digital';
 
-      if (shouldActivate) {
-        // Deactivate all active exams of the same format
-        await supabase
-          .from('exams')
-          .update({ is_active: false })
-          .eq('is_active', true)
-          .eq('format', examFormat);
+      await supabase
+        .from('exams')
+        .update({ is_active: shouldActivate })
+        .eq('id', examId);
 
-        // Activate the target exam
-        await supabase
-          .from('exams')
-          .update({ is_active: true })
-          .eq('id', examId);
-
-        setExams(prev =>
-          prev.map(e => {
-            const f = e.format || 'Digital';
-            if (f === examFormat) {
-              return { ...e, is_active: e.id === examId };
-            }
-            return e;
-          })
-        );
-      } else {
-        await supabase
-          .from('exams')
-          .update({ is_active: false })
-          .eq('id', examId);
-
-        setExams(prev =>
-          prev.map(e => (e.id === examId ? { ...e, is_active: false } : e))
-        );
-      }
+      setExams(prev =>
+        prev.map(e => (e.id === examId ? { ...e, is_active: shouldActivate } : e))
+      );
     } catch (err: any) {
       setError(err?.message || 'Failed to update exam activation.');
     } finally {

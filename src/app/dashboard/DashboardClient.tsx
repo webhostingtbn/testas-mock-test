@@ -17,10 +17,32 @@ import { PracticeView } from '@/components/dashboard/PracticeView';
 import { MockTestView } from '@/components/dashboard/MockTestView';
 import { ReviewView } from '@/components/dashboard/ReviewView';
 
+import { useCallback } from 'react';
+
 export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
   const [activeView, setActiveView] = useState<DashboardView>('dashboard');
   const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<any | null>(null);
+  const [backNavigation, setBackNavigation] = useState<{ label: string; onBack: () => void } | undefined>(undefined);
+  const [reviewSourceView, setReviewSourceView] = useState<DashboardView>('dashboard');
+
+  // Handle back navigation for the review view centrally
+  useEffect(() => {
+    if (activeView === 'review' && selectedAttemptForReview) {
+      setBackNavigation({
+        label: reviewSourceView === 'mock' ? 'Back to Mock Test' : 'Back to Dashboard',
+        onBack: () => {
+          setSelectedAttemptForReview(null);
+          setActiveView(reviewSourceView);
+        }
+      });
+    }
+  }, [activeView, selectedAttemptForReview, reviewSourceView]);
+
+  // Memoize the callback to prevent unnecessary re-renders
+  const handleBackNavigation = useCallback((nav: { label: string; onBack: () => void } | undefined) => {
+    setBackNavigation(nav);
+  }, []);
   
   // Lifted tab state for dashboard format switching
   const [activeFormatTab, setActiveFormatTab] = useState<'Digital' | 'Paper'>(data.profile?.format as 'Digital' | 'Paper' || 'Digital');
@@ -122,6 +144,7 @@ export default function DashboardClient({ session }: { session: Session }) {
       isAdmin={data.isAdmin}
       activeView={activeView}
       onViewChange={setActiveView}
+      backNavigation={backNavigation}
     >
       {activeView === 'dashboard' && (
         <DashboardOverview
@@ -134,11 +157,12 @@ export default function DashboardClient({ session }: { session: Session }) {
           activeFormatTab={activeFormatTab}
           onFormatTabChange={setActiveFormatTab}
           onReviewAttempt={(attempt) => {
+            setReviewSourceView('dashboard');
             setSelectedAttemptForReview(attempt);
             setActiveView('review');
           }}
           onResumeAttempt={(attempt) => {
-            data.handleResumeExam(attempt.id, attempt.exam_id);
+            data.handleResumeExam(attempt.id);
           }}
         />
       )}
@@ -147,6 +171,7 @@ export default function DashboardClient({ session }: { session: Session }) {
         <PracticeView
           profile={profile}
           activeModule={data.activeModule}
+          onBackNavigation={handleBackNavigation}
         />
       )}
 
@@ -168,8 +193,16 @@ export default function DashboardClient({ session }: { session: Session }) {
           selectedExamDetails={data.selectedExamDetails}
           onSelectExam={data.setSelectedExam}
           getExamAttemptInfo={data.getExamAttemptInfo}
-          radarStats={data.computeRadarStats()}
+          radarStats={data.selectedTestRadarStats}
+          selectedTestHistory={data.selectedTestHistory}
           onViewChange={setActiveView}
+          onBackNavigation={handleBackNavigation}
+          onReviewAttempt={(attempt) => {
+            setReviewSourceView('mock');
+            setSelectedAttemptForReview(attempt);
+            setActiveView('review');
+          }}
+          onResumeAttempt={data.handleResumeExam}
         />
       )}
 
@@ -180,7 +213,7 @@ export default function DashboardClient({ session }: { session: Session }) {
           pastExams={data.pastExams}
           onBack={() => {
             setSelectedAttemptForReview(null);
-            setActiveView('dashboard');
+            setActiveView(reviewSourceView);
           }}
         />
       )}
