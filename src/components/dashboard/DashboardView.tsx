@@ -232,7 +232,7 @@ export function DashboardView({
             </div>
           </div>
 
-          <KniCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+          {/* <KniCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="grid size-12 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600">
               <Target className="size-6" />
             </div>
@@ -261,7 +261,7 @@ export function DashboardView({
                 <ChevronRight className="size-4" />
               </KniButton>
             </div>
-          </KniCard>
+          </KniCard> */}
 
           <KniCard className="p-5 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -273,9 +273,9 @@ export function DashboardView({
                   Mock score trend
                 </h2>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 pb-4">
                 {/* View toggle (Graph / List) */}
-                <div className="flex rounded-xl bg-slate-100 p-1">
+                {/* <div className="flex rounded-xl bg-slate-100 p-1">
                   <button
                     type="button"
                     onClick={() => setChartViewMode('graph')}
@@ -300,7 +300,7 @@ export function DashboardView({
                   >
                     List
                   </button>
-                </div>
+                </div> */}
 
                 {/* Digital / Paper format tabs */}
                 <div className="flex rounded-xl bg-slate-100 p-1">
@@ -450,7 +450,7 @@ export function DashboardView({
         </section>
 
         <aside className="flex min-w-0 flex-col gap-6">
-          <div className="grid grid-cols-2 gap-3">
+          {/* <div className="grid grid-cols-2 gap-3">
             <KniCard className="p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -488,7 +488,7 @@ export function DashboardView({
                 {attemptsRemaining === null ? 'No attempt limit' : `${attemptsRemaining} attempts remaining`}
               </p>
             </KniCard>
-          </div>
+          </div> */}
 
           <KniCard className="p-5 sm:p-6 flex flex-col">
             <div className="flex items-start justify-between gap-4">
@@ -638,7 +638,7 @@ export function DashboardView({
             </div>
 
             {/* Stats legend grid */}
-            <div className="mt-5 grid grid-cols-3 gap-x-3 gap-y-2 border-t border-slate-100 pt-4 shrink-0">
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 sm:gap-y-6 md:gap-y-8 border-t border-slate-100 pt-4 shrink-0">
               {radarStats.map((stat) => (
                 <div key={stat.key} className="flex flex-col">
                   <span className="text-[10px] font-bold text-slate-400 truncate leading-tight uppercase tracking-wider" title={stat.label}>
@@ -657,7 +657,7 @@ export function DashboardView({
 
 
 
-          <KniCard className="p-5 sm:p-6">
+          {/* <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -731,7 +731,7 @@ export function DashboardView({
                 : 'Browse mock tests'}
               <ArrowUpRight className="size-4" />
             </KniButton>
-          </KniCard>
+          </KniCard> */}
         </aside>
       </div>
     </div>

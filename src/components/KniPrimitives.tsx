@@ -39,7 +39,7 @@ export function KniCard({
     <div
       onClick={onClick}
       className={cn(
-        'rounded-[22px] border transition duration-200',
+        'rounded-[18px] border transition duration-200',
         variant === 'dark'
           ? 'border-white/10 bg-kni-ink text-white'
           : 'border-slate-100 bg-white shadow-sm',
@@ -228,7 +228,7 @@ export function KniHeader({
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        <button
+        {/* <button
           type="button"
           aria-label="Notifications"
           title="Notifications"
@@ -236,7 +236,7 @@ export function KniHeader({
         >
           <Bell className="size-5" />
           <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-orange-600 ring-2 ring-white" />
-        </button>
+        </button> */}
 
         {email && (
           <div className="hidden text-right lg:block">
@@ -527,8 +527,10 @@ export function KniShell({
             onBack={backNavigation?.onBack}
             parentViewLabel={backNavigation?.label}
           />
-          <main className="relative z-10 flex-1 overflow-y-auto bg-[#fbfaf8] p-5">
-            {children}
+          <main className="relative z-10 flex-1 overflow-hidden bg-[#fbfaf8] p-5">
+            <div className="h-full overflow-y-auto custom-scrollbar">
+              {children}
+            </div>
           </main>
         </section>
       </div>

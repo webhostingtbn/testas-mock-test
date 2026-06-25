@@ -16,6 +16,7 @@ import {
   Check,
   Flame,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,20 @@ interface PracticeViewProps {
   profile: Profile | null;
   activeModule: ModuleTestType | null;
   onBackNavigation?: (nav: { label: string; onBack: () => void } | undefined) => void;
+}
+
+interface SubtestCounts {
+  easy: number;
+  medium: number;
+  hard: number;
+  total: number;
+}
+
+interface DifficultySegment {
+  key: keyof Pick<SubtestCounts, 'hard' | 'medium' | 'easy'>;
+  label: string;
+  className: string;
+  hoverClassName: string;
 }
 
 export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
@@ -164,7 +179,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       id: SubtestType;
       title: string;
       description: string;
-      icon: any;
+      icon: LucideIcon;
     }[] = [
       {
         id: 'figure_sequence',
@@ -196,7 +211,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       id: SubtestType;
       title: string;
       description: string;
-      icon: any;
+      icon: LucideIcon;
     }[] = [
       {
         id: 'figure_sequence',
@@ -297,7 +312,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   }, [activeModule, isPaper]);
 
   // Only count rated questions (unrated questions are hidden in practice)
-  const getSubtestCounts = (subtest: SubtestType) => {
+  const getSubtestCounts = (subtest: SubtestType): SubtestCounts => {
     const matchedSections = getMatchedSections(subtest);
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
@@ -734,6 +749,27 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
 
   const overallStats = getOverallStats();
 
+  const difficultySegments: DifficultySegment[] = [
+    {
+      key: 'hard',
+      label: 'Hard',
+      className: 'bg-rose-500',
+      hoverClassName: 'group-hover:bg-rose-600',
+    },
+    {
+      key: 'medium',
+      label: 'Medium',
+      className: 'bg-amber-400',
+      hoverClassName: 'group-hover:bg-amber-500',
+    },
+    {
+      key: 'easy',
+      label: 'Easy',
+      className: 'bg-emerald-500',
+      hoverClassName: 'group-hover:bg-emerald-600',
+    },
+  ];
+
   const overallProgressPercent = overallStats.totalQuestions > 0
     ? (overallStats.totalRated / overallStats.totalQuestions) * 100
     : 0;
@@ -834,9 +870,9 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     : 0;
 
   return (
-    <div className="mx-auto w-full max-w-[1480px]">
-      <div className="grid gap-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-        <section className="flex min-w-0 flex-col gap-6">
+    <div className="h-full max-w-[1480px] mx-auto overflow-hidden">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] h-full">
+        <section className="flex min-w-0 flex-col gap-4 h-full overflow-hidden">
           {/* Recommended Next Card */}
           <KniCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="grid size-12 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -958,7 +994,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
         <aside className="flex min-w-0 flex-col gap-4">
 
                     {/* Activity Streak Card */}
-          <KniCard className="p-5 sm:p-6">
+          {/* <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -985,90 +1021,108 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             <p className="mt-1 text-sm text-slate-500">
               Max Streak: {maxStreak} days
             </p>
-          </KniCard>
+          </KniCard> */}
 
-          {/* Difficulty Breakdown Card */}
+          {/* Subtests by Question Difficulty */}
           <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-                  Difficulty Breakdown
+                  Study Focus
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  Based on your ratings
+                  Question breakdown
                 </h2>
               </div>
               <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
-                <Target className="size-5" />
+                <Flame className="size-5" />
               </div>
             </div>
 
-            {/* Vertical Bar Chart */}
-            <div className="mt-5 flex items-end justify-between gap-4 sm:gap-8 h-48">
-              {/* Get max count for scaling */}
+            {/* Horizontal Stacked Bar Chart */}
+            <div className="mt-4 flex flex-col gap-2">
               {(() => {
-                const maxCount = overallStats.totalEasy + overallStats.totalMedium + overallStats.totalHard;
-                const easyHeight = Math.floor(Math.max((overallStats.totalEasy / maxCount) * 100, 1));
-                const mediumHeight = Math.floor(Math.max((overallStats.totalMedium / maxCount) * 100, 1));
-                const hardHeight = Math.floor(Math.max((overallStats.totalHard / maxCount) * 100, 1));
+                // Calculate counts for all subtests
+                const subtestWithCounts = subtests.map((sub) => {
+                  const counts = getSubtestCounts(sub.id);
+                  return { sub, counts };
+                });
 
-                return (
-                  <>
-                    {/* Easy Bar */}
-                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
-                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
-                        <div
-                          className="w-full bg-cyan-500 hover:bg-cyan-600 transition-all duration-500 rounded-t-lg"
-                          style={{
-                            height: `${Math.max(easyHeight, 4)}%`
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-bold text-slate-700">Easy</span>
-                      <span className="text-sm font-black text-slate-900">
-                        {overallStats.totalEasy}
-                      </span>
-                    </div>
+                // Sort urgent practice first: most hard, then medium, then easy.
+                subtestWithCounts.sort((a, b) => {
+                  if (b.counts.hard !== a.counts.hard) return b.counts.hard - a.counts.hard;
+                  if (b.counts.medium !== a.counts.medium) return b.counts.medium - a.counts.medium;
+                  return b.counts.easy - a.counts.easy;
+                });
 
-                    {/* Medium Bar */}
-                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
-                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
-                        <div
-                          className="w-full bg-amber-500 hover:bg-amber-600 transition-all duration-500 rounded-t-lg"
-                          style={{
-                            height: `${Math.max(mediumHeight, 4)}%`
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-bold text-slate-700">Medium</span>
-                      <span className="text-sm font-black text-slate-900">
-                        {overallStats.totalMedium}
-                      </span>
-                    </div>
+                return subtestWithCounts.map(({ sub, counts }) => {
+                  const total = counts.easy + counts.medium + counts.hard;
+                  const countLabel = `${counts.hard} hard, ${counts.medium} medium, ${counts.easy} easy`;
 
-                    {/* Hard Bar */}
-                    <div className="flex flex-col items-center gap-2 flex-1 w-full h-full">
-                      <div className="relative w-full bg-slate-100 rounded-t-lg overflow-hidden flex-1 flex items-end">
-                        <div
-                          className="w-full bg-rose-500 hover:bg-rose-600 transition-all duration-500 rounded-t-lg"
-                          style={{
-                            height: `${Math.max(hardHeight, 4)}%`
-                          }}
-                        />
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => setSelectedSubtest(sub.id)}
+                      aria-label={`${sub.title}: ${countLabel}`}
+                      className="group grid w-full grid-cols-[240px_1fr] items-center gap-3 rounded-md px-1 py-1.5 text-left transition hover:bg-slate-50"
+                    >
+                      <p className="min-w-0 text-xs font-black leading-snug text-slate-700 group-hover:text-orange-600">
+                        {sub.title}
+                      </p>
+                      <div
+                        className="relative h-5 min-w-0 overflow-hidden rounded-full bg-slate-100"
+                        style={{
+                          backgroundImage:
+                            'linear-gradient(to right, rgba(148, 163, 184, 0.38) 1px, transparent 1px)',
+                          backgroundSize: '10% 100%',
+                        }}
+                      >
+                        <div className="absolute inset-0 flex overflow-hidden rounded-full">
+                          {total > 0 ? (
+                            <>
+                              {difficultySegments.map((segment) => {
+                                const count = counts[segment.key];
+                                if (count === 0) return null;
+
+                                return (
+                                  <div
+                                    key={segment.key}
+                                    className={cn(
+                                      'h-full transition-all duration-500',
+                                      segment.className,
+                                      segment.hoverClassName,
+                                    )}
+                                    style={{ width: `${(count / total) * 100}%` }}
+                                    title={`${segment.label}: ${count}`}
+                                  />
+                                );
+                              })}
+                            </>
+                          ) : (
+                            <div className="h-full w-full bg-slate-100" />
+                          )}
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-slate-700">Hard</span>
-                      <span className="text-sm font-black text-slate-900">
-                        {overallStats.totalHard}
-                      </span>
-                    </div>
-                  </>
-                );
+                    </button>
+                  );
+                });
               })()}
+            </div>
+
+            {/* Legend */}
+            <div className="mt-4 flex items-center justify-center gap-4 border-t border-slate-100 pt-3">
+              {difficultySegments.map((segment) => (
+                <div key={segment.key} className="flex items-center gap-2">
+                  <span className={cn('size-2.5 rounded-full', segment.className)} />
+                  <span className="text-[11px] font-bold text-slate-500">{segment.label}</span>
+                </div>
+              ))}
             </div>
           </KniCard>
 
           {/* Overall Progress Card */}
-          <KniCard className="p-5 sm:p-6">
+          {/* <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
@@ -1088,7 +1142,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             <div className="mt-5 text-sm text-slate-500">
               You have rated {overallStats.totalRated} out of {overallStats.totalQuestions} questions.
             </div>
-          </KniCard>
+          </KniCard> */}
         </aside>
       </div>
     </div>

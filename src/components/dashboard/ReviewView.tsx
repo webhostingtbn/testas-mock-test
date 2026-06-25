@@ -2,117 +2,168 @@
 
 import { useState } from 'react';
 import {
-  ChevronLeft, ChevronDown, ChevronUp, FileText, Calendar,
+  ChevronDown, ChevronUp, FileText, Calendar,
   BarChart2, AlertCircle
 } from 'lucide-react';
-import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
-import { MODULE_TEST_LABELS } from '@/lib/constants';
+import { KniCard, KniProgress } from '@/components/KniPrimitives';
+import {
+  CORE_QUESTION_TYPES,
+  MODULE_TEST_LABELS,
+  PAPER_MODULE_QUESTION_TYPES,
+  getModuleCategory,
+} from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { Profile, Exam } from '@/lib/types';
+import type { MajorType, Profile } from '@/lib/types';
 
 interface AnswerData {
   question_id: string;
   is_correct: boolean;
+  correct?: boolean;
 }
 
-// ExamAttempt matches the PastExam type from useDashboardData
-interface ExamAttempt {
+interface SectionScore {
+  score?: number;
+  max_score?: number;
+  answers?: AnswerData[];
+}
+
+interface SectionData {
+  score?: number | string | Record<string, SectionScore>;
+  max_score?: number | string;
+  answers?: AnswerData[];
+  type?: string;
+}
+
+export interface ExamAttemptReview {
   id?: string;
+  exam_id?: string;
   created_at?: string;
+  completed_at?: string | null;
+  started_at?: string | null;
   total_score: number | null;
   max_score: number | null;
   status?: string;
-  exams?: Exam;
-  detailed_results?: Record<string, any>;
+  exams?: {
+    id?: string;
+    title?: string;
+    description?: string | null;
+    major?: MajorType | null;
+    format?: string | null;
+  };
+  detailed_results?: unknown;
 }
 
 interface ReviewViewProps {
   profile: Profile | null;
-  attempt: any;
-  pastExams: any[];
-  onBack: () => void;
+  attempt: ExamAttemptReview;
+  pastExams: ExamAttemptReview[];
+  onBack?: () => void;
 }
 
-export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewProps) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isSectionData(value: unknown): value is SectionData {
+  return isRecord(value);
+}
+
+function isSectionScore(value: unknown): value is SectionScore {
+  return isRecord(value);
+}
+
+function parseScoreValue(value: unknown): number | null {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function findNestedSectionScore(score: unknown, sectionTitle: string): SectionScore | null {
+  if (!isRecord(score)) return null;
+
+  const direct = score[sectionTitle];
+  if (isSectionScore(direct)) return direct;
+
+  const titleLower = sectionTitle.toLowerCase();
+  const matchedKey = Object.keys(score).find((key) => {
+    const keyLower = key.toLowerCase();
+    return keyLower === titleLower || titleLower.includes(keyLower) || keyLower.includes(titleLower);
+  });
+
+  if (!matchedKey) return null;
+  const matched = score[matchedKey];
+  return isSectionScore(matched) ? matched : null;
+}
+
+function getAttemptKey(attempt: ExamAttemptReview): string | null {
+  return attempt.id || attempt.created_at || null;
+}
+
+export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
+  const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(getAttemptKey(attempt));
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   // Helpers to handle legacy DB formatting and nested object bugs
-  const getScore = (sectionData: any, sectionTitle: string): number => {
+  const getScore = (sectionData: unknown, sectionTitle: string): number => {
     if (!sectionData) return 0;
     if (Array.isArray(sectionData)) {
-      return sectionData.filter((ans: any) => ans && (ans.is_correct === true || ans.correct === true)).length;
+      return sectionData.filter((answer) => isRecord(answer) && (answer.is_correct === true || answer.correct === true)).length;
     }
-    if (typeof sectionData !== 'object') return 0;
+    if (!isSectionData(sectionData)) return 0;
     
-    const s = sectionData.score;
-    if (typeof s === 'number') return s;
-    if (typeof s === 'string') {
-      const p = parseInt(s, 10);
-      return isNaN(p) ? 0 : p;
+    const parsedScore = parseScoreValue(sectionData.score);
+    if (parsedScore !== null) return parsedScore;
+
+    const nestedScore = findNestedSectionScore(sectionData.score, sectionTitle);
+    if (nestedScore && typeof nestedScore.score === 'number') {
+      return nestedScore.score;
     }
-    if (typeof s === 'object' && s !== null) {
-      if (s[sectionTitle] && typeof s[sectionTitle].score === 'number') {
-        return s[sectionTitle].score;
-      }
-      const titleLower = sectionTitle.toLowerCase();
-      const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
-      if (matchedKey && s[matchedKey] && typeof s[matchedKey].score === 'number') {
-        return s[matchedKey].score;
-      }
-    }
+
     return 0;
   };
 
-  const getMaxScore = (sectionData: any, sectionTitle: string): number => {
+  const getMaxScore = (sectionData: unknown, sectionTitle: string): number => {
     if (!sectionData) return 0;
     if (Array.isArray(sectionData)) {
       return sectionData.length;
     }
-    if (typeof sectionData !== 'object') return 0;
+    if (!isSectionData(sectionData)) return 0;
     
-    const ms = sectionData.max_score;
-    if (typeof ms === 'number') return ms;
-    if (typeof ms === 'string') {
-      const p = parseInt(ms, 10);
-      return isNaN(p) ? 0 : p;
+    const parsedMaxScore = parseScoreValue(sectionData.max_score);
+    if (parsedMaxScore !== null) return parsedMaxScore;
+
+    const nestedScore = findNestedSectionScore(sectionData.score, sectionTitle);
+    if (nestedScore && typeof nestedScore.max_score === 'number') {
+      return nestedScore.max_score;
     }
-    if (typeof sectionData.score === 'object' && sectionData.score !== null) {
-      const s = sectionData.score;
-      if (s[sectionTitle] && typeof s[sectionTitle].max_score === 'number') {
-        return s[sectionTitle].max_score;
-      }
-      const titleLower = sectionTitle.toLowerCase();
-      const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
-      if (matchedKey && s[matchedKey] && typeof s[matchedKey].max_score === 'number') {
-        return s[matchedKey].max_score;
-      }
-    }
+
     return 0;
   };
 
-  const getAnswers = (sectionData: any, sectionTitle: string): any[] => {
+  const getAnswers = (sectionData: unknown, sectionTitle: string): AnswerData[] => {
     if (!sectionData) return [];
-    if (Array.isArray(sectionData)) return sectionData;
-    if (typeof sectionData !== 'object') return [];
+    if (Array.isArray(sectionData)) {
+      return sectionData.filter((answer): answer is AnswerData => {
+        return isRecord(answer) && typeof answer.question_id === 'string' && typeof answer.is_correct === 'boolean';
+      });
+    }
+    if (!isSectionData(sectionData)) return [];
 
     if (Array.isArray(sectionData.answers)) return sectionData.answers;
 
-    const s = sectionData.score;
-    if (typeof s === 'object' && s !== null) {
-      if (s[sectionTitle] && Array.isArray(s[sectionTitle].answers)) {
-        return s[sectionTitle].answers;
-      }
-      const titleLower = sectionTitle.toLowerCase();
-      const matchedKey = Object.keys(s).find(k => k.toLowerCase() === titleLower || titleLower.includes(k.toLowerCase()) || k.toLowerCase().includes(titleLower));
-      if (matchedKey && s[matchedKey] && Array.isArray(s[matchedKey].answers)) {
-        return s[matchedKey].answers;
-      }
+    const nestedScore = findNestedSectionScore(sectionData.score, sectionTitle);
+    if (nestedScore && Array.isArray(nestedScore.answers)) {
+      return nestedScore.answers;
     }
+
     return [];
   };
 
-  const getType = (sectionData: any, sectionTitle: string): string => {
-    if (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData) && sectionData.type) {
+  const getType = (sectionData: unknown, sectionTitle: string): string => {
+    if (isSectionData(sectionData) && typeof sectionData.type === 'string') {
       return sectionData.type;
     }
     const t = sectionTitle.toLowerCase();
@@ -122,16 +173,49 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
     return 'module_mcq';
   };
 
-  const detailed = attempt?.detailed_results || {};
-  const sectionsList = Object.entries(detailed).map(([title, data]: [string, any]) => {
+  const selectedExamKey = attempt.exam_id || attempt.exams?.id;
+  const completedAttempts = [...pastExams]
+    .filter((pastAttempt) => {
+      const pastExamKey = pastAttempt.exam_id || pastAttempt.exams?.id;
+      return pastAttempt.status === 'completed' && pastAttempt.created_at && pastExamKey === selectedExamKey;
+    })
+    .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
+  const selectedAttempt = completedAttempts.find((pastAttempt) => getAttemptKey(pastAttempt) === selectedAttemptKey) || attempt;
+
+  const getSectionOrder = (sectionType: string, sectionTitle: string, fallbackIndex: number): number => {
+    const format = selectedAttempt.exams?.format || profile?.format || 'Digital';
+    const isPaper = format === 'Paper';
+    const order: string[] = [...CORE_QUESTION_TYPES[isPaper ? 'Paper' : 'Digital']];
+
+    if (isPaper) {
+      const category = getModuleCategory(profile?.module_test || selectedAttempt.exams?.major || null);
+      if (category) {
+        order.push(...PAPER_MODULE_QUESTION_TYPES[category]);
+      }
+    } else {
+      order.push('module_mcq');
+    }
+
+    const typeIndex = order.indexOf(sectionType);
+    if (typeIndex >= 0) return typeIndex;
+
+    const normalizedTitle = sectionTitle.toLowerCase();
+    const titleIndex = order.findIndex((type) => normalizedTitle.includes(type.replace(/_/g, ' ')));
+    return titleIndex >= 0 ? titleIndex : order.length + fallbackIndex;
+  };
+
+  const detailed = isRecord(selectedAttempt.detailed_results) ? selectedAttempt.detailed_results : {};
+  const sectionsList = Object.entries(detailed).map(([title, data], index) => {
+    const type = getType(data, title);
     return {
       title,
-      type: getType(data, title),
+      type,
       score: getScore(data, title),
       max_score: getMaxScore(data, title),
-      answers: getAnswers(data, title)
+      answers: getAnswers(data, title),
+      order: getSectionOrder(type, title, index),
     };
-  });
+  }).sort((a, b) => a.order - b.order);
 
   const toggleSection = (sectionTitle: string) => {
     setExpandedSections(prev => ({
@@ -140,43 +224,25 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
     }));
   };
 
-  // Calculate progression over time (chronological sorted list of completed attempts)
-  const completedAttempts = [...pastExams]
-    .filter(e => e.status === 'completed' && e.exams?.id === attempt?.exams?.id && e.created_at)
-    .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
-
-  const dateCompletedStr = attempt.created_at
-    ? new Date(attempt.created_at).toLocaleDateString('vi-VN', {
+  const dateCompletedStr = selectedAttempt.completed_at || selectedAttempt.created_at
+    ? new Date(selectedAttempt.completed_at || selectedAttempt.created_at || '').toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
+      }).replace(',', '')
     : 'Date unavailable';
 
-  const overallPercentage = attempt.max_score && attempt.total_score && attempt.max_score > 0
-    ? Math.round(((attempt.total_score as number) / attempt.max_score) * 100)
+  const overallPercentage = selectedAttempt.max_score && selectedAttempt.total_score !== null && selectedAttempt.max_score > 0
+    ? Math.round((selectedAttempt.total_score / selectedAttempt.max_score) * 100)
     : 0;
 
   return (
-    <div className="mx-auto w-full pb-10">
-
-
+    <div className="w-full h-full mx-auto overflow-auto flex flex-col">
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="grid size-8 place-items-center rounded-full bg-orange-100 text-orange-600">
-            <FileText className="size-4" />
-          </div>
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">
-            Exam Review
-          </span>
-        </div>
-        <h2 className="text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
-          {attempt.exams?.title || 'Mock Test'} Review
-        </h2>
-        <p className="text-sm text-slate-500 mt-2">
-          Format: <span className="font-medium text-slate-700">{profile?.format || 'Digital'}</span> • Completed on {dateCompletedStr}
+        <p className="text-sm text-slate-500">
+          Format: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || 'Digital'}</span> • Completed on {dateCompletedStr}
         </p>
       </div>
 
@@ -189,9 +255,9 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
             </p>
             <div className="flex items-baseline gap-3">
               <span className="text-5xl font-black tracking-tight text-slate-950">
-                {attempt.total_score ?? 0}
+                {selectedAttempt.total_score ?? 0}
               </span>
-              <span className="text-lg text-slate-400 font-medium">/ {attempt.max_score ?? 0}</span>
+              <span className="text-lg text-slate-400 font-medium">/ {selectedAttempt.max_score ?? 0}</span>
               <span
                 className={cn(
                   'inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold',
@@ -206,7 +272,7 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
               </span>
             </div>
             <p className="text-sm text-slate-500 mt-3">
-              You correctly answered <span className="font-bold text-slate-900">{attempt.total_score}</span> questions out of <span className="font-bold text-slate-900">{attempt.max_score}</span> total questions.
+              You correctly answered <span className="font-bold text-slate-900">{selectedAttempt.total_score}</span> questions out of <span className="font-bold text-slate-900">{selectedAttempt.max_score}</span> total questions.
             </p>
           </div>
           <div className="flex items-center gap-3 min-w-[180px]">
@@ -251,20 +317,32 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
         {completedAttempts.length > 0 ? (
           <div className="h-40 flex items-end justify-start gap-3 md:gap-4 w-full overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
             {completedAttempts.map((past, idx) => {
-              const pastPct = past.max_score && past.total_score && past.max_score > 0
-                ? Math.round(((past.total_score as number) / past.max_score) * 100)
+              const pastPct = past.max_score && past.total_score !== null && past.max_score > 0
+                ? Math.round((past.total_score / past.max_score) * 100)
                 : 0;
-              const isCurrent = past.id === attempt.id;
+              const pastAttemptKey = getAttemptKey(past);
+              const isCurrent = pastAttemptKey === getAttemptKey(selectedAttempt);
 
               return (
-                <div key={past.id} className="flex flex-col items-center flex-1 min-w-[60px] group relative">
+                <button
+                  key={pastAttemptKey || idx}
+                  type="button"
+                  onClick={() => {
+                    setSelectedAttemptKey(pastAttemptKey);
+                    setExpandedSections({});
+                  }}
+                  aria-pressed={isCurrent}
+                  className="flex min-w-[60px] flex-1 cursor-pointer flex-col items-center group relative focus:outline-none"
+                >
                   {/* Tooltip on Hover */}
                   <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] font-bold rounded-lg px-2 py-1 whitespace-nowrap pointer-events-none z-10 shadow-lg">
                     {past.total_score}/{past.max_score} ({pastPct}%)
                   </div>
 
                   {/* The Bar */}
-                  <div className="w-full relative rounded-t-xl overflow-hidden bg-slate-100 flex items-end h-[80px] transition-all duration-300 group-hover:shadow-md">
+                  <div className={`w-full relative rounded-t-xl overflow-hidden bg-slate-100 flex items-end h-[80px] transition-all duration-300 group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-orange-500 group-focus-visible:ring-offset-2 ${
+                    isCurrent ? 'ring-2 ring-orange-500 ring-offset-2' : ''
+                  }`}>
                     <div
                       style={{ height: `${pastPct}%` }}
                       className={`w-full rounded-t-xl transition-all duration-300 ${
@@ -277,7 +355,7 @@ export function ReviewView({ profile, attempt, pastExams, onBack }: ReviewViewPr
                   <span className={`text-[10px] mt-2 font-bold ${isCurrent ? 'text-orange-700 font-extrabold' : 'text-slate-400'}`}>
                     {isCurrent ? 'Current' : `#${idx + 1}`}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

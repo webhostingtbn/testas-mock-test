@@ -178,10 +178,7 @@ export default function DashboardClient({ session }: { session: Session }) {
       {activeView === 'mock' && (
         <MockTestView
           profile={profile}
-          activeModule={data.activeModule}
           pastExams={data.pastExams}
-          examLimit={data.examLimit}
-          isAdmin={data.isAdmin}
           briefingChecklist={data.briefingChecklist}
           onToggleChecklistItem={handleToggleChecklistItem}
           isStarting={data.isStarting}
@@ -193,15 +190,8 @@ export default function DashboardClient({ session }: { session: Session }) {
           selectedExamDetails={data.selectedExamDetails}
           onSelectExam={data.setSelectedExam}
           getExamAttemptInfo={data.getExamAttemptInfo}
-          radarStats={data.selectedTestRadarStats}
           selectedTestHistory={data.selectedTestHistory}
-          onViewChange={setActiveView}
           onBackNavigation={handleBackNavigation}
-          onReviewAttempt={(attempt) => {
-            setReviewSourceView('mock');
-            setSelectedAttemptForReview(attempt);
-            setActiveView('review');
-          }}
           onResumeAttempt={data.handleResumeExam}
         />
       )}

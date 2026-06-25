@@ -4,20 +4,17 @@
 import { useState, useEffect } from 'react';
 import {
   ClipboardCheck, Check, X, Timer, FileText, ShieldCheck,
-  Wifi, Volume2, Maximize2, Calculator, ChevronRight, ChevronLeft, FilePenLine, Laptop,
+  Wifi, Volume2, Maximize2, Calculator, ChevronRight, FilePenLine, Laptop,
   ArrowLeft
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
-import type { Profile, ModuleTestType } from '@/lib/types';
+import type { Profile } from '@/lib/types';
 import { TestSelectionView } from './TestSelectionView';
 
 interface MockTestViewProps {
   profile: Profile | null;
-  activeModule: ModuleTestType | null;
   pastExams: any[];
-  examLimit: number | null;
-  isAdmin: boolean;
   briefingChecklist: string[];
   onToggleChecklistItem: (id: string) => void;
   isStarting: boolean;
@@ -41,26 +38,14 @@ interface MockTestViewProps {
     maxScore: number | null;
     bestPercentage: number;
   };
-  radarStats: {
-    key: string;
-    label: string;
-    correct: number;
-    total: number;
-    percentage: number;
-  }[];
   selectedTestHistory: any[];
-  onViewChange: (view: any) => void;
   onBackNavigation?: (nav: { label: string; onBack: () => void } | undefined) => void;
-  onReviewAttempt: (attempt: any) => void;
   onResumeAttempt: (attempt: any) => void;
 }
 
 export function MockTestView({
   profile,
-  activeModule,
   pastExams,
-  examLimit,
-  isAdmin,
   briefingChecklist,
   onToggleChecklistItem,
   isStarting,
@@ -72,11 +57,8 @@ export function MockTestView({
   selectedExamDetails,
   onSelectExam,
   getExamAttemptInfo,
-  radarStats,
   selectedTestHistory,
-  onViewChange,
   onBackNavigation,
-  onReviewAttempt,
   onResumeAttempt,
 }: MockTestViewProps) {
   const [showSelection, setShowSelection] = useState(true);
@@ -103,16 +85,13 @@ export function MockTestView({
   if (showSelection) {
     return (
       <TestSelectionView
+        profile={profile}
         exams={exams}
         selectedExam={selectedExam}
         onSelectExam={onSelectExam}
         pastExams={pastExams}
         selectedTestHistory={selectedTestHistory}
-        radarStats={radarStats}
-        selectedExamDetails={selectedExamDetails}
-        getExamAttemptInfo={getExamAttemptInfo}
         onStartBriefing={() => setShowSelection(false)}
-        onReviewAttempt={onReviewAttempt}
         onResumeAttempt={onResumeAttempt}
       />
     );
@@ -123,9 +102,9 @@ export function MockTestView({
   const isAttemptLimitReached = selectedAttemptInfo.limitReached;
 
   return (
-    <div className="mx-auto w-full">
-      <div className="grid gap-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
-        <section className="flex min-w-0 flex-col gap-6">
+    <div className="h-full max-w-[1480px] mx-auto overflow-hidden">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] h-full">
+        <section className="flex min-w-0 flex-col gap-4 h-full overflow-hidden">
           <KniCard className="overflow-hidden p-0">
             <div className="border-b border-slate-100 bg-slate-50/50 p-6">
               <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
