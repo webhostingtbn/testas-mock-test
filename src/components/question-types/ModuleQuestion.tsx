@@ -32,7 +32,7 @@ function prepareLatex(text: any) {
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
-function normalizeOptions(options: any): { id: string; text?: string; image?: string }[] {
+function normalizeOptions(options: any): { id: string; text?: string; image_url?: string }[] {
   if (!options) return [];
   if (Array.isArray(options)) {
     return options.map((opt) => {
@@ -41,8 +41,8 @@ function normalizeOptions(options: any): { id: string; text?: string; image?: st
       }
       return {
         id: opt.id || '',
-        text: opt.text || '',
-        image: opt.image,
+        text: opt.text,
+        image_url: opt.image_url || opt.image,
       };
     });
   }
@@ -53,8 +53,8 @@ function normalizeOptions(options: any): { id: string; text?: string; image?: st
       }
       return {
         id: key,
-        text: (val as any)?.text || '',
-        image: (val as any)?.image,
+        text: (val as any)?.text,
+        image_url: (val as any)?.image_url || (val as any)?.image,
       };
     });
   }
@@ -140,6 +140,7 @@ export default function ModuleQuestion({
             {normalized.map((option, idx) => {
               const isSelected = selectedAnswer === option.id;
               const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
+              const hasImage = !!option.image_url;
 
               return (
                 <button
@@ -170,9 +171,17 @@ export default function ModuleQuestion({
                     {letter}
                   </div>
 
-                  {/* Option content */}
+                  {/* Option content - render image if present, otherwise text */}
                   <div className="flex-1">
-                    {option.text && (
+                    {hasImage ? (
+                      <div className="min-h-[60px] flex items-center justify-center">
+                        <img
+                          src={option.image_url}
+                          alt={`Option ${letter}`}
+                          className="max-h-24 object-contain"
+                        />
+                      </div>
+                    ) : option.text ? (
                       <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
                         isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
                       }`}>
@@ -183,18 +192,7 @@ export default function ModuleQuestion({
                           {prepareLatex(option.text)}
                         </ReactMarkdown>
                       </div>
-                    )}
-                    {option.image && (
-                      <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 inline-block">
-                        {option.image.startsWith('http') || option.image.startsWith('/') ? (
-                          <img src={option.image} alt={`Option ${letter}`} className="max-h-32 object-contain" />
-                        ) : (
-                          <div className="w-32 h-20 flex items-center justify-center text-xs text-gray-400">
-                            [Image]
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Selection indicator */}
@@ -275,6 +273,7 @@ export default function ModuleQuestion({
           {normalized.map((option, idx) => {
             const isSelected = selectedAnswer === option.id;
             const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
+            const hasImage = !!option.image_url;
 
             return (
               <button
@@ -305,9 +304,17 @@ export default function ModuleQuestion({
                   {letter}
                 </div>
 
-                {/* Option content */}
+                {/* Option content - render image if present, otherwise text */}
                 <div className="flex-1">
-                  {option.text && (
+                  {hasImage ? (
+                    <div className="min-h-[60px] flex items-center justify-center">
+                      <img
+                        src={option.image_url}
+                        alt={`Option ${letter}`}
+                        className="max-h-24 object-contain"
+                      />
+                    </div>
+                  ) : option.text ? (
                     <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
                       isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
                     }`}>
@@ -318,18 +325,7 @@ export default function ModuleQuestion({
                         {prepareLatex(option.text)}
                       </ReactMarkdown>
                     </div>
-                  )}
-                  {option.image && (
-                    <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 inline-block">
-                      {option.image.startsWith('http') || option.image.startsWith('/') ? (
-                        <img src={option.image} alt={`Option ${letter}`} className="max-h-32 object-contain" />
-                      ) : (
-                        <div className="w-32 h-20 flex items-center justify-center text-xs text-gray-400">
-                          [Image]
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {/* Selection indicator */}

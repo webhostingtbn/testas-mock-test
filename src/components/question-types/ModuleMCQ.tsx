@@ -41,7 +41,7 @@ function prepareLatex(text: any) {
     .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
-function normalizeOptions(options: any): { id: string; text: string }[] {
+function normalizeOptions(options: any): { id: string; text?: string; image_url?: string }[] {
   if (!options) return [];
   if (Array.isArray(options)) {
     return options.map((opt) => {
@@ -50,15 +50,22 @@ function normalizeOptions(options: any): { id: string; text: string }[] {
       }
       return {
         id: opt.id || '',
-        text: opt.text || '',
+        text: opt.text,
+        image_url: opt.image_url || opt.image,
       };
     });
   }
   if (typeof options === 'object') {
-    return Object.entries(options).map(([key, val]) => ({
-      id: key,
-      text: typeof val === 'string' ? val : (val as any)?.text || '',
-    }));
+    return Object.entries(options).map(([key, val]) => {
+      if (typeof val === 'string') {
+        return { id: key, text: val };
+      }
+      return {
+        id: key,
+        text: (val as any)?.text,
+        image_url: (val as any)?.image_url || (val as any)?.image,
+      };
+    });
   }
   return [];
 }
@@ -189,6 +196,7 @@ export default function ModuleMCQ({
                     {normalizeOptions(question.content.options).map((option, idx) => {
                         const isSelected = selectedOption === option.id;
                         const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
+                        const hasImage = !!option.image_url;
 
                         return (
                           <div
@@ -225,14 +233,24 @@ export default function ModuleMCQ({
                               <span className="font-bold text-gray-900 mt-px w-4 shrink-0">
                                 {letter}
                               </span>
-                              <div className="prose prose-sm prose-orange max-w-none flex-1 prose-p:my-0">
-                                <ReactMarkdown
-                                  remarkPlugins={[remarkMath, remarkGfm]}
-                                  rehypePlugins={[rehypeKatex]}
-                                >
-                                  {prepareLatex(option.text)}
-                                </ReactMarkdown>
-                              </div>
+                              {hasImage ? (
+                                <div className="flex-1 min-h-[60px] flex items-center justify-center">
+                                  <img
+                                    src={option.image_url}
+                                    alt={`Option ${letter}`}
+                                    className="max-h-24 object-contain"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="prose prose-sm prose-orange max-w-none flex-1 prose-p:my-0">
+                                  <ReactMarkdown
+                                    remarkPlugins={[remarkMath, remarkGfm]}
+                                    rehypePlugins={[rehypeKatex]}
+                                  >
+                                    {prepareLatex(option.text || '')}
+                                  </ReactMarkdown>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

@@ -48,7 +48,7 @@ export default function NumericalSeries({
       {/* Main Container */}
       <div className="grid grid-cols-1 gap-6 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar pb-12 lg:pb-0">
         {/* Sequence Display Card */}
-        <div className="bg-white rounded-2xl border border-orange-100 p-4 shadow-sm flex flex-col items-center justify-center min-h-48">
+        <div className="bg-white rounded-2xl border border-orange-100 p-4 shadow-sm flex flex-col items-center justify-center min-h-28">
           <div className="flex flex-wrap gap-3 items-start justify-center py-6 px-4 w-full">
             {sequence.map((item, idx) => {
               const isTarget = idx === targetIndex;
@@ -78,11 +78,11 @@ export default function NumericalSeries({
 
         {/* Paper Answer Sheet Card */}
         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
-          <div className="mb-4">
-            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+          <div className="mb-1">
+            {/* <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <span>📝 TestAS Answer Sheet (Continuing Numerical Series)</span>
-            </h4>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+            </h4> */}
+            <p className="text-xs text-slate-500 leading-relaxed">
               Mark the digits that appear in your solution. If the number is negative, mark the <strong>"-"</strong> box. The order of the digits does not matter.
             </p>
           </div>
