@@ -182,7 +182,7 @@ export function DashboardView({
     : Math.max(0, examLimit - pastExams.length);
 
   return (
-    <div className="mx-auto w-full max-w-[1480px]">
+    <div className="mx-auto w-full">
       <div className="grid gap-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
         <section className="flex min-w-0 flex-col gap-6">
           <div className="grid overflow-hidden rounded-[26px] bg-kni-soft sm:min-h-[250px] sm:grid-cols-[minmax(0,1fr)_250px]">
@@ -449,7 +449,7 @@ export function DashboardView({
           </KniCard>
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-6">
+        <aside className="flex min-w-0 flex-col gap-6 h-full">
           {/* <div className="grid grid-cols-2 gap-3">
             <KniCard className="p-5">
               <div className="flex items-start justify-between gap-3">
@@ -490,7 +490,7 @@ export function DashboardView({
             </KniCard>
           </div> */}
 
-          <KniCard className="p-5 sm:p-6 flex flex-col">
+          <KniCard className="p-5 sm:p-6 flex flex-col h-full">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
@@ -638,7 +638,7 @@ export function DashboardView({
             </div>
 
             {/* Stats legend grid */}
-            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 sm:gap-y-6 md:gap-y-8 border-t border-slate-100 pt-4 shrink-0">
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-4 shrink-0">
               {radarStats.map((stat) => (
                 <div key={stat.key} className="flex flex-col">
                   <span className="text-[10px] font-bold text-slate-400 truncate leading-tight uppercase tracking-wider" title={stat.label}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronUp, FileText, Calendar,
   BarChart2, AlertCircle
@@ -106,6 +106,8 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
   const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(getAttemptKey(attempt));
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
+  const chartRef = useRef<HTMLDivElement>(null);
+
   // Helpers to handle legacy DB formatting and nested object bugs
   const getScore = (sectionData: unknown, sectionTitle: string): number => {
     if (!sectionData) return 0;
@@ -181,6 +183,12 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     })
     .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
   const selectedAttempt = completedAttempts.find((pastAttempt) => getAttemptKey(pastAttempt) === selectedAttemptKey) || attempt;
+
+  useLayoutEffect(() => {
+    if (chartRef.current) {
+      chartRef.current.scrollLeft = chartRef.current.scrollWidth;
+    }
+  }, [completedAttempts.length]);
 
   const getSectionOrder = (sectionType: string, sectionTitle: string, fallbackIndex: number): number => {
     const format = selectedAttempt.exams?.format || profile?.format || 'Digital';
@@ -315,7 +323,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
           </div>
         </div>
         {completedAttempts.length > 0 ? (
-          <div className="h-40 flex items-end justify-start gap-3 md:gap-4 w-full overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
+          <div ref={chartRef} className="h-40 flex items-end justify-start gap-3 md:gap-4 w-full overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
             {completedAttempts.map((past, idx) => {
               const pastPct = past.max_score && past.total_score !== null && past.max_score > 0
                 ? Math.round((past.total_score / past.max_score) * 100)

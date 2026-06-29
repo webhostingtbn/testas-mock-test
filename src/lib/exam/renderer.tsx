@@ -237,20 +237,28 @@ class ModuleMCQRenderer implements QuestionRenderer {
 
   // Convert QuestionData to ModulePassageData format expected by ModuleMCQ
   private toModulePassage(passage: QuestionData): ModulePassageData {
-    const questions = (passage.questions || []).map((q) => ({
-      id: q.id,
-      sort_order: q.sortOrder,
-      content: {
-        question_text: (q.content as any)?.question_text || '',
-        options: (q.content as any)?.options || {},
-      },
-    }));
+    // Digital format: title, body_markdown, resolved_image_url are top-level properties
+    // Paper format / old structure: they live inside passage.content
+    const content = (passage.content as any) || {};
+    const pAny = passage as any;
+    const questions = (passage.questions || []).map((q) => {
+      const qContent = (q.content as any) || {};
+      const qAny = q as any;
+      return {
+        id: q.id,
+        sort_order: qAny.sort_order ?? q.sortOrder,
+        content: {
+          question_text: qContent.question_text || '',
+          options: qContent.options || {},
+        },
+      };
+    });
     return {
       id: passage.id,
-      title: (passage.content as any)?.title || passage.sectionId,
-      body_markdown: (passage.content as any)?.body_markdown || '',
-      image_url: (passage.content as any)?.image_url,
-      resolved_image_url: (passage.content as any)?.resolved_image_url,
+      title: pAny.title || content.title || passage.sectionId,
+      body_markdown: pAny.body_markdown || content.body_markdown || '',
+      image_url: pAny.image_url || content.image_url,
+      resolved_image_url: pAny.resolved_image_url || content.resolved_image_url,
       questions,
     };
   }

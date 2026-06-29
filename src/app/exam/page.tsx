@@ -164,32 +164,34 @@ export default function ExamPage() {
 
         if (qError) throw qError;
 
-        const formattedPassages = (passagesData || []).map(async (passage: any) => {
-          const pQuestions = (questionsData || [])
-            .filter((q: any) => q.passage_id === passage.id)
-            .map(async (q: any) => {
-              const content = (q.content as any) || {};
-              return {
-                ...q,
-                content: {
-                  ...content,
-                  resolved_image_url: content.image_url ? await imageService.resolveImageUrl(content.image_url) : undefined,
-                },
-              };
-            });
+        const formattedPassages = await Promise.all(
+          (passagesData || []).map(async (passage: any) => {
+            const pQuestions = (questionsData || [])
+              .filter((q: any) => q.passage_id === passage.id)
+              .map(async (q: any) => {
+                const content = (q.content as any) || {};
+                return {
+                  ...q,
+                  content: {
+                    ...content,
+                    resolved_image_url: content.image_url ? await imageService.resolveImageUrl(content.image_url) : undefined,
+                  },
+                };
+              });
 
-          const resolvedUrl = passage.image_url ? await imageService.resolveImageUrl(passage.image_url) : undefined;
+            const resolvedUrl = passage.image_url ? await imageService.resolveImageUrl(passage.image_url) : undefined;
 
-          return {
-             id: passage.id,
-             isPassage: true,
-             title: passage.title,
-             body_markdown: passage.body_markdown,
-             image_url: passage.image_url,
-             resolved_image_url: resolvedUrl,
-             questions: pQuestions,
-          };
-        });
+            return {
+               id: passage.id,
+               isPassage: true,
+               title: passage.title,
+               body_markdown: passage.body_markdown,
+               image_url: passage.image_url,
+               resolved_image_url: resolvedUrl,
+               questions: await Promise.all(pQuestions),
+            };
+          }),
+        );
 
         setSectionQuestions(formattedPassages);
         setIsLoadingQuestions(false);
@@ -333,15 +335,22 @@ export default function ExamPage() {
 
   // Build QuestionData object for the renderer
   const buildQuestionData = (): QuestionData => {
-    const q = currentQuestion as QuestionData;
+    const q = currentQuestion as QuestionData & Record<string, unknown>;
     return {
       id: q.id,
       sectionId: section.id,
-      sortOrder: q.sortOrder || 0,
+      sortOrder: (q.sort_order as number ?? q.sortOrder) || 0,
       questionType: section.questionType,
       content: q.content,
       isPassage: q.isPassage || false,
       questions: q.questions || undefined,
+      // Forward top-level passage fields so toModulePassage can read them
+      ...(q.isPassage ? {
+        title: q.title,
+        body_markdown: q.body_markdown,
+        image_url: q.image_url,
+        resolved_image_url: q.resolved_image_url,
+      } : {}),
     };
   };
 
@@ -422,7 +431,7 @@ export default function ExamPage() {
             <div key={q.id}>
               {url && <img src={url} alt="" />}
               {opts.map((optUrl: string, idx: number) => (
-                <img key={idx} src={optUrl} alt="" />
+                <img key={`${q.id}-opt-${idx}`} src={optUrl} alt="" />
               ))}
               {childQuestions.map((child: any) => (
                 child.content?.resolved_image_url && <img key={child.id} src={child.content.resolved_image_url} alt="" />

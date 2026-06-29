@@ -196,7 +196,7 @@ export function TestSelectionView({
   const latestCompleted = completedAttempts[completedAttempts.length - 1] ?? null;
 
   return (
-    <div className="h-full max-w-[1480px] mx-auto overflow-hidden">
+    <div className="h-full w-full mx-auto overflow-hidden">
       <div className="grid gap-6 lg:grid-cols-[300px_1fr] xl:grid-cols-[360px_1fr] h-full">
         <div className={`flex flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-0 lg:max-h-[calc(100vh-120px)] min-h-0 ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
           <div>
@@ -283,7 +283,7 @@ export function TestSelectionView({
         </div>
 
         {selectedExam && (
-          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} flex-col gap-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition duration-200 min-h-0`}>
+          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} flex-col gap-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition duration-200 min-w-0 min-h-0 w-full`}>
             <button
               onClick={() => setMobileView('list')}
               className="mb-2 flex cursor-pointer items-center gap-1.5 text-sm font-black text-slate-550 transition hover:text-slate-800 lg:hidden"

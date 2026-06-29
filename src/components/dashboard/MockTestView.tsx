@@ -102,10 +102,10 @@ export function MockTestView({
   const isAttemptLimitReached = selectedAttemptInfo.limitReached;
 
   return (
-    <div className="h-full max-w-[1480px] mx-auto overflow-hidden">
+    <div className="h-full w-full mx-auto overflow-hidden">
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] h-full">
         <section className="flex min-w-0 flex-col gap-4 h-full overflow-hidden">
-          <KniCard className="overflow-hidden p-0">
+          <KniCard className="overflow-y-auto p-0">
             <div className="border-b border-slate-100 bg-slate-50/50 p-6">
               <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600">
@@ -202,7 +202,7 @@ export function MockTestView({
 
         <aside className="flex min-w-0 flex-col gap-6">
           {/* Change Test Button */}
-          <div className="flex justify-center">
+          {/* <div className="flex justify-center">
             <KniButton
               variant="secondary"
               onClick={() => setShowSelection(true)}
@@ -211,7 +211,7 @@ export function MockTestView({
               <ArrowLeft className="size-3.5 mr-1.5" />
               Select a Different Test
             </KniButton>
-          </div>
+          </div> */}
 
           <KniCard className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-4">
