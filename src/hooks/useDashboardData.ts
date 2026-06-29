@@ -411,7 +411,7 @@ export function useDashboardData(session: Session) {
         categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('econ')) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
-        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('eng')) {
         categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
         categories['eng_2_2d'] = { correct: 0, total: 0, label: 'Visualising Solids (2D)', matchKeywords: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'] };
@@ -433,7 +433,7 @@ export function useDashboardData(session: Session) {
         categories['text'] = { correct: 0, total: 0, label: 'Text Completion', matchKeywords: ['text completion', 'text completions', 'understanding formal depictions', 'formal depictions'] };
       } else if (activeModLower.includes('econ')) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
-        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('eng')) {
         categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
         categories['eng_2'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };
@@ -592,7 +592,7 @@ export function useDashboardData(session: Session) {
         categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('econ')) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
-        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('eng')) {
         categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
         categories['eng_2_2d'] = { correct: 0, total: 0, label: 'Visualising Solids (2D)', matchKeywords: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'] };
@@ -614,7 +614,7 @@ export function useDashboardData(session: Session) {
         categories['text'] = { correct: 0, total: 0, label: 'Text Completion', matchKeywords: ['text completion', 'text completions', 'understanding formal depictions', 'formal depictions'] };
       } else if (activeModLower.includes('econ')) {
         categories['econ_1'] = { correct: 0, total: 0, label: 'Analyzing Economic Relationships', matchKeywords: ['analyzing economic relationships', 'economic relationships', 'economic relationship'] };
-        categories['econ_2'] = { correct: 0, total: 0, label: 'Analyzing Processes', matchKeywords: ['analyzing processes', 'processes', 'process'] };
+        categories['sc_2'] = { correct: 0, total: 0, label: 'Understanding Formal Depictions', matchKeywords: ['understanding formal depictions', 'formal depictions', 'text completion', 'text completions'] };
       } else if (activeModLower.includes('eng')) {
         categories['eng_1'] = { correct: 0, total: 0, label: 'Formalizing Technical Interrelationships', matchKeywords: ['Formalizing Technical Interrelationships', 'technical relationships', 'formalising technical'] };
         categories['eng_2'] = { correct: 0, total: 0, label: 'Analysing Technical Relationships', matchKeywords: ['analysing technical relationships', 'technical relationships', 'analysing technical'] };

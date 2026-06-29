@@ -114,7 +114,7 @@ export const CORE_QUESTION_TYPES: Record<'Paper' | 'Digital', string[]> = {
 export const PAPER_MODULE_QUESTION_TYPES: Record<'science' | 'engineering' | 'economics', string[]> = {
   science: ['sc_1', 'sc_2'],
   engineering: ['eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3'],
-  economics: ['econ_1', 'econ_2']
+  economics: ['econ_1', 'sc_2']
 };
 
 /** Normalizes the user's module name to a standard category */
