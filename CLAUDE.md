@@ -1,1 +1,2 @@
-@AGENTS.md
+- When reporting information to me, be extremely concise and sacrifice grammar for the sake of concision.
+- run /context after every major work

@@ -1,0 +1,41 @@
+{
+  "root": true,
+  "extends": [
+    "next/core-web-vitals",
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "rules": {
+    // TypeScript strict rules
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-non-null-assertion": "off",
+    "@typescript-eslint/no-inferrable-types": "off",
+
+    // Strict null checks
+    "@typescript-eslint/strict-boolean-expressions": ["warn", { "allowString": false, "allowNumber": false }],
+
+    // Disable rules that conflict with strict typing
+    "no-console": ["warn", { "allow": ["error"] }],
+    "no-debugger": "error",
+
+    // React/Next.js rules
+    "next/no-img-element": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        // Extra strict rules for TypeScript files
+        "@typescript-eslint/no-explicit-any": "error",
+        "@typescript-eslint/no-use-before-define": "error",
+        "@typescript-eslint/no-shadow": "error",
+        "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+        "@typescript-eslint/no-unnecessary-type-constraint": "warn",
+        "@typescript-eslint/no-unsafe-declaration-merging": "off"
+      }
+    }
+  ]
+}

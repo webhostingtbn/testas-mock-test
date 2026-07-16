@@ -47,4 +47,6 @@ next-env.d.ts
 
 # agent tools & configs
 .agents/
+.claude/
+.impeccable/
 skills-lock.json

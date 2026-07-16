@@ -235,45 +235,50 @@ export function TestSelectionView({
                   <div
                     key={exam.id}
                     onClick={() => handleSelectExam(exam)}
-                    className={`group flex cursor-pointer items-center gap-3.5 rounded-2xl border border-l-4 p-4 transition-all hover:shadow-xs ${
+                    className={`group flex flex-col cursor-pointer gap-3 rounded-2xl border border-l-4 p-4 transition-all hover:shadow-xs ${
                       isSelected
                         ? 'border-orange-500 border-l-orange-500 bg-orange-500/5 shadow-xs'
-                        : 'border-slate-150 border-l-transparent bg-white hover:border-slate-350'
+                        : 'border-slate-150 border-l-gray-300 bg-white hover:border-slate-350'
                     }`}
                   >
-                    <div className={`grid size-11 shrink-0 place-items-center rounded-xl transition ${visuals.bgColor}`}>
-                      {visuals.icon}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0">
                       <h4 className="truncate text-sm font-black text-slate-950 transition group-hover:text-orange-600">
                         {exam.title}
                       </h4>
-                      <p className="mt-0.5 text-[11px] font-semibold text-slate-500">
-                        {info.duration} min • {info.questions} questions
-                      </p>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1.5 text-right">
-                      <div className="flex flex-col items-end">
-                        {info.hasCompleted ? (
-                          <>
-                            <span className="text-xs font-black text-emerald-600">{info.bestPct}%</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
-                          </>
-                        ) : info.isInProgress ? (
-                          <>
-                            <span className="text-xs font-black text-amber-600">{info.progressPct}%</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">In Progress</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-xs font-black text-slate-400">0%</span>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Not Started</span>
-                          </>
-                        )}
+                    <div className="flex items-center gap-3">
+                      <div className={`hidden sm:grid lg:hidden xl:grid size-8 shrink-0 place-items-center rounded-lg transition ${visuals.bgColor}`}>
+                        {visuals.icon}
                       </div>
-                      <ChevronRight className="size-4 text-slate-450 transition-transform group-hover:translate-x-0.5" />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-semibold text-slate-500">
+                          {info.duration} min<br/>{info.questions} questions
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1.5 text-right">
+                        <div className="flex flex-col items-end">
+                          {info.hasCompleted ? (
+                            <>
+                              <span className="text-xs font-black text-emerald-600">{info.bestPct}%</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
+                            </>
+                          ) : info.isInProgress ? (
+                            <>
+                              <span className="text-xs font-black text-amber-600">{info.progressPct}%</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">In Progress</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs font-black text-slate-400">0%</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Not Started</span>
+                            </>
+                          )}
+                        </div>
+                        <ChevronRight className="size-4 text-slate-450 transition-transform group-hover:translate-x-0.5" />
+                      </div>
                     </div>
                   </div>
                 );

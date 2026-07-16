@@ -133,9 +133,10 @@ export default function PracticeSession({
   const currentQuestion = questions[currentIndex];
   const currentAnswer = answers[currentQuestion.id] ?? null;
 
-  // In practice-only mode, use stored ratings with folderId as fallback
-  // Otherwise, use stored ratings with folderId as fallback
-  const currentRating = ratings[currentQuestion.id] ?? (folderId !== 'unclassified' ? folderId : null);
+  // Only use stored ratings — do NOT fall back to folderId.
+  // folderId is just where the user selected to practice from;
+  // it does not mean every question in that list was rated.
+  const currentRating: 'easy' | 'medium' | 'hard' | null = ratings[currentQuestion.id] ?? null;
 
   const isCurrentRated = currentRating !== null;
   const isCurrentAnswered = currentQuestion.isPassage && currentQuestion.questions
