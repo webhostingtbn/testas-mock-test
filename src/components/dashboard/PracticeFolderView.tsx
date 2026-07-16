@@ -55,7 +55,7 @@ export default function PracticeFolderView({
   ];
 
   return (
-    <div className="w-full mx-auto overflow-hidden flex flex-col">
+    <div className="w-full mx-auto flex flex-col">
       <div className="mb-8">
         <p className="text-sm font-medium text-orange-700">Practice Folders</p>
         <h2 className="mt-1 text-3xl font-bold text-slate-900">{subtestTitle}</h2>

@@ -131,6 +131,7 @@ export default function PracticeSession({
   }
 
   const currentQuestion = questions[currentIndex];
+  const currentQuestionExamTitle = currentQuestion.exam_title || currentQuestion.questions?.[0]?.exam_title || '';
   const currentAnswer = answers[currentQuestion.id] ?? null;
 
   // Only use stored ratings — do NOT fall back to folderId.
@@ -344,10 +345,18 @@ export default function PracticeSession({
               <span className="text-sm font-bold text-slate-800">
                 {subtestTitle}
               </span>
-              <KniBadge 
-                status={folderId === 'easy' ? 'Easy' : folderId === 'medium' ? 'Medium' : folderId === 'hard' ? 'Hard' : 'Unclassified'} 
-                className="capitalize" 
-              />
+              <div className="flex items-center gap-2">
+                <KniBadge 
+                  status={folderId === 'easy' ? 'Easy' : folderId === 'medium' ? 'Medium' : folderId === 'hard' ? 'Hard' : 'Unclassified'} 
+                  className="capitalize" 
+                />
+                {currentQuestionExamTitle && (
+                  <span className="text-xs text-slate-400 font-medium hidden sm:inline-flex items-center">
+                    <span className="mx-1.5 text-slate-300 select-none">•</span>
+                    {currentQuestionExamTitle}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -438,9 +447,9 @@ export default function PracticeSession({
       </div>
 
       {/* Main split question pane */}
-      <div className="mx-auto flex flex-1 min-h-0 w-full flex-col lg:h-auto">
+      <div className="mx-auto flex flex-1 min-h-0 w-full flex-col lg:h-full">
         {/* Question area */}
-        <div className="bg-white border border-orange-100/60 rounded-2xl p-5 shadow-xs flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="bg-white border border-orange-100/60 rounded-2xl p-5 shadow-xs flex-1 min-h-0 flex flex-col overflow-y-auto lg:overflow-hidden">
           {renderQuestion()}
         </div>
       </div>

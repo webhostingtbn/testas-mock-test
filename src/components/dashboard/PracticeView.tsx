@@ -356,6 +356,17 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     return subtests.find(s => s.id === selectedSubtestId) ?? subtests[0];
   }, [subtests, selectedSubtestId]);
 
+  const sectionIdToExamTitle = useMemo(() => {
+    const mapping: Record<string, string> = {};
+    sections.forEach((s) => {
+      const examTitle = s.exams?.title || (Array.isArray(s.exams) ? s.exams[0]?.title : undefined);
+      if (examTitle) {
+        mapping[s.id] = examTitle;
+      }
+    });
+    return mapping;
+  }, [sections]);
+
   const loadPracticeData = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
@@ -363,7 +374,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       // 1. Fetch sections
       const { data: sData } = await supabase
         .from('sections')
-        .select('id, title, question_type');
+        .select('id, title, question_type, exam_id, exams(title)');
       if (sData) setSections(sData);
 
       // 2. Fetch all questions (only metadata to keep it fast)
@@ -476,6 +487,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
                   ...content,
                   resolved_image_url: qResolvedUrl,
                 },
+                exam_title: sectionIdToExamTitle[q.section_id] || '',
               };
             });
 
@@ -494,6 +506,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             resolved_image_url: resolvedUrl,
             questions: pQuestions,
             sort_order: passage.sort_order,
+            exam_title: sectionIdToExamTitle[passage.section_id] || '',
           };
         });
 
@@ -514,6 +527,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
                 ...content,
                 resolved_image_url: qResolvedUrl,
               },
+              exam_title: sectionIdToExamTitle[q.section_id] || '',
             };
           });
 
@@ -550,6 +564,11 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
           .order('sort_order', { ascending: true });
 
         const resolved = (questionsData || []).map((q: any) => {
+          let updatedQ = {
+            ...q,
+            exam_title: sectionIdToExamTitle[q.section_id] || '',
+          };
+
           if (subtest === 'figure_sequence') {
             const content = q.content as any;
             const { data: promptData } = supabase.storage
@@ -561,13 +580,10 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
               return data.publicUrl;
             });
 
-            return {
-              ...q,
-              content: {
-                ...content,
-                prompt_image_url: promptData.publicUrl,
-                options_urls: resolvedOptions,
-              },
+            updatedQ.content = {
+              ...content,
+              prompt_image_url: promptData.publicUrl,
+              options_urls: resolvedOptions,
             };
           } else if (subtest === 'latin_square' && q.question_type === 'latin_square') {
             const content = q.content as any;
@@ -575,15 +591,12 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
               .from('ExamDataset')
               .getPublicUrl(content.grid_image || '');
 
-            return {
-              ...q,
-              content: {
-                ...content,
-                grid_image_url: imgData.publicUrl,
-              },
+            updatedQ.content = {
+              ...content,
+              grid_image_url: imgData.publicUrl,
             };
           }
-          return q;
+          return updatedQ;
         });
 
         setPracticeQuestions(resolved);
@@ -870,9 +883,9 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     : 0;
 
   return (
-    <div className="h-full max-w-[1480px] mx-auto overflow-hidden">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] h-full">
-        <section className="flex min-w-0 flex-col gap-4 h-full overflow-hidden">
+    <div className="w-full max-w-[1480px] mx-auto">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)]">
+        <section className="flex min-w-0 flex-col gap-4">
           {/* Recommended Next Card */}
           <KniCard className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
             <div className="grid size-12 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -930,7 +943,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
               </label> */}
             </div>
 
-            <KniCard className="overflow-hidden p-0">
+            <KniCard className="p-0">
               {filteredSubtests.length > 0 ? filteredSubtests.map((sub) => {
                 const Icon = sub.icon;
                 const counts = getSubtestCounts(sub.id);
