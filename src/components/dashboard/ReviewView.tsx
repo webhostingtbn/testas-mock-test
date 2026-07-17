@@ -422,7 +422,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                     <div className="flex items-center gap-3 min-w-[140px]">
                       <div className="flex-1">
                         <KniProgress value={pct} />
-                        <div className="flex items-center justify-between text-[10px] font-bold mt-1">
+                        <div className="flex items-center justify-between gap-1 text-[10px] font-bold mt-1">
                           <span className="text-slate-500">Score</span>
                           <span className="text-slate-900">{correct} / {total}</span>
                         </div>
