@@ -1,0 +1,29 @@
+-- Protect server-managed profile fields for any direct Supabase Auth clients.
+CREATE OR REPLACE FUNCTION public.check_profile_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL
+     AND (SELECT role FROM public.profiles WHERE id = auth.uid()) IS DISTINCT FROM 'admin'
+     AND (
+       OLD.role IS DISTINCT FROM NEW.role
+       OR OLD.status IS DISTINCT FROM NEW.status
+       OR OLD.allow_test_limit IS DISTINCT FROM NEW.allow_test_limit
+     ) THEN
+    RAISE EXCEPTION 'Only admins can modify role, status, or allow_test_limit.';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_check_profile_update ON public.profiles;
+CREATE TRIGGER tr_check_profile_update
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_profile_update();
+
+REVOKE EXECUTE ON FUNCTION public.check_profile_update() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.check_profile_update() TO postgres, service_role;

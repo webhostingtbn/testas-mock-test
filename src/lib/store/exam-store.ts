@@ -14,6 +14,15 @@ export interface StoredSection {
   questionIds: string[];
 }
 
+export function flattenExamAnswers(
+  answers: Record<string, Record<string, unknown>>,
+): Record<string, unknown> {
+  return Object.values(answers).reduce<Record<string, unknown>>((flatAnswers, sectionAnswers) => {
+    Object.assign(flatAnswers, sectionAnswers);
+    return flatAnswers;
+  }, {});
+}
+
 export interface ExamFlowStep {
   type: 'section' | 'break';
   sectionIndex?: number;

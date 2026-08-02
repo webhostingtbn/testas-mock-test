@@ -1,25 +1,22 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useExamStore } from '@/lib/store/exam-store';
-import { createClient } from '@/lib/supabase/client';
 import ExamTopBar from '@/components/exam/ExamTopBar';
 import ExamBottomBar from '@/components/exam/ExamBottomBar';
 import BreakScreen from '@/components/exam/BreakScreen';
 import { getMockQuestions } from '@/lib/mock-data';
-import RatingWidget from '@/components/exam/RatingWidget';
 import SecurityOverlay from '@/components/exam/SecurityOverlay';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
 import { ImageService } from '@/lib/services/image-service';
 
 export default function ExamPage() {
-  const imageService = new ImageService();
+  const imageService = useMemo(() => new ImageService(), []);
   const router = useRouter();
   const { data: session } = useSession();
-  const supabase = createClient();
   const [hydrated, setHydrated] = useState(false);
   const [sectionQuestions, setSectionQuestions] = useState<any[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
@@ -32,7 +29,6 @@ export default function ExamPage() {
     currentSectionIndex,
     currentQuestionIndex,
     answers,
-    fontSize,
     startSection,
     startBreak,
     advanceFlowStep,
@@ -54,22 +50,23 @@ export default function ExamPage() {
       if (!email) return;
       
       try {
-        const { data } = await supabase
-          .from('profiles')
-          .select('email, full_name')
-          .eq('email', email)
-          .maybeSingle();
-        if (data) {
-          setUserProfile({
-            email: data.email,
-            fullName: data.full_name,
-          });
-        } else {
-          setUserProfile({
-            email: email,
-            fullName: session?.user?.name || null,
-          });
+        const res = await fetch('/api/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.profile) {
+            setUserProfile({
+              email: data.profile.email,
+              fullName: data.profile.full_name,
+            });
+            setUserId(data.profile.id);
+            return;
+          }
         }
+        setUserProfile({
+          email: email,
+          fullName: session?.user?.name || null,
+        });
+        if (session?.user?.id) setUserId(session.user.id);
       } catch (err) {
         console.error('Failed to fetch user profile for watermark:', err);
         setUserProfile({
@@ -78,145 +75,63 @@ export default function ExamPage() {
         });
       }
     }
-    
-    async function resolveUserId() {
-      if (session?.user?.id) {
-        setUserId(session.user.id);
-        return;
-      }
-      if (session?.user?.email) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('email', session.user.email)
-            .maybeSingle();
-          if (data?.id) {
-            setUserId(data.id);
-          }
-        } catch (err) {
-          console.error('Failed to resolve user ID by email:', err);
-        }
-      }
-    }
 
-    if (session) {
-      fetchProfile();
-      resolveUserId();
-    }
-  }, [session, supabase]);
+    fetchProfile();
+  }, [session]);
 
-  // Wait for zustand hydration
   useEffect(() => {
     setHydrated(true);
   }, []);
 
-  // If no exam is active, redirect to dashboard
   useEffect(() => {
     if (hydrated && !currentExamId) {
       router.push('/dashboard');
     }
   }, [hydrated, currentExamId, router]);
 
-  // Auto-start the first flow step
-  useEffect(() => {
-    if (!hydrated || !currentExamId) return;
-
-    const currentStep = flowSteps[currentFlowStepIndex];
-    if (!currentStep) return;
-
-    if (currentStep.type === 'section' && currentStep.sectionIndex !== undefined) {
-      const store = useExamStore.getState();
-      if (!store.sectionStartTime) {
-        startSection(currentStep.sectionIndex);
-      }
-    } else if (currentStep.type === 'break' && currentStep.breakDuration) {
-      const store = useExamStore.getState();
-      if (!store.breakStartTime) {
-        startBreak(currentStep.breakDuration);
-      }
-    }
-  }, [hydrated, currentExamId, currentFlowStepIndex, flowSteps, startSection, startBreak]);
-
-  // Fetch questions from Supabase when the section changes
   const fetchQuestionsForSection = useCallback(async (section: typeof sections[0]) => {
     setIsLoadingQuestions(true);
     try {
-      if (
-        section.questionType === 'module_mcq' ||
-        section.questionType === 'interpreting_texts' ||
-        section.questionType === 'representation_systems' ||
-        section.questionType === 'linguistic_structures'
-      ) {
-        const { data: passagesData, error: pError } = await supabase
-          .from('passages')
-          .select('*')
-          .eq('section_id', section.id)
-          .order('sort_order', { ascending: true });
+      const res = await fetch(`/api/exams/${currentExamId}`);
+      if (!res.ok) throw new Error('Failed to load questions from server API');
+      const examData = await res.json();
+      const rawQuestions = (examData.questions || []).filter(
+        (question: { section_id?: string }) => question.section_id === section.id,
+      );
 
-        if (pError) throw pError;
+      const isModuleSection = [
+        'module_mcq',
+        'interpreting_texts',
+        'representation_systems',
+        'linguistic_structures',
+      ].includes(section.questionType);
+      const sectionPassages = (examData.passages || []).filter(
+        (passage: { section_id?: string }) => passage.section_id === section.id,
+      );
+      const displayQuestions = isModuleSection
+        ? [
+            ...sectionPassages
+              .map((passage: { id: string; section_id?: string }) => ({
+                ...passage,
+                isPassage: true,
+                questions: rawQuestions.filter(
+                  (question: { passage_id?: string }) => question.passage_id === passage.id,
+                ),
+              }))
+              .filter((passage: { questions: unknown[] }) => passage.questions.length > 0),
+            ...rawQuestions.filter((question: { passage_id?: string }) => !question.passage_id),
+          ]
+        : rawQuestions;
 
-        const { data: questionsData, error: qError } = await supabase
-          .from('questions')
-          .select('id, section_id, sort_order, question_type, content, correct_answer, passage_id')
-          .eq('section_id', section.id)
-          .order('sort_order', { ascending: true });
-
-        if (qError) throw qError;
-
-        const formattedPassages = await Promise.all(
-          (passagesData || []).map(async (passage: any) => {
-            const pQuestions = (questionsData || [])
-              .filter((q: any) => q.passage_id === passage.id)
-              .map(async (q: any) => {
-                const content = (q.content as any) || {};
-                return {
-                  ...q,
-                  content: {
-                    ...content,
-                    resolved_image_url: content.image_url ? await imageService.resolveImageUrl(content.image_url) : undefined,
-                  },
-                };
-              });
-
-            const resolvedUrl = passage.image_url ? await imageService.resolveImageUrl(passage.image_url) : undefined;
-
-            return {
-               id: passage.id,
-               isPassage: true,
-               title: passage.title,
-               body_markdown: passage.body_markdown,
-               image_url: passage.image_url,
-               resolved_image_url: resolvedUrl,
-               questions: await Promise.all(pQuestions),
-            };
-          }),
-        );
-
-        setSectionQuestions(formattedPassages);
-        setIsLoadingQuestions(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('questions')
-        .select('id, sort_order, question_type, content, correct_answer')
-        .eq('section_id', section.id)
-        .order('sort_order', { ascending: true });
-
-      if (error || !data) throw error;
-
-      // Use ImageService to resolve all image paths to full URLs
-      const resolved = await imageService.resolveQuestionImageUrls(data);
+      const resolved = await imageService.resolveQuestionImageUrls(displayQuestions);
       setSectionQuestions(resolved);
     } catch (err) {
       console.error('Failed to load questions:', err);
-      // Fallback to mock data
       setSectionQuestions(getMockQuestions(section.questionType, section.questionCount));
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, [supabase]);
+  }, [currentExamId]);
 
   useEffect(() => {
     if (!hydrated || !currentExamId) return;
@@ -226,35 +141,33 @@ export default function ExamPage() {
     }
   }, [hydrated, currentExamId, currentSectionIndex, sections, fetchQuestionsForSection]);
 
-  // Navigate to results when all flow steps are completed
   useEffect(() => {
-    if (!hydrated || !currentExamId) return;
-    const currentStep = flowSteps[currentFlowStepIndex];
-    if (!currentStep) {
+    if (!hydrated || flowSteps.length === 0) return;
+    if (currentFlowStepIndex >= flowSteps.length) {
       router.push('/results');
     }
-  }, [hydrated, currentExamId, currentFlowStepIndex, flowSteps, router]);
-
-  if (!hydrated || !currentExamId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
+  }, [hydrated, currentFlowStepIndex, flowSteps.length, router]);
 
   const currentStep = flowSteps[currentFlowStepIndex];
 
-  // All steps completed — wait for useEffect to push to results
-  if (!currentStep) {
+  useEffect(() => {
+    if (!hydrated || !currentStep) return;
+
+    if (currentStep.type === 'section' && currentStep.sectionIndex !== undefined) {
+      startSection(currentStep.sectionIndex);
+    } else if (currentStep.type === 'break' && currentStep.breakDuration !== undefined) {
+      startBreak(currentStep.breakDuration);
+    }
+  }, [hydrated, currentStep, startSection, startBreak]);
+
+  if (!hydrated || !currentExamId || !currentStep) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // Handle break screen
   if (currentStep.type === 'break') {
     return (
       <BreakScreen
@@ -264,41 +177,30 @@ export default function ExamPage() {
     );
   }
 
-  // Section rendering
-  const section = sections[currentSectionIndex];
-  if (!section) return null;
-
-  if (isLoadingQuestions || sectionQuestions.length === 0) {
+  const currentSection = sections[currentSectionIndex];
+  if (!currentSection) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
-        <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-        <p className="text-gray-500 text-sm">Loading questions...</p>
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
+        <p>Section not found</p>
       </div>
     );
   }
 
-  const currentQuestion = sectionQuestions[currentQuestionIndex];
-  if (!currentQuestion) return null;
+  const totalQuestions = sectionQuestions.length > 0
+    ? sectionQuestions.length
+    : currentSection.questionCount;
 
-  const currentAnswer = getAnswer(section.id, currentQuestion.id);
-  
-  const currentRating = currentQuestion.isPassage && currentQuestion.questions && currentQuestion.questions.length > 0
-    ? getRating(section.id, currentQuestion.questions[0].id)
-    : getRating(section.id, currentQuestion.id);
+  const currentQuestion = sectionQuestions[currentQuestionIndex] || null;
 
-  const isCurrentQuestionRated = currentRating !== null && currentRating !== undefined;
+  const handleDifficultySelect = async (difficulty: 'easy' | 'medium' | 'hard') => {
+    if (!currentQuestion) return;
 
-  const handleAnswer = (answer: unknown) => {
-    setAnswer(section.id, currentQuestion.id, answer);
-  };
-
-  const handleRatingChange = async (difficulty: 'easy' | 'medium' | 'hard') => {
     if (currentQuestion.isPassage && currentQuestion.questions) {
       currentQuestion.questions.forEach((childQ: any) => {
-        setRating(section.id, childQ.id, difficulty);
+        setRating(currentSection.id, childQ.id, difficulty);
       });
     } else {
-      setRating(section.id, currentQuestion.id, difficulty);
+      setRating(currentSection.id, currentQuestion.id, difficulty);
     }
     
     if (userId) {
@@ -307,18 +209,13 @@ export default function ExamPage() {
           ? currentQuestion.questions.map((childQ: any) => childQ.id)
           : [currentQuestion.id];
 
-        const upsertData = questionIdsToSync.map((qId: string) => ({
-          user_id: userId,
-          question_id: qId,
-          difficulty: difficulty,
-          updated_at: new Date().toISOString()
-        }));
-
-        const { error } = await supabase
-          .from('user_question_practices')
-          .upsert(upsertData, { onConflict: 'user_id,question_id' });
-
-        if (error) throw error;
+        for (const qId of questionIdsToSync) {
+          await fetch(`/api/practice/${qId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ difficulty }),
+          });
+        }
       } catch (err) {
         console.error('Failed to sync difficulty rating to database:', err);
       }
@@ -333,133 +230,74 @@ export default function ExamPage() {
     advanceFlowStep();
   };
 
-  // Build QuestionData object for the renderer
   const buildQuestionData = (): QuestionData => {
-    const q = currentQuestion as QuestionData & Record<string, unknown>;
+    const q = currentQuestion || {};
     return {
-      id: q.id,
-      sectionId: section.id,
-      sortOrder: (q.sort_order as number ?? q.sortOrder) || 0,
-      questionType: section.questionType,
-      content: q.content,
-      isPassage: q.isPassage || false,
-      questions: q.questions || undefined,
-      // Forward top-level passage fields so toModulePassage can read them
-      ...(q.isPassage ? {
-        title: q.title,
-        body_markdown: q.body_markdown,
-        image_url: q.image_url,
-        resolved_image_url: q.resolved_image_url,
-      } : {}),
+      id: q.id || `q-${currentQuestionIndex}`,
+      sectionId: q.section_id || currentSection.id,
+      sortOrder: q.sort_order || currentQuestionIndex + 1,
+      questionType: q.question_type || currentSection.questionType,
+      content: q.content || q,
     };
   };
 
-  const renderQuestion = () => {
-    const questionData = buildQuestionData();
+  const questionData = currentQuestion ? buildQuestionData() : null;
+  const currentAnswer = questionData ? getAnswer(currentSection.id, questionData.id) : null;
 
-    // Handle Module MCQ passages specially - pass the full passage structure
-    if (questionData.isPassage) {
-      return questionRendererFactory.render(questionData, {
-        selectedAnswer: null,
-        selectedAnswers: answers[section.id] as Record<string, string> || {},
-        onAnswer: (val: unknown) => {
-          // For passage-based questions, val is { [questionId]: answer }
-          if (typeof val === 'object' && val !== null) {
-            const entries = Object.entries(val);
-            if (entries.length > 0) {
-              const [questionId, answer] = entries[0];
-              setAnswer(section.id, questionId, answer);
-            }
-          }
-        },
-        passage: questionData,
-      });
+  const handleAnswerChange = (value: unknown) => {
+    if (questionData) {
+      setAnswer(currentSection.id, questionData.id, value);
     }
-
-    return questionRendererFactory.render(questionData, {
-      selectedAnswer: currentAnswer,
-      onAnswer: handleAnswer,
-    });
   };
 
-  // Build answered question indices for the top bar
-  const answeredIndices = sectionQuestions
-    .map((q, idx) => {
-      // For Module MCQ, the item is a Passage. It is "answered" if ALL child questions are answered.
-      if (q.isPassage && q.questions) {
-        const allAnswered =
-          q.questions.length > 0 &&
-          q.questions.every((childQ: any) => {
-            const ans = getAnswer(section.id, childQ.id);
-            return ans !== null && ans !== undefined;
-          });
-        return allAnswered ? idx : -1;
-      }
+  const currentRating = currentQuestion ? getRating(currentSection.id, currentQuestion.id) : null;
 
-      // Standard questions
-      const ans = getAnswer(section.id, q.id);
-      return ans !== null && ans !== undefined ? idx : -1;
-    })
-    .filter((i) => i >= 0);
+  const answeredIndices = Object.keys(answers[currentSection.id] || {}).map((_, idx) => idx);
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-slate-50 text-slate-800 overflow-hidden" style={{ fontSize: `${fontSize}px` }}>
-      {/* <SecurityOverlay /> */}
-      {userProfile && (
-        <WatermarkOverlay 
-          email={userProfile.email} 
-          fullName={userProfile.fullName} 
+    <>
+      <SecurityOverlay />
+      <WatermarkOverlay email={userProfile?.email || session?.user?.email || ''} fullName={userProfile?.fullName || session?.user?.name || null} />
+      <div className="flex flex-col h-screen bg-background text-foreground select-none">
+        <ExamTopBar
+          sectionTitle={currentSection.title}
+          totalQuestions={totalQuestions}
+          currentQuestionIndex={currentQuestionIndex}
+          answeredQuestions={answeredIndices}
+          onQuestionClick={(idx) => goToQuestion(idx)}
+          onTimeUp={handleTimeUp}
         />
-      )}
-      <ExamTopBar
-        sectionTitle={section.title}
-        totalQuestions={sectionQuestions.length}
-        currentQuestionIndex={currentQuestionIndex}
-        answeredQuestions={answeredIndices}
-        onQuestionClick={goToQuestion}
-        onTimeUp={handleTimeUp}
-        isCurrentQuestionRated={isCurrentQuestionRated}
-      />
 
-      {/* Preload all images for the section so switching questions is instantaneous */}
-      <div className="hidden" aria-hidden="true">
-        {sectionQuestions.map(q => {
-          const url = q.content?.prompt_image_url || q.content?.grid_image_url || q.content?.question_image || q.content?.image_url || q.resolved_image_url;
-          const opts = q.content?.options_urls || [];
-          const childQuestions = q.questions || [];
-          return (
-            <div key={q.id}>
-              {url && <img src={url} alt="" />}
-              {opts.map((optUrl: string, idx: number) => (
-                <img key={`${q.id}-opt-${idx}`} src={optUrl} alt="" />
-              ))}
-              {childQuestions.map((child: any) => (
-                child.content?.resolved_image_url && <img key={child.id} src={child.content.resolved_image_url} alt="" />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-
-      <main className="flex-1 min-h-0 flex overflow-hidden bg-slate-50">
-        <div className="flex-1 flex flex-col min-h-0 w-full px-6 py-4 text-slate-800 pb-12 lg:pb-0 overflow-y-auto lg:overflow-hidden">
-          <div className="flex-1 min-h-0 w-full flex flex-col">
-            {renderQuestion()}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center">
+          <div className="w-full max-w-4xl space-y-6">
+            {isLoadingQuestions ? (
+              <div className="flex h-64 items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : questionData ? (
+              questionRendererFactory.render(questionData, {
+                selectedAnswer: currentAnswer,
+                onAnswer: handleAnswerChange,
+              })
+            ) : (
+              <div className="flex h-64 items-center justify-center text-muted-foreground">
+                Question type &quot;{currentSection.questionType}&quot; coming soon.
+              </div>
+            )}
           </div>
-        </div>
-      </main>
+        </main>
 
-      <ExamBottomBar
-        onBack={prevQuestion}
-        onNext={nextQuestion}
-        onEndSubtest={handleEndSubtest}
-        isFirstQuestion={currentQuestionIndex === 0}
-        isLastQuestion={currentQuestionIndex === sectionQuestions.length - 1}
-        sectionTitle={section.title}
-        isCurrentQuestionRated={isCurrentQuestionRated}
-        currentRating={currentRating}
-        onRatingChange={handleRatingChange}
-      />
-    </div>
+        <ExamBottomBar
+          onBack={prevQuestion}
+          onNext={nextQuestion}
+          onEndSubtest={handleEndSubtest}
+          isFirstQuestion={currentQuestionIndex === 0}
+          isLastQuestion={currentQuestionIndex === totalQuestions - 1}
+          sectionTitle={currentSection.title}
+          currentRating={currentRating}
+          onRatingChange={(rating) => handleDifficultySelect(rating)}
+        />
+      </div>
+    </>
   );
 }

@@ -2,6 +2,8 @@
 // Constants for the TestAS Mock Test application
 // =============================================================
 
+import type { Section } from '@/lib/types';
+
 /** Section durations in seconds */
 export const SECTION_DURATIONS = {
   FIGURE_SEQUENCE: 20 * 60,    // 20 minutes
@@ -135,27 +137,27 @@ export function getModuleCategory(activeModule: string | null): 'science' | 'eng
 
 /** Centralized helper to filter core and module sections based on format and active module */
 export function filterSections(
-  sections: any[],
+  sections: Section[],
   isPaper: boolean,
   activeModule: string | null
-): { coreSections: any[]; moduleSections: any[] } {
+): { coreSections: Section[]; moduleSections: Section[] } {
   // 1. Separate Core sections
   const coreTypes = CORE_QUESTION_TYPES[isPaper ? 'Paper' : 'Digital'];
-  const coreSections = sections.filter((s: any) => coreTypes.includes(s.question_type));
+  const coreSections = sections.filter((section) => coreTypes.includes(section.question_type));
 
   // 2. Separate Module sections
-  const moduleSections = sections.filter((s: any) => {
+  const moduleSections = sections.filter((section) => {
     if (!activeModule) return false;
 
     if (isPaper) {
       const category = getModuleCategory(activeModule);
       if (!category) return false;
       const allowedTypes = PAPER_MODULE_QUESTION_TYPES[category];
-      return allowedTypes.includes(s.question_type);
+      return allowedTypes.includes(section.question_type);
     } else {
       // For Digital, all module sections are grouped under the user's selected module title
       const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-      return s.title === targetModuleTitle;
+      return section.title === targetModuleTitle;
     }
   });
 

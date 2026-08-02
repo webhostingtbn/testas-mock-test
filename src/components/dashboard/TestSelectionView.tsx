@@ -111,15 +111,14 @@ export function TestSelectionView({
   }, [pastExams]);
 
   const filteredExams = useMemo(() => {
-    // TODO: temp comment out filter - show all exams regardless of tab
-    return activeExams;
+    return [...activeExams].sort((left, right) => left.title.localeCompare(right.title));
     // return activeExams.filter((exam) => {
     //   const info = getExamDisplayInfo(exam);
     //   if (activeTab === 'completed') return info.hasCompleted;
     //   if (activeTab === 'in_progress') return info.isInProgress;
     //   return true;
     // });
-  }, [activeExams /* , activeTab, getExamDisplayInfo */]);
+  }, [activeExams]);
 
   const handleSelectExam = (exam: Exam) => {
     onSelectExam(exam);

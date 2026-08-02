@@ -16,10 +16,13 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export function KniBackground() {
+export function KniBackground({ children, className }: { children?: ReactNode; className?: string } = {}) {
   return (
-    <div className="pointer-events-none fixed inset-0 z-0 bg-kni-canvas">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(234,88,12,.08),transparent_28%),radial-gradient(circle_at_88%_4%,rgba(15,23,42,.06),transparent_26%)]" />
+    <div className={cn("relative min-h-screen bg-kni-canvas", className)}>
+      <div className="pointer-events-none fixed inset-0 z-0 bg-kni-canvas">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(234,88,12,.08),transparent_28%),radial-gradient(circle_at_88%_4%,rgba(15,23,42,.06),transparent_26%)]" />
+      </div>
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }
@@ -122,19 +125,10 @@ export function KniBadge({
   );
 }
 
-export function KniProgress({
-  value,
-  className,
-}: {
-  value: number;
-  className?: string;
-}) {
+export function KniProgress({ value, className }: { value: number; className?: string }) {
   return (
     <div className={cn('h-2 w-full overflow-hidden rounded-full bg-slate-100', className)}>
-      <div
-        className="h-full rounded-full bg-orange-600 transition-all duration-300"
-        style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
-      />
+      <div className="h-full bg-orange-500 transition-all duration-300" style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   );
 }
@@ -494,18 +488,21 @@ export function KniShell({
   });
 
   const toggleSidebar = () => {
-    setSidebarExpanded(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('kni-sidebar-expanded', String(next));
-      } catch {}
-      return next;
-    });
+    const next = !sidebarExpanded;
+    setSidebarExpanded(next);
+    try {
+      localStorage.setItem('kni-sidebar-expanded', String(next));
+    } catch {}
   };
 
   return (
     <div className="h-screen max-h-screen w-full overflow-hidden bg-orange-50 text-slate-950 flex flex-col relative">
-      <KniBackground />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-kni-canvas"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(234,88,12,.08),transparent_28%),radial-gradient(circle_at_88%_4%,rgba(15,23,42,.06),transparent_26%)]" />
+      </div>
       <div className="relative flex flex-1 min-h-0">
         <KniSidebar
           onLogout={onLogout}

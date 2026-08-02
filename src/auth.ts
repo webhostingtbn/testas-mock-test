@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
-import { createClient as createServerClient } from '@supabase/supabase-js';
 import type { DefaultSession } from 'next-auth';
+import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 
 const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
 const googleClientId = process.env.AUTH_GOOGLE_ID;
@@ -31,12 +31,9 @@ async function syncUserToSupabase(user: {
   email: string;
   name: string | null;
   image: string | null;
-}) {
+}): Promise<void> {
   try {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = getAdminSupabaseClient();
 
     // Look for an existing profile by email first
     const { data: existingProfile } = await supabase
@@ -47,7 +44,7 @@ async function syncUserToSupabase(user: {
 
     if (existingProfile) {
       // Update existing profile (e.g. for last_login/updated_at if we had those columns or just name/avatar)
-      await supabase
+      const { error } = await supabase
         .from('profiles')
         .update({
           full_name: user.name || null,
@@ -55,6 +52,10 @@ async function syncUserToSupabase(user: {
           updated_at: new Date().toISOString()
         })
         .eq('id', existingProfile.id);
+
+      if (error) {
+        throw new Error(`Unable to update the profile: ${error.message}`);
+      }
       
       console.log('User synced to existing Supabase profile:', user.email);
     } else {
@@ -72,11 +73,15 @@ async function syncUserToSupabase(user: {
           module_test: null,
         });
 
-      if (error) console.error('Error creating new Supabase profile:', error);
-      else console.log('Created new Supabase profile for:', user.email);
+      if (error) {
+        throw new Error(`Unable to create the profile: ${error.message}`);
+      }
+
+      console.log('Created new Supabase profile for:', user.email);
     }
   } catch (err) {
     console.error('Supabase sync error:', err);
+    throw err;
   }
 }
 
@@ -90,8 +95,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   pages: {
-    signIn: '/login',
-    error: '/login',
+    signIn: '/',
+    error: '/',
   },
   cookies: {
     sessionToken: {
@@ -126,11 +131,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.image = user.image;
         
         // Try to get user id from Supabase, but don't fail if it doesn't work
+        if (!user.email) {
+          return token;
+        }
+
         try {
-          const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          );
+          const supabase = getAdminSupabaseClient();
           const { data } = await supabase
             .from('profiles')
             .select('id')

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
-import { createClient } from '@/lib/supabase/client';
+import { ImageService } from '@/lib/services/image-service';
 import { cn } from '@/lib/utils';
 import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
@@ -45,7 +45,7 @@ interface DifficultySegment {
 }
 
 export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
-  const supabase = createClient();
+  const imageService = useMemo(() => new ImageService(), []);
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
   const [questions, setQuestions] = useState<any[]>([]);
@@ -312,7 +312,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   }, [activeModule, isPaper]);
 
   // Only count rated questions (unrated questions are hidden in practice)
-  const getSubtestCounts = (subtest: SubtestType): SubtestCounts => {
+  const getSubtestCounts = useCallback((subtest: SubtestType): SubtestCounts => {
     const matchedSections = getMatchedSections(subtest);
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
@@ -326,13 +326,12 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       if (rating === 'easy') easy++;
       else if (rating === 'medium') medium++;
       else if (rating === 'hard') hard++;
-      // unrated questions are not counted
     });
 
-    const total = easy + medium + hard; // Only total rated questions
+    const total = easy + medium + hard;
 
     return { easy, medium, hard, total };
-  };
+  }, [getMatchedSections, questions, userRatings]);
 
   const filteredSubtests = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -344,7 +343,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       );
     }
     // Sort by hard count desc, then medium count desc
-    return result.sort((a, b) => {
+    return [...result].sort((a, b) => {
       const countsA = getSubtestCounts(a.id);
       const countsB = getSubtestCounts(b.id);
       if (countsB.hard !== countsA.hard) return countsB.hard - countsA.hard;
@@ -371,35 +370,26 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     if (!profile) return;
     setLoading(true);
     try {
-      // 1. Fetch sections
-      const { data: sData } = await supabase
-        .from('sections')
-        .select('id, title, question_type, exam_id, exams(title)');
-      if (sData) setSections(sData);
+      const res = await fetch('/api/practice');
+      if (!res.ok) throw new Error('Failed to fetch practice data');
+      const data = await res.json();
 
-      // 2. Fetch all questions (only metadata to keep it fast)
-      const { data: qData } = await supabase
-        .from('questions')
-        .select('id, question_type, section_id');
-      if (qData) setQuestions(qData);
+      setSections(data.sections || []);
+      const qData = data.questions || [];
+      setQuestions(qData);
 
-      // 3. Fetch user ratings with updated_at
-      const { data: rData } = await supabase
-        .from('user_question_practices')
-        .select('question_id, difficulty, updated_at')
-        .eq('user_id', profile.id);
-
+      const rData = data.userPractices || [];
       const ratingMap: Record<string, 'easy' | 'medium' | 'hard'> = {};
       const dateSet = new Set<string>();
-      if (rData) {
-        rData.forEach((row : any) => {
-          ratingMap[row.question_id] = row.difficulty as 'easy' | 'medium' | 'hard';
-          if (row.updated_at) {
-            const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
-            dateSet.add(dateStr);
-          }
-        });
-      }
+
+      rData.forEach((row: any) => {
+        ratingMap[row.question_id] = row.difficulty as 'easy' | 'medium' | 'hard';
+        if (row.updated_at) {
+          const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
+          dateSet.add(dateStr);
+        }
+      });
+
       setUserRatings(ratingMap);
       setUserPracticeDates(dateSet);
     } catch (err) {
@@ -407,7 +397,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     } finally {
       setLoading(false);
     }
-  }, [profile, supabase]);
+  }, [profile]);
 
   useEffect(() => {
     loadPracticeData();
@@ -438,169 +428,18 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     try {
       const targetIds = getQuestionIdsForFolder(subtest, folder);
 
-      // Check if there are no rated questions for this folder
       if (targetIds.length === 0) {
         setPracticeQuestions([]);
         return;
       }
 
-      const isSubjectSubtest = [
-        'module_mcq',
-        'interpreting_texts',
-        'representation_systems',
-        'linguistic_structures',
-        'sc_1', 'sc_2',
-        'econ_1', 'econ_2',
-        'eng_1', 'eng_2', 'eng_2_2d', 'eng_2_3d', 'eng_3'
-      ].includes(subtest);
+      const res = await fetch('/api/practice');
+      if (!res.ok) throw new Error('Failed to load practice questions');
+      const data = await res.json();
+      const allQ = (data.questions || []).filter((q: any) => targetIds.includes(q.id));
 
-      if (isSubjectSubtest) {
-        const matchedSections = getMatchedSections(subtest);
-        if (matchedSections.length === 0) throw new Error('No section found for this subtest');
-        const matchedSectionIds = matchedSections.map((s) => s.id);
-
-        const { data: passagesData } = await supabase
-          .from('passages')
-          .select('*')
-          .in('section_id', matchedSectionIds)
-          .order('sort_order', { ascending: true });
-
-        const { data: questionsData } = await supabase
-          .from('questions')
-          .select('*')
-          .in('section_id', matchedSectionIds)
-          .order('sort_order', { ascending: true });
-
-        const formattedPassages = (passagesData || []).map((passage: any) => {
-          const pQuestions = (questionsData || [])
-            .filter((q : any) => q.passage_id === passage.id)
-            .map((q: any) => {
-              const content = q.content || {};
-              let qResolvedUrl;
-              if (content.image_url) {
-                const { data } = supabase.storage.from('ExamDataset').getPublicUrl(content.image_url);
-                qResolvedUrl = data.publicUrl;
-              }
-              return {
-                ...q,
-                content: {
-                  ...content,
-                  resolved_image_url: qResolvedUrl,
-                },
-                exam_title: sectionIdToExamTitle[q.section_id] || '',
-              };
-            });
-
-          let resolvedUrl;
-          if (passage.image_url) {
-            const { data: imgData } = supabase.storage.from('ExamDataset').getPublicUrl(passage.image_url);
-            resolvedUrl = imgData.publicUrl;
-          }
-
-          return {
-            id: passage.id,
-            isPassage: true,
-            title: passage.title,
-            body_markdown: passage.body_markdown,
-            image_url: passage.image_url,
-            resolved_image_url: resolvedUrl,
-            questions: pQuestions,
-            sort_order: passage.sort_order,
-            exam_title: sectionIdToExamTitle[passage.section_id] || '',
-          };
-        });
-
-        // Load standalone questions without passages
-        const standaloneQuestions = (questionsData || [])
-          .filter((q: any) => !q.passage_id)
-          .map((q: any) => {
-            const content = q.content || {};
-            let qResolvedUrl;
-            if (content.image_url) {
-              const { data } = supabase.storage.from('ExamDataset').getPublicUrl(content.image_url);
-              qResolvedUrl = data.publicUrl;
-            }
-            return {
-              ...q,
-              isPassage: false,
-              content: {
-                ...content,
-                resolved_image_url: qResolvedUrl,
-              },
-              exam_title: sectionIdToExamTitle[q.section_id] || '',
-            };
-          });
-
-        const hasStandalones = standaloneQuestions.length > 0;
-        const allCombined = [...formattedPassages, ...standaloneQuestions].sort((a, b) => {
-          const aOrder = a.isPassage
-            ? (hasStandalones && a.questions.length > 0 ? a.questions[0].sort_order : a.sort_order)
-            : a.sort_order;
-          const bOrder = b.isPassage
-            ? (hasStandalones && b.questions.length > 0 ? b.questions[0].sort_order : b.sort_order)
-            : b.sort_order;
-          return aOrder - bOrder;
-        });
-
-        // Filter only rated questions (questions in targetIds are already rated)
-        const combined = allCombined.filter((item: any) => {
-          let questionId: string | undefined;
-          if (item.isPassage) {
-            if (item.questions.length === 0) return false;
-            questionId = item.questions[0].id;
-          } else {
-            questionId = item.id;
-          }
-          // Only include if question is in our rated targetIds
-          return questionId && targetIds.includes(questionId);
-        });
-
-        setPracticeQuestions(combined);
-      } else {
-        const { data: questionsData } = await supabase
-          .from('questions')
-          .select('id, section_id, sort_order, question_type, content, correct_answer')
-          .in('id', targetIds)
-          .order('sort_order', { ascending: true });
-
-        const resolved = (questionsData || []).map((q: any) => {
-          let updatedQ = {
-            ...q,
-            exam_title: sectionIdToExamTitle[q.section_id] || '',
-          };
-
-          if (subtest === 'figure_sequence') {
-            const content = q.content as any;
-            const { data: promptData } = supabase.storage
-              .from('ExamDataset')
-              .getPublicUrl(content.prompt_image || '');
-
-            const resolvedOptions = (content.options || []).map((path: string) => {
-              const { data } = supabase.storage.from('ExamDataset').getPublicUrl(path);
-              return data.publicUrl;
-            });
-
-            updatedQ.content = {
-              ...content,
-              prompt_image_url: promptData.publicUrl,
-              options_urls: resolvedOptions,
-            };
-          } else if (subtest === 'latin_square' && q.question_type === 'latin_square') {
-            const content = q.content as any;
-            const { data: imgData } = supabase.storage
-              .from('ExamDataset')
-              .getPublicUrl(content.grid_image || '');
-
-            updatedQ.content = {
-              ...content,
-              grid_image_url: imgData.publicUrl,
-            };
-          }
-          return updatedQ;
-        });
-
-        setPracticeQuestions(resolved);
-      }
+      const resolved = await imageService.resolveQuestionImageUrls(allQ);
+      setPracticeQuestions(resolved);
     } catch (err) {
       console.error('Failed to load practice questions:', err);
     } finally {
@@ -655,7 +494,6 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
         userId={profile?.id || ''}
         userEmail={profile?.email || ''}
         userFullName={profile?.full_name}
-        supabase={supabase}
         onExit={handleExitPracticeSession}
         onQuestionRated={loadPracticeData}
         isPaper={isPaper}

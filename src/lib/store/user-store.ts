@@ -1,12 +1,11 @@
 import { create } from 'zustand';
 import type { Profile } from '@/lib/types';
-import { createClient } from '@/lib/supabase/client';
 
 interface UserState {
   profile: Profile | null;
   isLoading: boolean;
   setProfile: (profile: Profile | null) => void;
-  fetchProfile: (email: string) => Promise<Profile | null>;
+  fetchProfile: () => Promise<Profile | null>;
   clearProfile: () => void;
 }
 
@@ -14,23 +13,16 @@ export const useUserStore = create<UserState>((set) => ({
   profile: null,
   isLoading: false,
   setProfile: (profile) => set({ profile }),
-  fetchProfile: async (email) => {
+  fetchProfile: async () => {
     set({ isLoading: true });
-    const supabase = createClient();
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
+      const res = await fetch('/api/me');
+      if (!res.ok) {
         set({ isLoading: false });
         return null;
       }
-
-      const userProfile = data as Profile;
+      const data = await res.json();
+      const userProfile = data.profile as Profile;
       set({ profile: userProfile, isLoading: false });
       return userProfile;
     } catch (err) {

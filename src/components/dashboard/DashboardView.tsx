@@ -505,6 +505,17 @@ export function DashboardView({
               </div>
             </div>
 
+            {radarStats.length === 0 ? (
+              <div className="mt-5 grid min-h-52 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+                <div>
+                  <Target className="mx-auto size-7 text-slate-300" />
+                  <p className="mt-3 text-sm font-bold text-slate-700">No mastery data yet</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    Complete a {activeFormatTab.toLowerCase()} mock test to see your section scores.
+                  </p>
+                </div>
+              </div>
+            ) : (
             <div className="mt-5 relative w-full aspect-[4/3] flex items-center justify-center overflow-visible">
               <svg viewBox="0 0 400 300" className="w-full h-full overflow-visible select-none">
                 <defs>
@@ -636,6 +647,7 @@ export function DashboardView({
                 })}
               </svg>
             </div>
+            )}
 
             {/* Stats legend grid */}
             <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-4 shrink-0">

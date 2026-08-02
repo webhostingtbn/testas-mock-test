@@ -33,10 +33,16 @@ const MCQ_TYPES = [
   "sc_1",
   "sc_2",
   "econ_1",
+  "econ_2",
+  "eng_1",
+  "eng_2",
   "eng_3",
   "eng_2_2d",
   "eng_2_3d",
   "module_mcq",
+  "interpreting_texts",
+  "representation_systems",
+  "linguistic_structures",
 ];
 
 const args = process.argv.slice(2);
@@ -413,8 +419,16 @@ function normalizeQuestion(row: QuestionRow): NormalizedResult {
 }
 
 async function main() {
+  let connectionString = process.env.DATABASE_URL;
+  if (connectionString && connectionString.includes("db.izcudijmubegczhfcjlw.supabase.co")) {
+    connectionString = connectionString
+      .replace("db.izcudijmubegczhfcjlw.supabase.co", "aws-1-ap-northeast-2.pooler.supabase.com")
+      .replace("postgresql://postgres:", "postgresql://postgres.izcudijmubegczhfcjlw:");
+    console.log("Rewrote DATABASE_URL to use IPv4 connection pooler...");
+  }
+
   const client = new Client({
-    connectionString: process.env.DATABASE_URL,
+    connectionString,
   });
 
   await client.connect();

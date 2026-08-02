@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth?.user?.email;
-  const isOnLoginPage = req.nextUrl.pathname.startsWith('/login');
+  const isOnLoginPage = req.nextUrl.pathname === '/' || req.nextUrl.pathname.startsWith('/login');
   const isOnAuthPage = req.nextUrl.pathname.startsWith('/api/auth');
   const isDevelopmentPreview =
     process.env.NODE_ENV === 'development' &&
@@ -43,12 +43,18 @@ export const proxy = auth((req) => {
         'redirect-login-to-dashboard'
       );
     }
+    // Redirect duplicate /login route to canonical / homepage
+    if (req.nextUrl.pathname.startsWith('/login')) {
+      const url = req.nextUrl.clone();
+      url.pathname = '/';
+      return addDebugHeaders(NextResponse.redirect(url), 'redirect-login-to-canonical');
+    }
     return addDebugHeaders(NextResponse.next(), 'allow-login');
   }
 
   if (!isLoggedIn) {
     return addDebugHeaders(
-      NextResponse.redirect(new URL('/login', req.nextUrl)),
+      NextResponse.redirect(new URL('/', req.nextUrl)),
       'redirect-protected-to-login'
     );
   }

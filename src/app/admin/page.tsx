@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +9,6 @@ import {
   LogOut, ChevronDown, ChevronUp, UserSquare, Home, ShieldAlert,
   Search, Download, Users, CheckCircle2, Clock,
 } from 'lucide-react';
-
 import { signOut, useSession } from 'next-auth/react';
 
 interface UserExam {
@@ -41,8 +39,6 @@ interface ExamConfig {
   created_at: string;
   format: string | null;
 }
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function getInitial(user: ProfileWithExams) {
   return (user.full_name || user.email || '?')[0].toUpperCase();
@@ -90,7 +86,7 @@ function exportUserReport(user: ProfileWithExams) {
             if (ans && typeof ans === 'object' && 'user_answer' in ans) {
               const correct = ans.is_correct ? '✓' : '✗';
               lines.push(
-                `      ${qLabel}. ${correct}  User: ${formatAnsValue(ans.user_answer)}  | Correct: ${formatAnsValue(ans.correct_answer)}`
+                `      ${qLabel}. ${correct}  User: ${formatAnsValue(ans.user_answer)}`
               );
             } else {
               lines.push(`      ${qLabel}. ${formatAnsValue(ans)}`);
@@ -106,175 +102,14 @@ function exportUserReport(user: ProfileWithExams) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  const safeName = (user.full_name || user.email || user.id).replace(/[^a-z0-9]/gi, '_');
-  a.download = `report_${safeName}_${Date.now()}.txt`;
+  a.download = `user_report_${(user.full_name || user.email).replace(/[^a-z0-9]/gi, '_')}.txt`;
   a.click();
   URL.revokeObjectURL(url);
 }
-
-function exportAllUsersCSV(users: ProfileWithExams[]) {
-  const moduleNamesSet = new Set<string>();
-  users.forEach(user => {
-    const latestExam = user.user_exams[0];
-    if (latestExam?.detailed_results) {
-      Object.keys(latestExam.detailed_results).forEach(key => moduleNamesSet.add(key));
-    }
-  });
-  const modules = Array.from(moduleNamesSet);
-  const headers = ['Name', 'Phone', 'Email', 'Date Joined', 'Latest Score', ...modules];
-
-  const rows = users.map(user => {
-    const name = `"${(user.full_name || '').replace(/"/g, '""')}"`;
-    const phone = `"${(user.phonenumber || '').replace(/"/g, '""')}"`;
-    const email = `"${(user.email || '').replace(/"/g, '""')}"`;
-    const dateJoined = `"${new Date(user.created_at).toLocaleDateString()}"`;
-    const latestExam = user.user_exams[0];
-    const latestScoreStr = latestExam && latestExam.total_score !== null 
-      ? `${latestExam.total_score}/${latestExam.max_score}` 
-      : 'N/A';
-    const score = `"${latestScoreStr}"`;
-
-    const moduleScores = modules.map(mod => {
-      let modScoreStr = 'N/A';
-      if (latestExam?.detailed_results?.[mod]) {
-        const sectionData = latestExam.detailed_results[mod];
-        const isLegacy = Array.isArray(sectionData);
-        modScoreStr = isLegacy ? 'N/A' : `${(sectionData as any).score}/${(sectionData as any).max_score}`;
-      }
-      return `"${modScoreStr}"`;
-    });
-
-    return [name, phone, email, dateJoined, score, ...moduleScores].join(',');
-  });
-
-  const csvContent = [headers.join(','), ...rows].join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `all_users_export_${Date.now()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ─── ExpandedRow ──────────────────────────────────────────────────────────────
-
-function ExpandedRow({ user, colSpan }: { user: ProfileWithExams; colSpan: number }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="p-0 bg-slate-50 border-b border-gray-200">
-        <div className="px-6 py-5">
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">
-            Exam History — {user.full_name || user.email}
-          </h4>
-
-          {user.user_exams.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No exams taken yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {user.user_exams.map((exam, idx) => (
-                <div key={exam.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-xs">
-                  <div className="flex flex-wrap sm:flex-nowrap justify-between gap-4 mb-4 pb-3 border-b border-gray-100">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                          exam.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                        }`}>
-                          {exam.status.toUpperCase()}
-                        </span>
-                        <span className="text-xs text-gray-500 font-medium">
-                          Attempt #{idx + 1} — {new Date(exam.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-gray-400 font-mono">ID: {exam.id}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[10px] text-gray-500 uppercase font-semibold">Total Score</p>
-                      <p className="text-lg font-bold text-gray-900">
-                        {exam.total_score ?? '-'}
-                        <span className="text-gray-400 text-sm font-normal"> / {exam.max_score ?? '-'}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  {exam.detailed_results && Object.keys(exam.detailed_results).length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {Object.entries(exam.detailed_results).map(([sectionTitle, sectionData]) => {
-                        const isLegacy = Array.isArray(sectionData);
-                        const answers: any[] = isLegacy ? sectionData : (sectionData as any).answers || [];
-                        const scoreStr = isLegacy ? null : `${(sectionData as any).score} / ${(sectionData as any).max_score}`;
-
-                        return (
-                          <div key={sectionTitle} className="bg-gray-50 border border-gray-100 rounded-lg p-3">
-                            <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
-                              <p className="text-xs font-bold text-gray-700">{sectionTitle}</p>
-                              {scoreStr && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm bg-orange-100 text-orange-800">
-                                  Score: {scoreStr}
-                                </span>
-                              )}
-                            </div>
-                            {Array.isArray(answers) ? (
-                              <div className="flex flex-wrap gap-1.5">
-                                {answers.length > 0 ? answers.map((ans, qi) => {
-                                  let displayAns = '-';
-                                  let bgClass = 'bg-white border-gray-200 text-gray-700';
-                                  let titleStr: string | undefined;
-
-                                  if (ans && typeof ans === 'object' && 'user_answer' in ans) {
-                                    displayAns = formatAnsValue(ans.user_answer);
-                                    if (ans.correct_answer !== undefined) {
-                                      titleStr = `Correct: ${formatAnsValue(ans.correct_answer)}`;
-                                    }
-                                    bgClass = ans.is_correct
-                                      ? 'bg-green-50 border-green-200 text-green-700'
-                                      : 'bg-red-50 border-red-200 text-red-700';
-                                  } else {
-                                    displayAns = formatAnsValue(ans);
-                                  }
-
-                                  return (
-                                    <span
-                                      key={qi}
-                                      title={titleStr}
-                                      className={`inline-flex items-center px-2 py-0.5 border text-xs font-mono rounded whitespace-nowrap ${bgClass}`}
-                                    >
-                                      <span className="opacity-40 mr-1 font-normal">Q{qi + 1}.</span>
-                                      <span className="font-bold">{displayAns}</span>
-                                    </span>
-                                  );
-                                }) : (
-                                  <span className="text-xs text-gray-400 italic">Skipped</span>
-                                )}
-                              </div>
-                            ) : (
-                              <pre className="text-[10px] text-gray-600 overflow-x-auto">
-                                {JSON.stringify(answers, null, 2)}
-                              </pre>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400 italic">No detailed records for this attempt.</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const supabase = createClient();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [users, setUsers] = useState<ProfileWithExams[]>([]);
   const [exams, setExams] = useState<ExamConfig[]>([]);
@@ -291,23 +126,18 @@ export default function AdminPage() {
       try {
         if (!session?.user) { router.push('/login'); return; }
 
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles').select('role').eq('email', session.user.email).maybeSingle();
+        const usersRes = await fetch('/api/admin/users');
+        if (usersRes.status === 403) {
+          setIsAdmin(false);
+          setIsLoading(false);
+          return;
+        }
+        if (!usersRes.ok) throw new Error('Failed to load admin user data');
 
-        if (profileError) throw new Error(`Profile check failed: ${profileError.message}`);
-        if (!profile || profile.role !== 'admin') { setIsAdmin(false); setIsLoading(false); return; }
-
+        const usersData = await usersRes.json();
         setIsAdmin(true);
 
-        const { data: allUsers, error: fetchError } = await supabase
-          .from('profiles')
-          .select(`id, email, full_name, role, created_at, phonenumber, allow_test_limit,
-            user_exams ( id, created_at, status, total_score, max_score, detailed_results )`)
-          .order('created_at', { ascending: false });
-
-        if (fetchError) throw fetchError;
-
-        const formattedUsers = (allUsers || []).map((u : any) => ({
+        const formattedUsers = (usersData.users || []).map((u: any) => ({
           ...u,
           user_exams: (u.user_exams || []).sort(
             (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -316,12 +146,11 @@ export default function AdminPage() {
 
         setUsers(formattedUsers as ProfileWithExams[]);
 
-        const { data: examsData, error: examsError } = await supabase
-          .from('exams').select('id, title, is_active, retry_number, created_at, format')
-          .order('created_at', { ascending: false });
-
-        if (examsError) throw examsError;
-        setExams((examsData || []) as ExamConfig[]);
+        const examsRes = await fetch('/api/exams');
+        if (examsRes.ok) {
+          const examsData = await examsRes.json();
+          setExams((examsData.exams || []) as ExamConfig[]);
+        }
       } catch (err: any) {
         setError(err.message || 'An error occurred fetching data.');
       } finally {
@@ -329,7 +158,7 @@ export default function AdminPage() {
       }
     }
     checkAdminAndFetchData();
-  }, [router, supabase, session, status]);
+  }, [router, session, status]);
 
   const toggleExpand = (userId: string) =>
     setExpandedUserId(prev => (prev === userId ? null : userId));
@@ -337,13 +166,12 @@ export default function AdminPage() {
   const toggleExamActive = async (examId: string, shouldActivate: boolean) => {
     setIsUpdatingExamId(examId);
     try {
-      const targetExam = exams.find(e => e.id === examId);
-      const examFormat = targetExam?.format || 'Digital';
-
-      await supabase
-        .from('exams')
-        .update({ is_active: shouldActivate })
-        .eq('id', examId);
+      const res = await fetch(`/api/admin/exams/${examId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: shouldActivate }),
+      });
+      if (!res.ok) throw new Error('Failed to update exam state');
 
       setExams(prev =>
         prev.map(e => (e.id === examId ? { ...e, is_active: shouldActivate } : e))
@@ -366,8 +194,12 @@ export default function AdminPage() {
     
     setIsUpdatingLimit(true);
     try {
-      const { error } = await supabase.from('profiles').update({ allow_test_limit: limit }).eq('id', userId);
-      if (error) throw error;
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allow_test_limit: limit }),
+      });
+      if (!res.ok) throw new Error('Failed to update user limit');
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, allow_test_limit: limit } : u));
     } catch (err: any) {
       setError(err.message || 'Failed to update limit');
@@ -387,8 +219,12 @@ export default function AdminPage() {
 
     setIsUpdatingLimit(true);
     try {
-      const { error } = await supabase.from('profiles').update({ allow_test_limit: limit }).neq('role', 'admin');
-      if (error) throw error;
+      const res = await fetch('/api/admin/users/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allow_test_limit: limit }),
+      });
+      if (!res.ok) throw new Error('Failed to update limits');
       setUsers(prev => prev.map(u => u.role === 'admin' ? u : { ...u, allow_test_limit: limit }));
       alert(`Successfully updated test limit to ${limit} for all normal users.`);
     } catch (err: any) {
@@ -398,329 +234,244 @@ export default function AdminPage() {
     }
   };
 
-  const non_admin_users = useMemo(
-    () => users.filter(u => u.role !== 'admin'),
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return users;
+    return users.filter(u =>
+      (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.phonenumber && u.phonenumber.includes(q))
+    );
+  }, [users, searchQuery]);
+
+  const totalExamsTaken = useMemo(
+    () => users.reduce((acc, u) => acc + u.user_exams.length, 0),
+    [users]
+  );
+  const totalCompleted = useMemo(
+    () => users.reduce((acc, u) => acc + u.user_exams.filter(e => e.status === 'completed').length, 0),
     [users]
   );
 
-  const filteredUsers = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return non_admin_users;
-    return non_admin_users.filter(u =>
-      (u.full_name || '').toLowerCase().includes(q) ||
-      (u.email || '').toLowerCase().includes(q) ||
-      (u.phonenumber || '').toLowerCase().includes(q)
-    );
-  }, [non_admin_users, searchQuery]);
-
-  // ── stats ──
-  const totalCompleted = useMemo(
-    () => non_admin_users.reduce((s, u) => s + u.user_exams.filter(e => e.status === 'completed').length, 0),
-    [non_admin_users]
-  );
-
-  if (isLoading) {
+  if (isLoading || status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-[3px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+      <div className="flex h-screen items-center justify-center bg-slate-900 text-slate-100">
+        <div className="flex flex-col items-center gap-3">
+          <Clock className="h-8 w-8 animate-spin text-indigo-400" />
+          <p className="text-sm text-slate-400 font-medium">Verifying admin credentials...</p>
+        </div>
       </div>
     );
   }
 
   if (isAdmin === false) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mb-4" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-        <p className="text-gray-500 mb-6">You need admin privileges to view this page.</p>
-        <Button onClick={() => router.push('/dashboard')} className="bg-orange-500 hover:bg-orange-600 text-white">
-          <Home className="w-4 h-4 mr-2" /> Return to Dashboard
+      <div className="flex h-screen flex-col items-center justify-center bg-slate-900 px-4 text-center">
+        <div className="rounded-full bg-red-500/10 p-4 text-red-400 mb-4">
+          <ShieldAlert className="h-10 w-10" />
+        </div>
+        <h1 className="text-2xl font-bold text-slate-100">Access Denied</h1>
+        <p className="mt-2 text-sm text-slate-400 max-w-sm">
+          You do not have administrator permissions to view this control panel.
+        </p>
+        <Button onClick={() => router.push('/dashboard')} className="mt-6 gap-2 bg-indigo-600 hover:bg-indigo-500">
+          <Home className="h-4 w-4" /> Return to Dashboard
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      {/* ── Header ── */}
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className=" mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-16">
+      <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-3">
-            <UserSquare className="w-8 h-8 text-orange-500" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold">
+              <UserSquare className="h-5 w-5" />
+            </div>
             <div>
-              <h1 className="font-bold text-gray-900 text-lg">Admin Dashboard</h1>
-              <p className="text-xs text-gray-500">Manage Users and Test Results</p>
+              <h1 className="text-lg font-bold text-slate-100 leading-none">Admin Control Panel</h1>
+              <p className="text-xs text-slate-400 mt-0.5">Manage Users & Exam Permissions</p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="text-gray-600 hover:text-gray-900">
-              <Home className="w-4 h-4 mr-1.5" /> Site
+          <div className="flex items-center gap-3">
+            <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="gap-2 border-slate-700 text-slate-300 hover:bg-slate-800">
+              <Home className="h-4 w-4" /> Dashboard
             </Button>
-            <Button variant="ghost" size="sm" onClick={async () => { await signOut({ callbackUrl: '/login' }); }}
-              className="text-red-500 hover:bg-red-50 hover:text-red-600">
-              <LogOut className="w-4 h-4 mr-1.5" /> Logout
+            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: '/login' })} className="gap-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+              <LogOut className="h-4 w-4" /> Sign out
             </Button>
           </div>
         </div>
       </header>
 
-      <main className=" mx-auto px-6 py-4 space-y-6">
+      <main className="mx-auto max-w-7xl px-6 pt-8 space-y-8">
+        {error && (
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400 flex items-center justify-between">
+            <span>{error}</span>
+            <Button size="sm" variant="ghost" onClick={() => setError(null)} className="h-auto p-1 text-red-400 hover:bg-red-500/20">✕</Button>
+          </div>
+        )}
 
-        {/* ── Stat Pills ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-3">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-orange-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Total Users</p>
-              <p className="text-xl font-bold text-gray-900">{non_admin_users.length}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Completed Exams</p>
-              <p className="text-xl font-bold text-gray-900">{totalCompleted}</p>
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 shadow-sm col-span-2 sm:col-span-1">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 font-medium">Active Exam</p>
-              <p className="text-sm font-semibold text-gray-900 truncate max-w-[160px]">
-                {exams.find(e => e.is_active)?.title ?? 'None'}
-              </p>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Registered Users</CardTitle>
+              <Users className="h-4 w-4 text-indigo-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{users.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Attempts Initiated</CardTitle>
+              <Clock className="h-4 w-4 text-amber-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{totalExamsTaken}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-slate-800 bg-slate-900/60">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Exams Completed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">{totalCompleted}</div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* ── Exam Activation ── */}
-        <Card className="border-gray-200 shadow-sm py-2">
-          <CardHeader className="pb-1">
-            <CardTitle>Exam Activation</CardTitle>
-            <CardDescription>Only one exam should be active at a time for students.</CardDescription>
+        <Card className="border-slate-800 bg-slate-900/60">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold text-white">Global Exam Activation Settings</CardTitle>
+            <CardDescription className="text-xs text-slate-400">Toggle which exams are enabled for student selection.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {exams.length === 0 ? (
-                <p className="text-sm text-gray-500">No exams found in the database.</p>
-              ) : (
-                exams.map((exam) => {
-                  const disabled = isUpdatingExamId === exam.id;
-                  return (
-                    <div key={exam.id}
-                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-gray-200 bg-white p-4">
-                      <div>
-                        <p className="font-semibold text-gray-900">{exam.title}</p>
-                        <p className="text-xs text-gray-400 font-mono">ID: {exam.id}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">Retry limit: {exam.retry_number ?? 'No limit'}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs font-semibold px-2 py-1 rounded-full border ${
-                          exam.is_active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'
-                        }`}>
-                          {exam.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                        <Button size="sm" disabled={disabled}
-                          variant={exam.is_active ? 'outline' : 'default'}
-                          onClick={() => toggleExamActive(exam.id, !exam.is_active)}>
-                          {disabled ? 'Updating…' : exam.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
+            <div className="divide-y divide-slate-800">
+              {exams.map(exam => (
+                <div key={exam.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <div className="font-medium text-sm text-slate-200">{exam.title}</div>
+                    <div className="text-xs text-slate-500">Format: {exam.format || 'Digital'} • Retry Limit: {exam.retry_number ?? 'Default'}</div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={exam.is_active ? "default" : "outline"}
+                    disabled={isUpdatingExamId === exam.id}
+                    onClick={() => toggleExamActive(exam.id, !exam.is_active)}
+                    className={exam.is_active ? "bg-emerald-600 hover:bg-emerald-500" : "border-slate-700 text-slate-400"}
+                  >
+                    {exam.is_active ? 'Active' : 'Disabled'}
+                  </Button>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* ── Error Banner ── */}
-        {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+        <Card className="border-slate-800 bg-slate-900/60">
+          <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <p className="font-bold">Failed to load data</p>
-              <p className="text-sm opacity-90">{error}</p>
+              <CardTitle className="text-base font-semibold text-white">Registered Users & Test Limits</CardTitle>
+              <CardDescription className="text-xs text-slate-400">Review student activity and adjust exam limits.</CardDescription>
             </div>
-          </div>
-        )}
-
-        {/* ── User Table ── */}
-        <div>
-          {/* Table header row */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Platform Users</h2>
-              <p className="text-sm text-gray-400 mt-0.5">
-                Showing {filteredUsers.length} of {non_admin_users.length} users
-              </p>
-            </div>
-            {/* Actions & Search */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <div className="flex items-center gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                 <input
                   type="text"
-                  placeholder="Search name, email, phone…"
+                  placeholder="Search user..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 h-9 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
+                  className="w-full rounded-lg bg-slate-800/80 border border-slate-700 pl-9 pr-3 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto h-9 text-gray-600 hover:text-blue-600 hover:border-blue-300 flex items-center justify-center gap-2"
-                onClick={updateAllUsersLimit}
-                disabled={isUpdatingLimit}
-                title="Change test limit for all users"
-              >
-                <Users className="w-4 h-4" />
-                <span className="text-sm">Set All Limits</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto h-9 text-gray-600 hover:text-orange-600 hover:border-orange-300 flex items-center justify-center gap-2"
-                onClick={() => exportAllUsersCSV(filteredUsers)}
-                title="Export filtered users as CSV"
-              >
-                <Download className="w-4 h-4" />
-                <span className="text-sm">Export CSV</span>
+              <Button size="sm" onClick={updateAllUsersLimit} disabled={isUpdatingLimit} className="bg-indigo-600 hover:bg-indigo-500 text-xs">
+                Set Global Limit
               </Button>
             </div>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          </CardHeader>
+          <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50">
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">User</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap hidden md:table-cell">Phone</th>
-                    <th className="text-left px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap hidden sm:table-cell">Joined</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Limit</th>
-                    <th className="text-center px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Exams</th>
-                    <th className="text-right px-4 py-3 font-semibold text-gray-500 text-xs uppercase tracking-wider whitespace-nowrap">Actions</th>
+              <table className="w-full text-left text-xs text-slate-300">
+                <thead className="border-b border-slate-800 bg-slate-900/80 uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="p-3">User</th>
+                    <th className="p-3">Role</th>
+                    <th className="p-3">Phone</th>
+                    <th className="p-3">Attempts Used</th>
+                    <th className="p-3">Allowed Limit</th>
+                    <th className="p-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center py-12 text-gray-400 text-sm italic">
-                        {searchQuery ? 'No users match your search.' : 'No users found.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredUsers.map((user) => {
-                      const isExpanded = expandedUserId === user.id;
-                      const completedExams = user.user_exams.filter(e => e.status === 'completed');
-                      const latestScore = user.user_exams[0];
-
-                      return (
-                        <Fragment key={user.id}>
-                          <tr
-                            key={user.id}
-                            className={`border-b border-gray-100 hover:bg-orange-50/40 transition-colors cursor-pointer ${isExpanded ? 'bg-orange-50/30' : ''}`}
-                            onClick={() => toggleExpand(user.id)}
-                          >
-                            {/* User */}
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-xs font-bold shrink-0">
-                                  {getInitial(user)}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-gray-900 truncate max-w-[180px]">
-                                    {user.full_name || 'No Name'}
-                                  </p>
-                                  <p className="text-xs text-gray-400 truncate max-w-[180px]">{user.email}</p>
-                                </div>
+                <tbody className="divide-y divide-slate-800/60">
+                  {filteredUsers.map(user => (
+                    <Fragment key={user.id}>
+                      <tr className="hover:bg-slate-800/40">
+                        <td className="p-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 font-semibold text-indigo-400">
+                              {getInitial(user)}
+                            </div>
+                            <div>
+                              <div className="font-medium text-slate-200">{user.full_name || 'N/A'}</div>
+                              <div className="text-slate-500 text-[11px]">{user.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className={user.role === 'admin' ? 'bg-indigo-600' : 'bg-slate-800 text-slate-400'}>
+                            {user.role || 'user'}
+                          </Badge>
+                        </td>
+                        <td className="p-3 text-slate-400">{user.phonenumber || '-'}</td>
+                        <td className="p-3 font-semibold">{user.user_exams.length}</td>
+                        <td className="p-3 font-semibold text-indigo-400">{user.allow_test_limit}</td>
+                        <td className="p-3 text-right space-x-2">
+                          <Button size="sm" variant="ghost" onClick={() => updateUserLimit(user.id, user.allow_test_limit)} disabled={isUpdatingLimit} className="text-slate-400 hover:text-white">
+                            Edit Limit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => exportUserReport(user)} className="border-slate-700 text-slate-300">
+                            <Download className="h-3.5 w-3.5 mr-1" /> Export
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => toggleExpand(user.id)} className="text-slate-400">
+                            {expandedUserId === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </td>
+                      </tr>
+                      {expandedUserId === user.id && (
+                        <tr>
+                          <td colSpan={6} className="bg-slate-900/90 p-4">
+                            <h4 className="font-semibold text-xs text-slate-400 uppercase tracking-wider mb-2">Exam History ({user.user_exams.length})</h4>
+                            {user.user_exams.length === 0 ? (
+                              <p className="text-xs text-slate-500">No exam attempts recorded.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {user.user_exams.map(exam => (
+                                  <div key={exam.id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-xs">
+                                    <div>
+                                      <span className="font-medium text-slate-300">Date: {new Date(exam.created_at).toLocaleString()}</span>
+                                      <span className="ml-3 text-slate-500">Status: {exam.status}</span>
+                                    </div>
+                                    <div className="font-semibold text-indigo-400">
+                                      Score: {exam.total_score ?? '-'} / {exam.max_score ?? '-'}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                            </td>
-
-                            {/* Phone */}
-                            <td className="px-4 py-3 hidden md:table-cell">
-                              <span className="text-xs text-gray-600 font-mono">
-                                {user.phonenumber || <span className="text-gray-300">—</span>}
-                              </span>
-                            </td>
-
-                            {/* Joined */}
-                            <td className="px-4 py-3 hidden sm:table-cell">
-                              <span className="text-xs text-gray-500">
-                                {new Date(user.created_at).toLocaleDateString()}
-                              </span>
-                            </td>
-
-                            {/* Limit */}
-                            <td className="px-4 py-3 text-center">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); updateUserLimit(user.id, user.allow_test_limit); }}
-                                disabled={isUpdatingLimit}
-                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                                title="Click to change limit"
-                              >
-                                {user.allow_test_limit ?? 1}
-                              </button>
-                            </td>
-
-                            {/* Exams */}
-                            <td className="px-4 py-3 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="text-green-600 font-bold">{completedExams.length}</span>
-                                <span className="text-gray-400 text-xs">/ {user.user_exams.length}</span>
-                              </div>
-                              {latestScore && latestScore.total_score !== null && (
-                                <Badge variant="outline" className="text-[10px] mt-0.5 border-orange-200 text-orange-700 bg-orange-50">
-                                  {latestScore.total_score}/{latestScore.max_score}
-                                </Badge>
-                              )}
-                            </td>
-
-                            {/* Actions */}
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2.5 text-xs text-gray-600 hover:text-orange-600 hover:border-orange-300 gap-1"
-                                  onClick={() => exportUserReport(user)}
-                                  title="Export report"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                  <span className="hidden sm:inline">Export</span>
-                                </Button>
-                                <button
-                                  className="w-7 h-7 flex items-center justify-center rounded-md bg-gray-100 hover:bg-gray-200 transition-colors"
-                                  onClick={() => toggleExpand(user.id)}
-                                  aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                                >
-                                  {isExpanded
-                                    ? <ChevronUp className="w-4 h-4 text-gray-500" />
-                                    : <ChevronDown className="w-4 h-4 text-gray-500" />}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-
-                          {/* Expanded detail row */}
-                          {isExpanded && (
-                            <ExpandedRow key={`${user.id}-expanded`} user={user} colSpan={6} />
-                          )}
-                        </Fragment>
-                      );
-                    })
-                  )}
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
