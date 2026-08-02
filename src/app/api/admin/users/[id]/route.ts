@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminUpdateUserLimit } from '@/lib/data/admin-data';
+import { adminUpdateUserProfile } from '@/lib/data/admin-data';
 
 export async function PATCH(
   request: Request,
@@ -7,13 +7,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { allow_test_limit } = await request.json();
-
-    if (typeof allow_test_limit !== 'number') {
-      return NextResponse.json({ error: 'allow_test_limit number is required' }, { status: 400 });
-    }
-
-    const user = await adminUpdateUserLimit(id, allow_test_limit);
+    const updates: unknown = await request.json();
+    const user = await adminUpdateUserProfile(id, updates);
     return NextResponse.json({ user });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';
@@ -22,6 +17,9 @@ export async function PATCH(
     }
     if (message === 'FORBIDDEN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (message === 'INVALID_PROFILE_UPDATE') {
+      return NextResponse.json({ error: 'Invalid profile update' }, { status: 400 });
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }
