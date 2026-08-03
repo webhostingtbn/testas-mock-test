@@ -12,6 +12,7 @@ import type { Profile, ModuleTestType, Exam } from '@/lib/types';
 import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
+import { usePracticeStore } from '@/lib/store/practice-store';
 
 interface PastExam {
   id: string;
@@ -132,6 +133,9 @@ export function useDashboardData(session: Session) {
           const attemptsJson = await attemptsRes.json();
           setPastExams((attemptsJson.attempts || []) as PastExam[]);
         }
+
+        // Prefetch practice data silently in the background
+        usePracticeStore.getState().fetchPracticeData();
       } catch (e) {
         console.error('[DashboardClient] Failed loading profile or exams:', e);
         await signOut({ callbackUrl: '/login' });

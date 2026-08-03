@@ -6,6 +6,7 @@ import { KniButton } from '@/components/KniPrimitives';
 import SecurityOverlay from '@/components/exam/SecurityOverlay';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
+import { usePracticeStore } from '@/lib/store/practice-store';
 
 interface PracticeQuestion {
   id: string;
@@ -95,6 +96,8 @@ export default function PracticeSession({
     }
   }, [timeRemaining, timerActive]);
 
+  const updateRating = usePracticeStore((state) => state.updateRating);
+
   const handleRatingSelect = async (difficulty: 'easy' | 'medium' | 'hard') => {
     if (!currentItem || timeRemaining <= 0) return;
 
@@ -107,14 +110,7 @@ export default function PracticeSession({
           ? currentItem.questions.map((childQ) => childQ.id)
           : [currentItem.id];
 
-        for (const qId of questionIdsToSync) {
-          await fetch(`/api/practice/${qId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ difficulty }),
-          });
-        }
-
+        await updateRating(questionIdsToSync, difficulty);
         onQuestionRated();
       } catch (err) {
         console.error('Failed to sync difficulty rating during practice:', err);

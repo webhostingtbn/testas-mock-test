@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
 import PracticeSession from './PracticeSession';
+import { usePracticeStore } from '@/lib/store/practice-store';
 
 interface PracticeViewProps {
   profile: Profile | null;
@@ -46,11 +47,20 @@ interface DifficultySegment {
 
 export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
   const imageService = useMemo(() => new ImageService(), []);
-  const [loading, setLoading] = useState(true);
-  const [sections, setSections] = useState<any[]>([]);
-  const [questions, setQuestions] = useState<any[]>([]);
-  const [userRatings, setUserRatings] = useState<Record<string, 'easy' | 'medium' | 'hard'>>({});
-  const [userPracticeDates, setUserPracticeDates] = useState<Set<string>>(new Set());
+  const {
+    sections,
+    questions,
+    userRatings,
+    userPracticeDates: userPracticeDatesList,
+    isLoaded,
+    isLoading,
+    fetchPracticeData,
+  } = usePracticeStore();
+
+  const userPracticeDates = useMemo(
+    () => new Set(userPracticeDatesList),
+    [userPracticeDatesList]
+  );
 
   const isPaper = (profile?.format || 'Digital').toLowerCase() === 'paper';
 
@@ -358,7 +368,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   const sectionIdToExamTitle = useMemo(() => {
     const mapping: Record<string, string> = {};
     sections.forEach((s) => {
-      const examTitle = s.exams?.title || (Array.isArray(s.exams) ? s.exams[0]?.title : undefined);
+      const examTitle = Array.isArray(s.exams) ? s.exams[0]?.title : s.exams?.title;
       if (examTitle) {
         mapping[s.id] = examTitle;
       }
@@ -366,42 +376,11 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     return mapping;
   }, [sections]);
 
-  const loadPracticeData = useCallback(async () => {
-    if (!profile) return;
-    setLoading(true);
-    try {
-      const res = await fetch('/api/practice');
-      if (!res.ok) throw new Error('Failed to fetch practice data');
-      const data = await res.json();
-
-      setSections(data.sections || []);
-      const qData = data.questions || [];
-      setQuestions(qData);
-
-      const rData = data.userPractices || [];
-      const ratingMap: Record<string, 'easy' | 'medium' | 'hard'> = {};
-      const dateSet = new Set<string>();
-
-      rData.forEach((row: any) => {
-        ratingMap[row.question_id] = row.difficulty as 'easy' | 'medium' | 'hard';
-        if (row.updated_at) {
-          const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
-          dateSet.add(dateStr);
-        }
-      });
-
-      setUserRatings(ratingMap);
-      setUserPracticeDates(dateSet);
-    } catch (err) {
-      console.error('Failed to load practice data:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [profile]);
-
   useEffect(() => {
-    loadPracticeData();
-  }, [loadPracticeData]);
+    if (profile) {
+      fetchPracticeData();
+    }
+  }, [profile, fetchPracticeData]);
 
   const practiceSubtest = filteredSubtests[0] ?? null;
 
@@ -433,12 +412,10 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
         return;
       }
 
-      const res = await fetch('/api/practice');
-      if (!res.ok) throw new Error('Failed to load practice questions');
-      const data = await res.json();
-      const allQ = (data.questions || []).filter((q: any) => targetIds.includes(q.id));
+      const targetSet = new Set(targetIds);
+      const allQ = questions.filter((q) => targetSet.has(q.id));
 
-      const resolved = await imageService.resolveQuestionImageUrls(allQ);
+      const resolved = await imageService.resolveQuestionImageUrls(allQ as any);
       setPracticeQuestions(resolved);
     } catch (err) {
       console.error('Failed to load practice questions:', err);
@@ -495,7 +472,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
         userEmail={profile?.email || ''}
         userFullName={profile?.full_name}
         onExit={handleExitPracticeSession}
-        onQuestionRated={loadPracticeData}
+        onQuestionRated={() => fetchPracticeData({ force: true })}
         isPaper={isPaper}
         isPracticeOnly={true}
       />
@@ -537,7 +514,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     );
   }
 
-  if (loading) {
+  if (!isLoaded && isLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="size-12 animate-spin rounded-full border-4 border-slate-200 border-t-orange-500"></div>
