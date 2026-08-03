@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import {
   ClipboardCheck, Check, X, Timer, FileText, ShieldCheck,
   Wifi, Volume2, Maximize2, Calculator, ChevronRight, FilePenLine, Laptop,
-  ArrowLeft
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
@@ -65,16 +64,12 @@ export function MockTestView({
 
   // Synchronize back navigation in the header
   useEffect(() => {
-    if (!onBackNavigation) return;
+    if (!onBackNavigation || showSelection) return;
 
-    if (!showSelection) {
-      onBackNavigation({
-        label: 'Back to Tests',
-        onBack: () => setShowSelection(true)
-      });
-    } else {
-      onBackNavigation(undefined);
-    }
+    onBackNavigation({
+      label: 'Back to Tests',
+      onBack: () => setShowSelection(true)
+    });
 
     return () => {
       onBackNavigation(undefined);
@@ -93,6 +88,7 @@ export function MockTestView({
         selectedTestHistory={selectedTestHistory}
         onStartBriefing={() => setShowSelection(false)}
         onResumeAttempt={onResumeAttempt}
+        onBackNavigation={onBackNavigation}
       />
     );
   }
@@ -102,17 +98,17 @@ export function MockTestView({
   const isAttemptLimitReached = selectedAttemptInfo.limitReached;
 
   return (
-    <div className="h-full w-full mx-auto overflow-hidden">
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] h-full">
-        <section className="flex min-w-0 flex-col gap-4 h-full overflow-hidden">
-          <KniCard className="overflow-y-auto p-0">
-            <div className="border-b border-slate-100 bg-slate-50/50 p-6">
-              <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600">
+    <div className="mx-auto w-full pb-6 xl:h-full xl:pb-0">
+      <div className="grid gap-4 xl:h-full xl:grid-cols-[minmax(0,1.15fr)_minmax(340px,0.85fr)] xl:gap-6">
+        <section className="flex min-w-0 flex-col gap-4 xl:h-full xl:overflow-hidden">
+          <KniCard className="p-0 xl:overflow-y-auto">
+            <div className="border-b border-slate-100 bg-slate-50/50 p-4 sm:p-6">
+              <div className="mb-4 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 sm:text-xs sm:tracking-[0.16em]">
                   <ClipboardCheck className="size-3.5" />
                   Mock Test Briefing
                 </span>
-                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold uppercase tracking-[0.16em] transition ${isEligible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition sm:text-xs sm:tracking-[0.16em] ${isEligible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
                   {isEligible ? (
                     <>
                       <Check className="size-3.5" />
@@ -126,18 +122,18 @@ export function MockTestView({
                   )}
                 </span>
               </div>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex gap-3 sm:items-center sm:gap-4">
                 <div className="grid size-12 shrink-0 place-items-center rounded-full bg-orange-50 text-orange-600 shadow-xs">
                   {selectedExam.format === 'Paper' ? <FilePenLine className="size-6" /> : <Laptop className="size-6"/>}
                 </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-600 sm:text-xs sm:tracking-[0.18em]">
                     {selectedExam.major ? MODULE_TEST_LABELS[selectedExam.major] : "Core Module"}
                   </p>
-                  <h2 className="mt-0.5 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  <h2 className="mt-0.5 break-words text-xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
                     {selectedExam.title}
                   </h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                  <p className="mt-1 text-sm leading-5 text-slate-500 sm:leading-6">
                     {selectedAttemptInfo.attemptCount > 0 && selectedAttemptInfo.bestScore !== null ? (
                       `Your best score is ${selectedAttemptInfo.bestPercentage}%. Review the setup below before beginning a timed attempt.`
                     ) : (
@@ -147,18 +143,18 @@ export function MockTestView({
                 </div>
               </div>
             </div>
-            <div className="p-6">
-              <div className="mb-3 flex items-end justify-between gap-3">
+            <div className="p-4 sm:p-6">
+              <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Preparation checklist</p>
                   <h3 className="text-xl font-black tracking-tight text-slate-950">Get ready to focus</h3>
                   <p className="text-xs font-medium text-orange-600 mt-0.5 animate-pulse">Click each requirement below to confirm.</p>
                 </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-[0.16em] ${briefingChecklist.length === 5 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200/35' : 'bg-amber-500/10 text-amber-700 border border-amber-200/35'}`}>
+                <span className={`w-fit shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] sm:text-xs sm:tracking-[0.16em] ${briefingChecklist.length === 5 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200/35' : 'bg-amber-500/10 text-amber-700 border border-amber-200/35'}`}>
                   {briefingChecklist.length} of 5 ready
                 </span>
               </div>
-              <div className="grid gap-3">
+              <div className="grid gap-2.5 sm:gap-3">
                 {CHECKLIST_ITEMS.map(item => {
                   const checked = briefingChecklist.includes(item.id);
                   const Icon = item.icon;
@@ -168,19 +164,19 @@ export function MockTestView({
                       type="button"
                       aria-pressed={checked}
                       onClick={() => onToggleChecklistItem(item.id)}
-                      className={`group flex w-full items-start gap-3 rounded-2xl border py-3 px-4 text-left transition cursor-pointer ${
+                      className={`group flex min-h-18 w-full items-start gap-3 rounded-2xl border px-3 py-3 text-left transition cursor-pointer sm:px-4 ${
                         checked
                           ? 'border-emerald-200 bg-emerald-50/80 shadow-xs'
                           : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50'
                       }`}
                     >
-                      <span className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl transition ${
+                      <span className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl transition sm:size-10 ${
                         checked ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-600'
                       }`}>
                         <Icon className="size-5" />
                       </span>
                       <span className="min-w-0 flex-1 self-center">
-                        <span className={`block text-sm font-black transition ${checked ? 'text-emerald-800' : 'text-slate-900'}`}>{item.label}</span>
+                        <span className={`block text-sm font-black leading-tight transition ${checked ? 'text-emerald-800' : 'text-slate-900'}`}>{item.label}</span>
                         <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{item.description}</span>
                       </span>
                       <div className="flex items-center justify-center shrink-0 self-center">
@@ -200,7 +196,7 @@ export function MockTestView({
           </KniCard>
         </section>
 
-        <aside className="flex min-w-0 flex-col gap-6">
+        <aside className="flex min-w-0 flex-col gap-4 xl:gap-6">
           {/* Change Test Button */}
           {/* <div className="flex justify-center">
             <KniButton
@@ -213,7 +209,7 @@ export function MockTestView({
             </KniButton>
           </div> */}
 
-          <KniCard className="p-5 sm:p-6">
+          <KniCard className="p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">Attempt overview</p>
@@ -224,7 +220,7 @@ export function MockTestView({
               </div>
             </div>
 
-            <div className="divide-y divide-slate-100 mt-5">
+            <div className="mt-4 divide-y divide-slate-100 sm:mt-5">
               <div className="flex items-center justify-between gap-4 py-2.5 first:pt-0">
                 <span className="text-xs font-medium text-slate-500">Sections</span>
                 <span className="text-right text-xs font-black text-slate-950">
@@ -276,7 +272,7 @@ export function MockTestView({
 
 
 
-          <KniCard className="p-5 sm:p-6">
+          <KniCard className="p-4 sm:p-6">
             <div className={`rounded-2xl border p-4 ${isEligible ? 'border-emerald-200 bg-emerald-50/70' : 'border-rose-200 bg-rose-50/70'}`}>
               <div className="flex items-start gap-3">
                 <div className={`grid size-9 shrink-0 place-items-center rounded-xl ${isEligible ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>

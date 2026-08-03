@@ -247,22 +247,22 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     : 0;
 
   return (
-    <div className="w-full h-full mx-auto overflow-auto flex flex-col">
-      <div className="mb-6">
-        <p className="text-sm text-slate-500">
+    <div className="mx-auto flex h-auto w-full flex-col overflow-visible lg:h-full lg:overflow-auto">
+      <div className="mb-4 sm:mb-6">
+        <p className="text-sm leading-6 text-slate-500">
           Format: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || 'Digital'}</span> • Completed on {dateCompletedStr}
         </p>
       </div>
 
       {/* Score Summary Card */}
-      <KniCard className="p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <KniCard className="mb-4 rounded-2xl p-4 sm:mb-6 sm:p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center md:gap-6">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:tracking-[0.18em]">
               Score Summary
             </p>
             <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-black tracking-tight text-slate-950">
+              <span className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
                 {selectedAttempt.total_score ?? 0}
               </span>
               <span className="text-lg text-slate-400 font-medium">/ {selectedAttempt.max_score ?? 0}</span>
@@ -279,11 +279,11 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                 {overallPercentage}%
               </span>
             </div>
-            <p className="text-sm text-slate-500 mt-3">
+            <p className="mt-3 text-sm leading-6 text-slate-500">
               You correctly answered <span className="font-bold text-slate-900">{selectedAttempt.total_score}</span> questions out of <span className="font-bold text-slate-900">{selectedAttempt.max_score}</span> total questions.
             </p>
           </div>
-          <div className="flex items-center gap-3 min-w-[180px]">
+          <div className="flex min-w-0 items-center gap-3 sm:min-w-[180px]">
             <div className="flex-1">
               <KniProgress
                 value={overallPercentage}
@@ -293,8 +293,8 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                 Performance
               </span>
             </div>
-            <div className="w-px h-10 bg-slate-100 md:block hidden" />
-            <div className="flex flex-col gap-1 min-w-[120px]">
+            <div className="hidden h-10 w-px bg-slate-100 md:block" />
+            <div className="hidden min-w-[120px] flex-col gap-1 md:flex">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Calendar className="size-3.5" />
                 <span className="font-medium">Completed</span>
@@ -308,8 +308,8 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
       </KniCard>
 
         {/* Progression Chart Card */}
-      <KniCard className="p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
+      <KniCard className="mb-4 rounded-2xl p-4 sm:mb-6 sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600 mb-1">
               Score Progression

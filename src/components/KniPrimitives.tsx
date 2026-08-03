@@ -525,7 +525,7 @@ export function KniShell({
             parentViewLabel={backNavigation?.label}
           />
           <main className="relative z-10 flex-1 bg-[#fbfaf8] p-5 min-h-0">
-            <div className="h-full overflow-y-auto custom-scrollbar">
+            <div className="h-[calc(100vh-180px)] sm:h-full overflow-y-auto custom-scrollbar">
               {children}
             </div>
           </main>

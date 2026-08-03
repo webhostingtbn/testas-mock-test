@@ -1,10 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Award,
   BookOpen,
   Box,
@@ -29,6 +28,7 @@ interface TestSelectionViewProps {
   selectedTestHistory: ExamAttemptReview[];
   onStartBriefing: () => void;
   onResumeAttempt: (attempt: ExamAttemptReview) => void;
+  onBackNavigation?: (nav: { label: string; onBack: () => void } | undefined) => void;
 }
 
 interface ExamDisplayInfo {
@@ -62,10 +62,26 @@ export function TestSelectionView({
   selectedTestHistory,
   onStartBriefing,
   onResumeAttempt,
+  onBackNavigation,
 }: TestSelectionViewProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress'>('all');
   const [mobileView, setMobileView] = useState<'list' | 'dashboard'>('list');
+
+  useEffect(() => {
+    if (!onBackNavigation) return;
+
+    if (mobileView === 'dashboard') {
+      onBackNavigation({
+        label: 'Back to Tests',
+        onBack: () => setMobileView('list'),
+      });
+    } else {
+      onBackNavigation(undefined);
+    }
+
+    return () => onBackNavigation(undefined);
+  }, [mobileView, onBackNavigation]);
 
   const activeExams = useMemo(() => exams.filter((exam) => exam.is_active), [exams]);
 
@@ -195,9 +211,8 @@ export function TestSelectionView({
   const latestCompleted = completedAttempts[completedAttempts.length - 1] ?? null;
 
   return (
-    <div className="h-full w-full mx-auto overflow-hidden">
-      <div className="grid gap-6 lg:grid-cols-[300px_1fr] xl:grid-cols-[360px_1fr] h-full">
-        <div className={`flex flex-col gap-4 overflow-hidden rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-0 lg:max-h-[calc(100vh-120px)] min-h-0 ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
+    <div className="mx-auto grid min-h-0 w-full max-w-full gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:gap-6 lg:pb-0 xl:grid-cols-[360px_1fr]">
+        <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-0 lg:max-h-[calc(100vh-120px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-950">Available Tests</h2>
             <p className="mt-1 text-xs text-slate-500">Choose an active test to view details or start.</p>
@@ -219,7 +234,7 @@ export function TestSelectionView({
             ))}
           </div> */}
 
-          <div className="flex max-h-[400px] flex-col gap-3 overflow-y-auto pr-1 lg:max-h-[calc(100vh-280px)]">
+          <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100vh-280px)] lg:overflow-y-auto lg:pr-1">
             {filteredExams.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center">
                 <p className="text-xs font-semibold text-slate-500">No tests match this filter</p>
@@ -287,23 +302,15 @@ export function TestSelectionView({
         </div>
 
         {selectedExam && (
-          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} flex-col gap-6 rounded-xl border border-slate-100 bg-white p-6 shadow-sm transition duration-200 min-w-0 min-h-0 w-full`}>
-            <button
-              onClick={() => setMobileView('list')}
-              className="mb-2 flex cursor-pointer items-center gap-1.5 text-sm font-black text-slate-550 transition hover:text-slate-800 lg:hidden"
-            >
-              <ArrowLeft className="size-4" />
-              Back to Tests
-            </button>
-
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="text-3xl font-black tracking-tight text-slate-950">
+          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} min-h-0 w-full min-w-0 flex-col gap-5 bg-white px-5 py-5 transition duration-200 lg:gap-6 rounded-xl lg:border lg:border-slate-100 lg:p-6 lg:shadow-sm`}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h1 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
                 {selectedExam.title}
               </h1>
 
               <KniButton
                 onClick={onStartBriefing}
-                className="flex h-11 items-center gap-1.5 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-md shadow-orange-500/20 transition cursor-pointer hover:bg-orange-500"
+                className="flex h-11 w-full items-center gap-1.5 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-sm shadow-orange-500/20 transition cursor-pointer hover:bg-orange-500 sm:w-auto"
               >
                 <PlayCircle className="size-4.5" />
                 Start Test
@@ -342,7 +349,6 @@ export function TestSelectionView({
             )}
           </div>
         )}
-      </div>
     </div>
   );
 }
