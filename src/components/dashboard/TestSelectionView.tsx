@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { KniButton, KniCard } from '@/components/KniPrimitives';
 import type { Exam, Profile } from '@/lib/types';
+import { isFullCompletion, isResumableAttempt } from '@/lib/types';
 import { ReviewView, type ExamAttemptReview } from './ReviewView';
 
 interface TestSelectionViewProps {
@@ -83,11 +84,19 @@ export function TestSelectionView({
     return () => onBackNavigation(undefined);
   }, [mobileView, onBackNavigation]);
 
-  const activeExams = useMemo(() => exams.filter((exam) => exam.is_active), [exams]);
+  const activeExams = useMemo(() => {
+    return exams.filter((exam) => {
+      if (exam.is_active === false) return false;
+      if (profile?.format) {
+        return (exam.format || '').toLowerCase() === profile.format.toLowerCase();
+      }
+      return true;
+    });
+  }, [exams, profile]);
 
   const getExamDisplayInfo = useCallback((exam: Exam): ExamDisplayInfo => {
     const attempts = pastExams.filter((attempt) => attempt.exam_id === exam.id);
-    const hasCompleted = attempts.some((attempt) => attempt.status === 'completed');
+    const hasCompleted = attempts.some((attempt) => isFullCompletion({ status: attempt.status ?? '', completion_reason: attempt.completion_reason }));
     const hasStarted = attempts.length > 0;
 
     const sections = exam.sections || [];
@@ -100,7 +109,7 @@ export function TestSelectionView({
 
     let bestPct = 0;
     attempts.forEach((attempt) => {
-      if (attempt.status === 'completed' && attempt.total_score !== null && attempt.max_score) {
+      if (isFullCompletion({ status: attempt.status ?? '', completion_reason: attempt.completion_reason }) && attempt.total_score !== null && attempt.max_score) {
         const pct = Math.round((attempt.total_score / attempt.max_score) * 100);
         if (pct > bestPct) bestPct = pct;
       }
@@ -120,7 +129,7 @@ export function TestSelectionView({
       duration,
       questions,
       hasCompleted,
-      isInProgress: hasStarted && !hasCompleted,
+      isInProgress: attempts.some((attempt) => isResumableAttempt({ status: attempt.status ?? '' })),
       bestPct,
       progressPct,
     };

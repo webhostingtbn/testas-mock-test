@@ -335,7 +335,7 @@ export function AdminUsersPanel() {
   }
 
   return (
-    <div className="mx-auto">
+    <div className="mx-auto w-full">
       <div className="mb-6">
         <p className="text-sm font-medium text-orange-700">Admin Panel</p>
         <h2 className="mt-1 text-3xl font-bold text-slate-900">Platform Management</h2>

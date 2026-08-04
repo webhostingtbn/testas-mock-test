@@ -1,5 +1,5 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -9,6 +9,7 @@ import {
   filterSections,
 } from '@/lib/constants';
 import type { Profile, ModuleTestType, Exam } from '@/lib/types';
+import { isFullCompletion } from '@/lib/types';
 import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
@@ -19,6 +20,8 @@ interface PastExam {
   user_id: string;
   exam_id: string;
   status: string;
+  completion_reason?: string | null;
+  answered_count?: number | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -34,6 +37,11 @@ interface PastExam {
     label: string;
     correct: number;
     total: number;
+    answers: Array<{
+      question_id: string;
+      is_correct: boolean;
+      is_answered: boolean;
+    }>;
   }>;
 }
 
@@ -123,7 +131,12 @@ export function useDashboardData(session: Session) {
           const loadedExams = (examsJson.exams || []) as Exam[];
           setExams(loadedExams);
           setExamLimit(realProfile.role === 'admin' ? null : realProfile.allow_test_limit ?? 1);
-          if (loadedExams.length > 0) {
+          const matchingExams = loadedExams.filter((e) =>
+            !realProfile.format || (e.format || '').toLowerCase() === realProfile.format.toLowerCase()
+          );
+          if (matchingExams.length > 0) {
+            setSelectedExam(matchingExams[0]);
+          } else if (loadedExams.length > 0) {
             setSelectedExam(loadedExams[0]);
           }
         }
@@ -190,7 +203,7 @@ export function useDashboardData(session: Session) {
         const examData = await res.json();
         const dbSections = examData.sections || [];
 
-        const isPaper = currentExam.format === 'Paper';
+        const isPaper = typeof currentExam.format === 'string' && currentExam.format.toLowerCase() === 'paper';
         const { coreSections: coreSectionsMatched, moduleSections: moduleSectionsMatched } = filterSections(dbSections, isPaper, activeModule);
         const allMatchedSections = [...coreSectionsMatched, ...moduleSectionsMatched];
         const sectionsCount = allMatchedSections.length;
@@ -312,7 +325,8 @@ export function useDashboardData(session: Session) {
     let bestScore = null;
     let maxScore = null;
     let bestPercentage = 0;
-    attempts.forEach((pe) => {
+    // Only consider full completions for best score
+    attempts.filter((pe) => isFullCompletion(pe)).forEach((pe) => {
       if (pe.total_score !== null && pe.max_score) {
         const pct = Math.round((pe.total_score / pe.max_score) * 100);
         if (pct >= bestPercentage) {
@@ -338,6 +352,7 @@ export function useDashboardData(session: Session) {
 
     for (const attempt of pastExams) {
       if (attempt.status !== 'completed') continue;
+      if (!isFullCompletion(attempt)) continue;
       const attemptFormat = attempt.exam_format ?? attempt.exams?.format ?? 'Digital';
       if (formatOverride && attemptFormat !== formatOverride) continue;
 
@@ -369,6 +384,7 @@ export function useDashboardData(session: Session) {
 
     for (const attempt of pastExams) {
       if (attempt.exam_id !== examId || attempt.status !== 'completed') continue;
+      if (!isFullCompletion(attempt)) continue;
       const attemptFormat = attempt.exam_format ?? attempt.exams?.format ?? 'Digital';
       if (formatOverride && attemptFormat !== formatOverride) continue;
 

@@ -18,7 +18,10 @@ import type { MajorType, Profile } from '@/lib/types';
 interface AnswerData {
   question_id: string;
   is_correct: boolean;
+  is_answered?: boolean;
   correct?: boolean;
+  section_id?: string;
+  [key: string]: unknown;
 }
 
 interface SectionScore {
@@ -43,6 +46,8 @@ export interface ExamAttemptReview {
   total_score: number | null;
   max_score: number | null;
   status?: string;
+  completion_reason?: string | null;
+  answered_count?: number | null;
   exams?: {
     id?: string;
     title?: string;
@@ -51,6 +56,13 @@ export interface ExamAttemptReview {
     format?: string | null;
   };
   detailed_results?: unknown;
+  section_scores?: Array<{
+    key: string;
+    label: string;
+    correct: number;
+    total: number;
+    answers: AnswerData[];
+  }>;
 }
 
 interface ReviewViewProps {
@@ -184,11 +196,15 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     .sort((a, b) => new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime());
   const selectedAttempt = completedAttempts.find((pastAttempt) => getAttemptKey(pastAttempt) === selectedAttemptKey) || attempt;
 
+  const fullCompletions = completedAttempts.filter(
+    (a) => a.completion_reason !== 'ended_early',
+  );
+
   useLayoutEffect(() => {
     if (chartRef.current) {
       chartRef.current.scrollLeft = chartRef.current.scrollWidth;
     }
-  }, [completedAttempts.length]);
+  }, [fullCompletions.length]);
 
   const getSectionOrder = (sectionType: string, sectionTitle: string, fallbackIndex: number): number => {
     const format = selectedAttempt.exams?.format || profile?.format || 'Digital';
@@ -212,18 +228,43 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     return titleIndex >= 0 ? titleIndex : order.length + fallbackIndex;
   };
 
+  const METADATA_KEYS = new Set(['answers', 'completion_reason', 'answered_count', 'version', 'v2']);
+
   const detailed = isRecord(selectedAttempt.detailed_results) ? selectedAttempt.detailed_results : {};
-  const sectionsList = Object.entries(detailed).map(([title, data], index) => {
-    const type = getType(data, title);
-    return {
-      title,
-      type,
-      score: getScore(data, title),
-      max_score: getMaxScore(data, title),
-      answers: getAnswers(data, title),
-      order: getSectionOrder(type, title, index),
-    };
-  }).sort((a, b) => a.order - b.order);
+  const sectionScores = Array.isArray(selectedAttempt.section_scores) ? selectedAttempt.section_scores : [];
+
+  const sectionsList = (
+    sectionScores.length > 0
+      ? sectionScores.map((sec, index) => {
+          const type = getType(sec, sec.label);
+          const answersForSec = selectedAttempt.completion_reason === 'ended_early'
+            ? sec.answers.filter((answer) => answer.is_answered !== false)
+            : sec.answers;
+          return {
+            title: sec.label,
+            type,
+            score: answersForSec.filter((answer) => answer.is_correct).length,
+            max_score: selectedAttempt.completion_reason === 'ended_early'
+              ? answersForSec.length
+              : sec.total,
+            answers: answersForSec,
+            order: getSectionOrder(type, sec.label, index),
+          };
+        })
+      : Object.entries(detailed)
+          .filter(([title]) => !METADATA_KEYS.has(title))
+          .map(([title, data], index) => {
+            const type = getType(data, title);
+            return {
+              title,
+              type,
+              score: getScore(data, title),
+              max_score: getMaxScore(data, title),
+              answers: getAnswers(data, title),
+              order: getSectionOrder(type, title, index),
+            };
+          })
+  ).sort((a: { order: number }, b: { order: number }) => a.order - b.order);
 
   const toggleSection = (sectionTitle: string) => {
     setExpandedSections(prev => ({
@@ -242,15 +283,19 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
       }).replace(',', '')
     : 'Date unavailable';
 
-  const overallPercentage = selectedAttempt.max_score && selectedAttempt.total_score !== null && selectedAttempt.max_score > 0
-    ? Math.round((selectedAttempt.total_score / selectedAttempt.max_score) * 100)
-    : 0;
+  const isEarly = selectedAttempt.completion_reason === 'ended_early';
+  const totalScore = selectedAttempt.total_score ?? 0;
+  const maxScore = selectedAttempt.max_score ?? 0;
+  const answeredCount = isEarly ? (selectedAttempt.answered_count ?? 0) : maxScore;
+
+  const accuracyPercentage = answeredCount > 0 ? Math.round((totalScore / answeredCount) * 100) : 0;
+  const completionPercentage = maxScore > 0 ? Math.round((answeredCount / maxScore) * 100) : 0;
 
   return (
     <div className="mx-auto flex h-auto w-full flex-col overflow-visible lg:h-full lg:overflow-auto">
       <div className="mb-4 sm:mb-6">
         <p className="text-sm leading-6 text-slate-500">
-          Format: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || 'Digital'}</span> • Completed on {dateCompletedStr}
+          Format: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || 'Digital'}</span> • {isEarly ? 'Ended early' : 'Completed'} on {dateCompletedStr}
         </p>
       </div>
 
@@ -263,44 +308,58 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
             </p>
             <div className="flex items-baseline gap-3">
               <span className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
-                {selectedAttempt.total_score ?? 0}
+                {isEarly ? accuracyPercentage : totalScore}
+                {isEarly && <span className="text-2xl font-bold">%</span>}
               </span>
-              <span className="text-lg text-slate-400 font-medium">/ {selectedAttempt.max_score ?? 0}</span>
+              <span className="text-lg text-slate-400 font-medium">
+                {isEarly ? `(${totalScore}/${answeredCount} correct)` : `/ ${maxScore}`}
+              </span>
               <span
                 className={cn(
                   'inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold',
-                  overallPercentage >= 80
+                  accuracyPercentage >= 80
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    : overallPercentage >= 50
+                    : accuracyPercentage >= 50
                       ? 'border-amber-200 bg-amber-50 text-amber-700'
                       : 'border-rose-200 bg-rose-50 text-rose-700'
                 )}
               >
-                {overallPercentage}%
+                {accuracyPercentage}% Accuracy
               </span>
+              {isEarly && (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-xs font-bold">
+                  Ended Early ({completionPercentage}% Completed)
+                </span>
+              )}
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              You correctly answered <span className="font-bold text-slate-900">{selectedAttempt.total_score}</span> questions out of <span className="font-bold text-slate-900">{selectedAttempt.max_score}</span> total questions.
-            </p>
+            {isEarly ? (
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                You answered <span className="font-bold text-slate-900">{answeredCount}</span> of <span className="font-bold text-slate-900">{maxScore}</span> total questions ({completionPercentage}% test completion) and scored <span className="font-bold text-slate-900">{totalScore}</span> correct ({accuracyPercentage}% accuracy).
+              </p>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                You correctly answered <span className="font-bold text-slate-900">{totalScore}</span> questions out of <span className="font-bold text-slate-900">{maxScore}</span> total questions ({accuracyPercentage}%).
+              </p>
+            )}
           </div>
           <div className="flex min-w-0 items-center gap-3 sm:min-w-[180px]">
             <div className="flex-1">
               <KniProgress
-                value={overallPercentage}
+                value={accuracyPercentage}
                 className="mb-2"
               />
               <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-                Performance
+                {isEarly ? 'Accuracy' : 'Performance'}
               </span>
             </div>
             <div className="hidden h-10 w-px bg-slate-100 md:block" />
             <div className="hidden min-w-[120px] flex-col gap-1 md:flex">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Calendar className="size-3.5" />
-                <span className="font-medium">Completed</span>
+                <span className="font-medium">{isEarly ? 'Ended Early' : 'Completed'}</span>
               </div>
               <span className="text-xs text-slate-400">
-                Official mock conditions
+                {isEarly ? `Partial attempt (${answeredCount}/${maxScore} Qs)` : 'Official mock conditions'}
               </span>
             </div>
           </div>
@@ -322,9 +381,9 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
             <BarChart2 className="size-4.5" />
           </div>
         </div>
-        {completedAttempts.length > 0 ? (
+        {fullCompletions.length > 0 ? (
           <div ref={chartRef} className="h-40 flex items-end justify-start gap-3 md:gap-4 w-full overflow-x-auto pb-2 custom-scrollbar -mx-2 px-2">
-            {completedAttempts.map((past, idx) => {
+            {fullCompletions.map((past, idx) => {
               const pastPct = past.max_score && past.total_score !== null && past.max_score > 0
                 ? Math.round((past.total_score / past.max_score) * 100)
                 : 0;
@@ -456,19 +515,22 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                     ) : (
                       <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
                         {sectionAnswers.map((ans: AnswerData, idx: number) => {
+                          const isAnswered = ans.is_answered !== false;
                           const isCorrect = ans.is_correct === true;
                           return (
                             <div
                               key={ans.question_id || idx}
                               className={`flex flex-col items-center justify-center h-10 rounded-lg border text-[10px] font-bold transition-all duration-200 ${
-                                isCorrect
-                                  ? 'bg-emerald-50/80 border-emerald-200 text-emerald-700'
-                                  : 'bg-rose-50/80 border-rose-200 text-rose-700'
+                                !isAnswered
+                                  ? 'bg-slate-50/80 border-slate-200 text-slate-400'
+                                  : isCorrect
+                                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-700'
+                                    : 'bg-rose-50/80 border-rose-200 text-rose-700'
                               }`}
-                              title={`Question ${idx + 1}: ${isCorrect ? 'Correct' : 'Incorrect'}`}
+                              title={`Question ${idx + 1}: ${!isAnswered ? 'Unvisited' : isCorrect ? 'Correct' : 'Incorrect'}`}
                             >
                               <span className="text-[9px] text-slate-400 font-semibold block leading-none mb-0.5">Q{idx + 1}</span>
-                              <span className="leading-none text-xs">{isCorrect ? '✓' : '✗'}</span>
+                              <span className="leading-none text-xs">{!isAnswered ? '—' : isCorrect ? '✓' : '✗'}</span>
                             </div>
                           );
                         })}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { submitAttempt } from '@/lib/data/attempts';
+import { parseSubmissionRequest } from '@/lib/exam/submission-request';
 
 export async function POST(
   request: Request,
@@ -7,12 +8,18 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const { userAnswers } = await request.json();
-    if (typeof userAnswers !== 'object' || userAnswers === null || Array.isArray(userAnswers)) {
-      return NextResponse.json({ error: 'userAnswers must be an object' }, { status: 400 });
+    const raw: unknown = await request.json();
+
+    const parsed = parseSubmissionRequest(raw);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
-    const result = await submitAttempt(id, userAnswers);
+    const result = await submitAttempt(
+      id,
+      parsed.value.userAnswers,
+      parsed.value.completionReason,
+    );
     return NextResponse.json({ result });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';

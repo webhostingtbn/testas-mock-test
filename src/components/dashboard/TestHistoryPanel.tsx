@@ -1,28 +1,28 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
-  ChevronRight, Clock, Calendar, CheckCircle2, PlayCircle
+  ChevronRight, Clock, CheckCircle2, PlayCircle, AlertTriangle
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
+import { isFullCompletion, isTerminalAttempt, isResumableAttempt } from '@/lib/types';
+import type { ExamAttemptReview } from '@/components/dashboard/ReviewView';
 
 interface TestHistoryPanelProps {
-  pastExams: any[];
+  pastExams: ExamAttemptReview[];
   selectedExamId: string;
-  onSelectAttempt: (attempt: any) => void;
-  onResumeAttempt: (attempt: any) => void;
+  onSelectAttempt: (attempt: ExamAttemptReview) => void;
+  onResumeAttempt: (attempt: ExamAttemptReview) => void;
 }
 
 export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, onResumeAttempt }: TestHistoryPanelProps) {
-  // Filter past exams to only show attempts for the selected exam
   const testAttempts = pastExams
     .filter((attempt) => attempt.exam_id === selectedExamId)
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
-  const completedAttempts = testAttempts.filter(attempt => attempt.status === 'completed');
-  const inProgressAttempts = testAttempts.filter(attempt => attempt.status !== 'completed');
+  const completedAttempts = testAttempts.filter(attempt => isTerminalAttempt(attempt));
+  const inProgressAttempts = testAttempts.filter(attempt => isResumableAttempt(attempt));
 
-  const getPercentage = (attempt: any) => {
+  const getPercentage = (attempt: ExamAttemptReview) => {
     if (!attempt.max_score || attempt.max_score === 0) return 0;
     return Math.round(((attempt.total_score ?? 0) / attempt.max_score) * 100);
   };
@@ -123,7 +123,13 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
               Completed ({completedAttempts.length})
             </h3>
             {completedAttempts.map((attempt) => {
-              const percentage = getPercentage(attempt);
+              const isEarly = attempt.completion_reason === 'ended_early';
+              const totalScore = attempt.total_score ?? 0;
+              const maxScore = attempt.max_score ?? 0;
+              const answeredCount = isEarly ? (attempt.answered_count ?? 0) : maxScore;
+              const accuracy = answeredCount > 0 ? Math.round((totalScore / answeredCount) * 100) : 0;
+              const completion = maxScore > 0 ? Math.round((answeredCount / maxScore) * 100) : 0;
+
               return (
                 <div
                   key={attempt.id}
@@ -133,13 +139,30 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                     <p className="text-sm font-bold text-slate-900 truncate">
                       Attempt on {formatDate(attempt.created_at)}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      Score: {attempt.total_score ?? 0} / {attempt.max_score ?? 0} correct
-                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {isEarly ? (
+                        <p className="text-xs text-slate-500">
+                          Score: <span className="font-semibold text-slate-900">{totalScore}/{answeredCount}</span> correct • Answered <span className="font-semibold text-slate-900">{answeredCount}/{maxScore}</span> ({completion}%)
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Score: <span className="font-semibold text-slate-900">{totalScore}/{maxScore}</span> correct
+                        </p>
+                      )}
+                      {isEarly && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
+                          <AlertTriangle className="size-2.5" />
+                          Ended Early
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="text-lg font-black text-slate-950">{percentage}%</span>
+                      <span className="text-lg font-black text-slate-950">{accuracy}%</span>
+                      <span className="block text-[9px] font-bold uppercase text-slate-400">
+                        {isEarly ? 'Accuracy' : 'Score'}
+                      </span>
                     </div>
                     <KniButton
                       variant="secondary"
@@ -163,15 +186,25 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Best Score</p>
             <p className="text-xl font-black text-slate-950 mt-1">
-              {Math.max(...completedAttempts.map(a => getPercentage(a)))}%
+              {(() => {
+                const fullCompletions = completedAttempts.filter(a => isFullCompletion(a));
+                return fullCompletions.length > 0
+                  ? `${Math.max(...fullCompletions.map(a => getPercentage(a)))}%`
+                  : 'N/A';
+              })()}
             </p>
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average</p>
             <p className="text-xl font-black text-slate-950 mt-1">
-              {Math.round(
-                completedAttempts.reduce((sum, a) => sum + getPercentage(a), 0) / completedAttempts.length
-              )}%
+              {(() => {
+                const fullCompletions = completedAttempts.filter(a => isFullCompletion(a));
+                return fullCompletions.length > 0
+                  ? `${Math.round(
+                      fullCompletions.reduce((sum, a) => sum + getPercentage(a), 0) / fullCompletions.length
+                    )}%`
+                  : 'N/A';
+              })()}
             </p>
           </div>
         </div>

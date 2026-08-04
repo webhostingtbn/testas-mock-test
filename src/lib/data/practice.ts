@@ -43,6 +43,15 @@ export async function fetchPracticeData() {
 
   if (qErr) throw new Error(`Failed to fetch practice questions: ${qErr.message}`);
 
+  const { data: passages, error: passErr } = sectionIds.length > 0
+    ? await supabase
+    .from('passages')
+    .select('id, section_id, title, body_markdown, image_url')
+    .in('section_id', sectionIds)
+    : { data: [], error: null };
+
+  if (passErr) throw new Error(`Failed to fetch practice passages: ${passErr.message}`);
+
   const { data: userPractices, error: pErr } = await supabase
     .from('user_question_practices')
     .select('*')
@@ -50,9 +59,28 @@ export async function fetchPracticeData() {
 
   if (pErr) throw new Error(`Failed to fetch practice ratings: ${pErr.message}`);
 
+  const passageMap = new Map((passages ?? []).map((p) => [p.id, p]));
+
+  const enrichedQuestions = (questions ?? []).map((q) => {
+    const passage = q.passage_id ? passageMap.get(q.passage_id) : undefined;
+    if (passage) {
+      const contentObj = typeof q.content === 'object' && q.content !== null ? q.content : {};
+      return {
+        ...q,
+        content: {
+          ...contentObj,
+          passage_title: passage.title,
+          passage_markdown: passage.body_markdown,
+          passage_image_url: passage.image_url,
+        },
+      };
+    }
+    return q;
+  });
+
   return {
     sections: sections || [],
-    questions: questions || [],
+    questions: enrichedQuestions,
     userPractices: userPractices || [],
   };
 }
@@ -66,23 +94,34 @@ export async function updatePracticeRating(questionId: string, difficulty: 'easy
     .select('id, section_id')
     .eq('id', questionId)
     .maybeSingle();
-  if (questionError || !question) throw new Error('QUESTION_NOT_AVAILABLE');
+
+  if (questionError) {
+    throw new Error(`Failed to verify question: ${questionError.message}`);
+  }
+  if (!question) {
+    throw new Error('QUESTION_NOT_FOUND');
+  }
 
   const { data: section, error: sectionError } = await supabase
     .from('sections')
     .select('exam_id')
     .eq('id', question.section_id)
     .maybeSingle();
-  if (sectionError || !section) throw new Error('QUESTION_NOT_AVAILABLE');
+  if (sectionError) throw new Error(`Failed to verify question section: ${sectionError.message}`);
+  if (!section) throw new Error('QUESTION_NOT_FOUND');
 
   let examQuery = supabase
     .from('exams')
     .select('id')
     .eq('id', section.exam_id)
     .eq('is_active', true);
-  if (profile.format) examQuery = examQuery.eq('format', profile.format);
+  if (profile.role !== 'admin' && profile.format) {
+    examQuery = examQuery.eq('format', profile.format);
+  }
+
   const { data: exam, error: examError } = await examQuery.maybeSingle();
-  if (examError || !exam) throw new Error('QUESTION_NOT_AVAILABLE');
+  if (examError) throw new Error(`Failed to verify question exam: ${examError.message}`);
+  if (!exam) throw new Error('FORBIDDEN');
 
   const { data, error } = await supabase
     .from('user_question_practices')

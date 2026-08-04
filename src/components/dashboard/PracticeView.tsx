@@ -24,6 +24,24 @@ import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
 import PracticeSession from './PracticeSession';
 import { usePracticeStore } from '@/lib/store/practice-store';
+import {
+  PAPER_CORE_SUBTESTS,
+  DIGITAL_CORE_SUBTESTS,
+  PAPER_MODULE_SUBTESTS,
+  SUBTEST_TITLES,
+  type SubtestDefinition,
+  getModuleCategory,
+} from '@/lib/constants';
+
+const SUBTEST_ICON_MAP: Record<SubtestDefinition['iconName'], LucideIcon> = {
+  Blocks,
+  FileText,
+  BookOpen,
+  Clock,
+  Layers,
+  Laptop,
+};
+import { filterPracticeQuestionsByRating } from '@/lib/exam/practice-helpers';
 
 interface PracticeViewProps {
   profile: Profile | null;
@@ -86,18 +104,25 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     | 'module_mcq';
 
   const SUBTEST_KEYWORDS: Record<string, string[]> = {
-    sc_1: ['scientific relationships', 'scientific interrelationships', 'quantitative problems'],
-    sc_2: ['formal depictions', 'text completion'],
-    econ_1: ['economic relationships', 'economic interrelationships'],
-    econ_2: ['processes', 'economic processes'],
-    eng_1: ['formalising technical', 'formalizing technical'],
-    eng_2: ['visualising solids', 'visualizing solids', 'solids'],
+    sc_1: ['scientific relationships', 'scientific interrelationships', 'analyzing scientific relationships'],
+    sc_2: ['formal depictions', 'understanding formal depictions'],
+    econ_1: ['economic relationships', 'economic interrelationships', 'analyzing economic relationships'],
+    econ_2: ['processes', 'economic processes', 'analyzing processes'],
+    eng_1: ['formalising technical', 'formalizing technical', 'technical interrelationships'],
+    eng_2: ['visualising solids', 'visualizing solids'],
     eng_2_2d: ['visualising solids - 2d', 'visualizing solids - 2d', 'solids - 2d', 'visualizing solids 2d'],
     eng_2_3d: ['visualising solids - 3d', 'visualizing solids - 3d', 'solids - 3d', 'visualizing solids 3d'],
-    eng_3: ['analysing technical', 'analyzing technical'],
+    eng_3: ['analysing technical', 'analyzing technical', 'technical relationships'],
   };
 
   const getMatchedSections = useCallback((subtest: SubtestType) => {
+    // 1. Direct question_type match first
+    const directMatches = sections.filter((s) => s.question_type === subtest);
+    if (directMatches.length > 0) {
+      return directMatches;
+    }
+
+    // 2. Keyword fallback for module/title based matching
     const keywords = SUBTEST_KEYWORDS[subtest];
     if (keywords) {
       return sections.filter((s) =>
@@ -139,7 +164,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   // Navigation State inside SPA
   const [selectedSubtest, setSelectedSubtest] = useState<SubtestType | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<'easy' | 'medium' | 'hard' | null>(null);
-  const [practiceQuestions, setPracticeQuestions] = useState<any[]>([]);
+  const [practiceQuestions, setPracticeQuestions] = useState<Array<Record<string, unknown> & { id: string }>>([]);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubtestId, setSelectedSubtestId] = useState<string | null>(null);
@@ -185,131 +210,30 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
 
   // Main subtest card list
   const subtests = useMemo(() => {
-    const paperSubtests: {
-      id: SubtestType;
-      title: string;
-      description: string;
-      icon: LucideIcon;
-    }[] = [
-      {
-        id: 'figure_sequence',
-        title: 'Completing Patterns',
-        description: 'Train visual pattern sequence completion.',
-        icon: Blocks
-      },
-      {
-        id: 'solving_quantitative',
-        title: 'Solving Quantitative Problems',
-        description: 'Practice mathematical word problems.',
-        icon: FileText
-      },
-      {
-        id: 'inferring_relationships',
-        title: 'Inferring Relationships',
-        description: 'Identify the logical relationship between pairs of concepts.',
-        icon: BookOpen
-      },
-      {
-        id: 'numerical_series',
-        title: 'Continuing Numerical Series',
-        description: 'Find pattern rules and continue the numerical series.',
-        icon: Clock
-      }
-    ];
-
-    const digitalSubtests: {
-      id: SubtestType;
-      title: string;
-      description: string;
-      icon: LucideIcon;
-    }[] = [
-      {
-        id: 'figure_sequence',
-        title: 'Figure Sequences',
-        description: 'Train visual pattern recognition and transformations.',
-        icon: Blocks
-      },
-      {
-        id: 'math_equation',
-        title: 'Mathematical Equations',
-        description: 'Practice quantitative relationships and equation logic.',
-        icon: FileText
-      },
-      {
-        id: 'latin_square',
-        title: 'Latin Squares',
-        description: 'Strengthen rule deduction and symbolic reasoning.',
-        icon: Layers
-      }
-    ];
-
-    const baseSubtests = isPaper ? paperSubtests : digitalSubtests;
+    const baseDefs = isPaper ? PAPER_CORE_SUBTESTS : DIGITAL_CORE_SUBTESTS;
+    const items = baseDefs.map((def) => ({
+      id: def.id as SubtestType,
+      title: def.title,
+      description: def.description,
+      icon: SUBTEST_ICON_MAP[def.iconName],
+    }));
 
     if (activeModule) {
-      const activeModLower = activeModule.toLowerCase();
-
       if (isPaper) {
-        if (activeModLower.includes('science') || activeModLower === 'cs') {
-          baseSubtests.push(
-            {
-              id: 'sc_1',
-              title: 'Analyzing Scientific Relationships',
-              description: 'Practice analyzing interrelationships between scientific concepts.',
-              icon: Laptop,
-            },
-            {
-              id: 'sc_2',
-              title: 'Understanding Formal Depictions',
-              description: 'Practice transposing information into diagrams and formal systems.',
-              icon: Laptop,
-            }
-          );
-        } else if (activeModLower.includes('engin')) {
-          baseSubtests.push(
-            {
-              id: 'eng_1',
-              title: 'Formalizing Technical Interrelationships',
-              description: 'Practice formalizing technical and physical laws.',
-              icon: Laptop,
-            },
-            {
-              id: 'eng_2_2d',
-              title: 'Visualising Solids (2D)',
-              description: 'Practice 2D projections and views of 3D objects.',
-              icon: Laptop,
-            },
-            {
-              id: 'eng_2_3d',
-              title: 'Visualising Solids (3D)',
-              description: 'Practice 3D cube rotations and direction analysis.',
-              icon: Laptop,
-            },
-            {
-              id: 'eng_3',
-              title: 'Analysing Technical Relationships',
-              description: 'Practice analyzing physical and technical relationships.',
-              icon: Laptop,
-            }
-          );
-        } else if (activeModLower.includes('econ')) {
-          baseSubtests.push(
-            {
-              id: 'econ_1',
-              title: 'Analyzing Economic Relationships',
-              description: 'Practice analyzing economic data and charts.',
-              icon: Laptop,
-            },
-            {
-              id: 'sc_2',
-              title: 'Understanding Formal Depictions',
-              description: 'Practice transposing information into diagrams and formal systems.',
-              icon: Laptop,
-            }
-          );
+        const category = getModuleCategory(activeModule);
+        if (category && PAPER_MODULE_SUBTESTS[category]) {
+          PAPER_MODULE_SUBTESTS[category].forEach((def) => {
+            items.push({
+              id: def.id as SubtestType,
+              title: def.title,
+              description: def.description,
+              icon: SUBTEST_ICON_MAP[def.iconName],
+            });
+          });
         }
       } else {
         const moduleLabel = activeModule.includes('science') || activeModule === 'CS' ? 'Natural & Computer Science' : activeModule;
-        baseSubtests.push({
+        items.push({
           id: 'module_mcq' as const,
           title: `${moduleLabel} Module`,
           description: `Practice subject-specific questions for ${moduleLabel}.`,
@@ -318,7 +242,19 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       }
     }
 
-    return baseSubtests;
+    return items;
+  }, [activeModule, isPaper]);
+
+  const getSubtestTitle = useCallback((subtest: SubtestType): string => {
+    if (subtest === 'figure_sequence') {
+      return isPaper ? SUBTEST_TITLES.figure_sequence_paper : SUBTEST_TITLES.figure_sequence_digital;
+    }
+    if (subtest === 'module_mcq') {
+      return activeModule
+        ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule)
+        : 'Subject Module';
+    }
+    return SUBTEST_TITLES[subtest] || subtest;
   }, [activeModule, isPaper]);
 
   // Only count rated questions (unrated questions are hidden in practice)
@@ -327,17 +263,9 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
-    let easy = 0;
-    let medium = 0;
-    let hard = 0;
-
-    subtestQuestions.forEach((q) => {
-      const rating = userRatings[q.id];
-      if (rating === 'easy') easy++;
-      else if (rating === 'medium') medium++;
-      else if (rating === 'hard') hard++;
-    });
-
+    const easy = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'easy').length;
+    const medium = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'medium').length;
+    const hard = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'hard').length;
     const total = easy + medium + hard;
 
     return { easy, medium, hard, total };
@@ -386,18 +314,12 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
 
 
   // Only show rated questions in practice - hide unrated questions completely
-  const getQuestionIdsForFolder = (subtest: SubtestType, folder: string) => {
+  const getQuestionIdsForFolder = (subtest: SubtestType, folder: 'easy' | 'medium' | 'hard') => {
     const matchedSections = getMatchedSections(subtest);
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
-    return subtestQuestions
-      .filter((q) => {
-        const rating = userRatings[q.id];
-        // Only show questions that have been rated (not undefined/null)
-        if (!rating) return false;
-        return rating === folder;
-      })
+    return filterPracticeQuestionsByRating(subtestQuestions, userRatings, folder)
       .map((q) => q.id);
   };
 
@@ -415,7 +337,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       const targetSet = new Set(targetIds);
       const allQ = questions.filter((q) => targetSet.has(q.id));
 
-      const resolved = await imageService.resolveQuestionImageUrls(allQ as any);
+      const resolved = await imageService.resolveQuestionImageUrls(allQ);
       setPracticeQuestions(resolved);
     } catch (err) {
       console.error('Failed to load practice questions:', err);
@@ -440,32 +362,10 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       );
     }
 
-    const subtestTitles: Record<SubtestType, string> = {
-      figure_sequence: isPaper ? 'Completing Patterns' : 'Figure Sequences',
-      math_equation: 'Mathematical Equations',
-      latin_square: 'Latin Squares',
-      solving_quantitative: 'Solving Quantitative Problems',
-      inferring_relationships: 'Inferring Relationships',
-      numerical_series: 'Continuing Numerical Series',
-      interpreting_texts: 'Understanding and Interpreting Texts',
-      representation_systems: 'Using Representation Systems Flexibly',
-      linguistic_structures: 'Recognizing Linguistic Structures',
-      sc_1: 'Analyzing Scientific Relationships',
-      sc_2: 'Understanding Formal Depictions',
-      econ_1: 'Analyzing Economic Relationships',
-      econ_2: 'Analyzing Processes',
-      eng_1: 'Formalizing Technical Interrelationships',
-      eng_2: 'Visualising Solids',
-      eng_2_2d: 'Visualising Solids (2D)',
-      eng_2_3d: 'Visualising Solids (3D)',
-      eng_3: 'Analysing Technical Relationships',
-      module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
-    };
-
     return (
       <PracticeSession
-        subtestType={selectedSubtest as any}
-        subtestTitle={subtestTitles[selectedSubtest]}
+        subtestType={selectedSubtest}
+        subtestTitle={getSubtestTitle(selectedSubtest)}
         folderId={selectedFolder}
         questions={practiceQuestions}
         userId={profile?.id || ''}
@@ -480,33 +380,11 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   }
 
   if (selectedSubtest) {
-    const subtestTitles: Record<SubtestType, string> = {
-      figure_sequence: isPaper ? 'Completing Patterns' : 'Figure Sequences',
-      math_equation: 'Mathematical Equations',
-      latin_square: 'Latin Squares',
-      solving_quantitative: 'Solving Quantitative Problems',
-      inferring_relationships: 'Inferring Relationships',
-      numerical_series: 'Continuing Numerical Series',
-      interpreting_texts: 'Understanding and Interpreting Texts',
-      representation_systems: 'Using Representation Systems Flexibly',
-      linguistic_structures: 'Recognizing Linguistic Structures',
-      sc_1: 'Analyzing Scientific Relationships',
-      sc_2: 'Understanding Formal Depictions',
-      econ_1: 'Analyzing Economic Relationships',
-      econ_2: 'Analyzing Processes',
-      eng_1: 'Formalizing Technical Interrelationships',
-      eng_2: 'Visualising Solids',
-      eng_2_2d: 'Visualising Solids (2D)',
-      eng_2_3d: 'Visualising Solids (3D)',
-      eng_3: 'Analysing Technical Relationships',
-      module_mcq: activeModule ? (activeModule.includes('science') || activeModule === 'CS' ? 'Natural Science & CS Module' : activeModule) : 'Subject Module',
-    };
-
     const counts = getSubtestCounts(selectedSubtest);
 
     return (
       <PracticeFolderView
-        subtestTitle={subtestTitles[selectedSubtest]}
+        subtestTitle={getSubtestTitle(selectedSubtest)}
         counts={counts}
         onBack={handleBackToPractice}
         onSelectFolder={(folder) => startPracticeSession(selectedSubtest, folder)}

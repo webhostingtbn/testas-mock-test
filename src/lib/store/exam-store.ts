@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { CompletionReason } from '@/lib/types';
 
 // ---- Types for the store ----
 
@@ -54,6 +55,9 @@ interface ExamState {
   // ---- Font size ----
   fontSize: number;
 
+  // ---- Completion state ----
+  completionReason: CompletionReason;
+
   // ---- Actions ----
   startExam: (params: {
     examId: string;
@@ -86,6 +90,8 @@ interface ExamState {
   getAnsweredCount: (sectionId: string) => number;
   isQuestionAnswered: (sectionId: string, questionIndex: number) => boolean;
 
+  endExamEarly: () => void;
+
   resetExam: () => void;
 }
 
@@ -104,6 +110,7 @@ const initialState = {
   breakStartTime: null,
   breakDuration: 0,
   fontSize: 16,
+  completionReason: 'finished' as CompletionReason,
 };
 
 export const useExamStore = create<ExamState>()(
@@ -134,6 +141,7 @@ export const useExamStore = create<ExamState>()(
           ratings: {},
           sectionStartTime: null,
           breakStartTime: null,
+          completionReason: 'finished' as CompletionReason,
         });
       },
 
@@ -273,6 +281,17 @@ export const useExamStore = create<ExamState>()(
         return answer !== null && answer !== undefined;
       },
 
+      // ---- End exam early ----
+      endExamEarly: () => {
+        const { flowSteps } = get();
+        set({
+          completionReason: 'ended_early' as CompletionReason,
+          currentFlowStepIndex: flowSteps.length,
+          sectionStartTime: null,
+          breakStartTime: null,
+        });
+      },
+
       // ---- Reset ----
       resetExam: () => {
         set(initialState);
@@ -296,6 +315,7 @@ export const useExamStore = create<ExamState>()(
         breakStartTime: state.breakStartTime,
         breakDuration: state.breakDuration,
         fontSize: state.fontSize,
+        completionReason: state.completionReason,
       }),
     }
   )

@@ -28,28 +28,7 @@ interface ExamPayload {
   };
 }
 
-const KNOWN_QUESTION_TYPES: ReadonlySet<string> = new Set([
-  'figure_sequence',
-  'math_equation',
-  'latin_square',
-  'module_mcq',
-  'completing_patterns',
-  'solving_quantitative',
-  'inferring_relationships',
-  'numerical_series',
-  'interpreting_texts',
-  'representation_systems',
-  'linguistic_structures',
-  'sc_1',
-  'sc_2',
-  'econ_1',
-  'econ_2',
-  'eng_1',
-  'eng_2',
-  'eng_2_2d',
-  'eng_2_3d',
-  'eng_3',
-]);
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -57,14 +36,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isSection(value: unknown): value is Section {
   if (!isRecord(value)) return false;
+  const duration = Number(value.duration_seconds);
+  const count = Number(value.question_count);
+  const sort = Number(value.sort_order);
+
   return typeof value.id === 'string'
     && typeof value.exam_id === 'string'
     && typeof value.title === 'string'
     && typeof value.question_type === 'string'
-    && KNOWN_QUESTION_TYPES.has(value.question_type)
-    && typeof value.duration_seconds === 'number'
-    && typeof value.question_count === 'number'
-    && typeof value.sort_order === 'number';
+    && !Number.isNaN(duration)
+    && !Number.isNaN(count)
+    && !Number.isNaN(sort);
 }
 
 function isQuestion(value: unknown): value is ExamQuestionRecord {
@@ -91,7 +73,11 @@ function buildStoredSections(
   activeModule: ModuleTestType | null,
 ): StoredSection[] {
   const { coreSections, moduleSections } = filterSections(payload.sections, isPaper, activeModule);
-  const selectedSections = [...coreSections, ...moduleSections];
+  let selectedSections = [...coreSections, ...moduleSections];
+  if (selectedSections.length === 0 && payload.sections.length > 0) {
+    selectedSections = payload.sections;
+  }
+
   const questionIdsBySection = new Map<string, string[]>();
 
   payload.questions.forEach((question) => {
@@ -103,16 +89,20 @@ function buildStoredSections(
   return selectedSections
     .map((section) => {
       const questionIds = questionIdsBySection.get(section.id) ?? [];
+      const questionCount = questionIds.length > 0
+        ? questionIds.length
+        : (section.question_count || 1);
+
       return {
         id: section.id,
         title: section.title,
         questionType: section.question_type,
-        durationSeconds: section.duration_seconds,
-        questionCount: questionIds.length > 0 ? questionIds.length : section.question_count,
+        durationSeconds: section.duration_seconds || 1800,
+        questionCount,
         questionIds,
       };
     })
-    .filter((section) => section.questionIds.length > 0);
+    .filter((section) => section.questionCount > 0);
 }
 
 function isModuleQuestionType(questionType: string, isPaper: boolean): boolean {
@@ -191,7 +181,8 @@ export async function startExam(
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
 
-    const isPaper = format === 'Paper';
+    const targetFormat = format || examData.exam?.format || 'Digital';
+    const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
     const builtSections = buildStoredSections(examData, isPaper, activeModule);
     if (builtSections.length === 0) throw new Error('Exam has no questions for the selected format/module');
 
@@ -224,8 +215,8 @@ export async function resumeExam(
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
 
-    const format = (examData.exam?.format || 'Digital') as 'Digital' | 'Paper';
-    const isPaper = format === 'Paper';
+    const targetFormat = examData.exam?.format || 'Digital';
+    const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
     const builtSections = buildStoredSections(examData, isPaper, activeModule);
     if (builtSections.length === 0) throw new Error('Exam has no questions for the selected format/module');
 

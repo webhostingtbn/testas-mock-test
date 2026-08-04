@@ -15,7 +15,7 @@ export async function fetchExams() {
   if (profile.role !== 'admin') {
     query = query.eq('is_active', true);
     if (profile.format) {
-      query = query.eq('format', profile.format);
+      query = query.ilike('format', profile.format);
     }
   }
 

@@ -5,11 +5,7 @@
  */
 type ImageContent = Record<string, unknown>;
 
-interface ImageQuestion {
-  [key: string]: unknown;
-  content?: ImageContent;
-  questions?: ImageQuestion[];
-}
+
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -116,16 +112,17 @@ export class ImageService {
     return newContent;
   }
 
-  async resolveQuestionImageUrls(questions: ImageQuestion[]): Promise<ImageQuestion[]> {
+  async resolveQuestionImageUrls<T extends { content?: unknown; questions?: T[] }>(questions: T[]): Promise<T[]> {
     return Promise.all(
       questions.map(async (question) => {
         const resolvedChildren = Array.isArray(question.questions)
           ? await this.resolveQuestionImageUrls(question.questions)
           : undefined;
-        if (!question.content && !resolvedChildren) return question;
+        const contentRecord = isRecord(question.content) ? question.content : undefined;
+        if (!contentRecord && !resolvedChildren) return question;
         return {
           ...question,
-          ...(question.content ? { content: await this.resolveImageUrls(question.content) } : {}),
+          ...(contentRecord ? { content: await this.resolveImageUrls(contentRecord) } : {}),
           ...(resolvedChildren ? { questions: resolvedChildren } : {}),
         };
       })

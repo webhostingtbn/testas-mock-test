@@ -224,6 +224,14 @@ class NumericalSeriesRenderer implements QuestionRenderer {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isUuidString(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 class ModuleMCQRenderer implements QuestionRenderer {
   canRender(question: QuestionData): boolean {
     const moduleTypes = [
@@ -237,42 +245,74 @@ class ModuleMCQRenderer implements QuestionRenderer {
 
   // Convert QuestionData to ModulePassageData format expected by ModuleMCQ
   private toModulePassage(passage: QuestionData): ModulePassageData {
-    // Digital format: title, body_markdown, resolved_image_url are top-level properties
-    // Paper format / old structure: they live inside passage.content
-    const content = (passage.content as any) || {};
-    const pAny = passage as any;
-    const questions = (passage.questions || []).map((q) => {
-      const qContent = (q.content as any) || {};
-      const qAny = q as any;
-      return {
-        id: q.id,
-        sort_order: qAny.sort_order ?? q.sortOrder,
-        content: {
-          question_text: qContent.question_text || '',
-          options: qContent.options || {},
+    const content = isRecord(passage.content) ? passage.content : {};
+    const pRecord = passage as unknown as Record<string, unknown>;
+
+    let questions: ModuleQuestionData[];
+
+    if (passage.questions && passage.questions.length > 0) {
+      questions = passage.questions.map((q) => {
+        const qContent = isRecord(q.content) ? q.content : {};
+        const qRecord = q as unknown as Record<string, unknown>;
+        return {
+          id: q.id,
+          sort_order: typeof qRecord.sort_order === 'number' ? qRecord.sort_order : (q.sortOrder ?? 1),
+          content: {
+            question_text: typeof qContent.question_text === 'string' ? qContent.question_text : '',
+            options: (isRecord(qContent.options) || Array.isArray(qContent.options) ? qContent.options : {}) as unknown as Record<string, string>,
+          },
+        };
+      });
+    } else {
+      // Single question passed directly (e.g. Practice Mode)
+      questions = [
+        {
+          id: passage.id,
+          sort_order: typeof pRecord.sort_order === 'number' ? pRecord.sort_order : (passage.sortOrder ?? 1),
+          content: {
+            question_text: typeof content.question_text === 'string' ? content.question_text : (typeof passage.content === 'string' ? passage.content : ''),
+            options: (isRecord(content.options) || Array.isArray(content.options) ? content.options : {}) as unknown as Record<string, string>,
+          },
         },
-      };
-    });
+      ];
+    }
+
+    let rawTitle = typeof pRecord.title === 'string' ? pRecord.title : (typeof content.title === 'string' ? content.title : (typeof content.passage_title === 'string' ? content.passage_title : undefined));
+    if (!rawTitle && passage.sectionId && !isUuidString(passage.sectionId)) {
+      rawTitle = passage.sectionId;
+    }
+    const title = rawTitle || 'Reference Information';
+
+    const bodyMarkdown = typeof pRecord.body_markdown === 'string' ? pRecord.body_markdown : (typeof content.body_markdown === 'string' ? content.body_markdown : (typeof content.passage_markdown === 'string' ? content.passage_markdown : (typeof content.passage_text === 'string' ? content.passage_text : '')));
+    const imageUrl = typeof pRecord.image_url === 'string' ? pRecord.image_url : (typeof content.image_url === 'string' ? content.image_url : (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined));
+    const resolvedImageUrl = typeof pRecord.resolved_image_url === 'string' ? pRecord.resolved_image_url : (typeof content.resolved_image_url === 'string' ? content.resolved_image_url : imageUrl);
+
     return {
       id: passage.id,
-      title: pAny.title || content.title || passage.sectionId,
-      body_markdown: pAny.body_markdown || content.body_markdown || '',
-      image_url: pAny.image_url || content.image_url,
-      resolved_image_url: pAny.resolved_image_url || content.resolved_image_url,
+      title,
+      body_markdown: bodyMarkdown,
+      image_url: imageUrl,
+      resolved_image_url: resolvedImageUrl,
       questions,
     };
   }
 
   render(props: RendererProps): React.ReactNode {
     const passage = props.passage || props.question;
-    const selectedAnswers = props.selectedAnswers as Record<string, string> || {};
+    const selectedAnswers =
+      (props.selectedAnswers as Record<string, string>) ||
+      (typeof props.selectedAnswer === 'object' && props.selectedAnswer !== null
+        ? (props.selectedAnswer as Record<string, string>)
+        : typeof props.selectedAnswer === 'string'
+        ? { [passage.id]: props.selectedAnswer }
+        : {});
     const modulePassage = this.toModulePassage(passage);
     return (
       <ModuleMCQ
         passage={modulePassage}
         selectedAnswers={selectedAnswers}
         onAnswer={(questionId: string, val: string) => {
-          props.onAnswer({ [questionId]: val });
+          props.onAnswer(val);
         }}
       />
     );
@@ -311,7 +351,7 @@ class ModuleQuestionRenderer implements QuestionRenderer {
         image_url?: string;
         environment_text?: string;
         environment_images?: string[];
-        options?: any;
+        options?: unknown;
         grid_image?: string;
         grid_image_url?: string;
         options_image?: string;

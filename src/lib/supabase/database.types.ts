@@ -79,6 +79,8 @@ export interface Database {
         user_id: string;
         exam_id: string;
         status: string;
+        completion_reason: string;
+        answered_count: number;
         started_at: string | null;
         completed_at: string | null;
         total_score: number | null;
@@ -111,6 +113,15 @@ export interface Database {
           p_attempt_id: string;
           p_user_id: string;
           p_user_answers: Json;
+        };
+        Returns: Json;
+      };
+      submit_attempt_transaction_v2: {
+        Args: {
+          p_attempt_id: string;
+          p_user_id: string;
+          p_user_answers: Json;
+          p_completion_reason: string;
         };
         Returns: Json;
       };

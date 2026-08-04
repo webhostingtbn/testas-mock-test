@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, Smile, Meh, Frown } from 'lucide-react';
 import { KniButton } from '@/components/KniPrimitives';
-import SecurityOverlay from '@/components/exam/SecurityOverlay';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
 import { usePracticeStore } from '@/lib/store/practice-store';
@@ -73,28 +72,28 @@ export default function PracticeSession({
   const [timerActive, setTimerActive] = useState<boolean>(true);
 
   const currentItem = questions[currentIndex] || null;
-
-  useEffect(() => {
+  const handleGoToQuestion = (newIndex: number) => {
+    setCurrentIndex(newIndex);
+    const nextItem = questions[newIndex];
+    setUserAnswer(nextItem ? answers[nextItem.id] ?? null : null);
     const defaultSecs = QUESTION_TIME_LIMITS[subtestType] || 90;
     setTimeRemaining(defaultSecs);
     setTimerActive(true);
-    const nextItem = questions[currentIndex];
-    setUserAnswer(nextItem ? answers[nextItem.id] ?? null : null);
-  }, [answers, currentIndex, questions, subtestType]);
+  };
 
   useEffect(() => {
     if (!timerActive || timeRemaining <= 0) return;
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => Math.max(0, prev - 1));
+      setTimeRemaining((prev) => {
+        const nextSec = Math.max(0, prev - 1);
+        if (nextSec <= 0) {
+          setTimerActive(false);
+        }
+        return nextSec;
+      });
     }, 1000);
     return () => clearInterval(interval);
   }, [timerActive, timeRemaining]);
-
-  useEffect(() => {
-    if (timeRemaining <= 0 && timerActive) {
-      setTimerActive(false);
-    }
-  }, [timeRemaining, timerActive]);
 
   const updateRating = usePracticeStore((state) => state.updateRating);
 
@@ -145,16 +144,16 @@ export default function PracticeSession({
 
   return (
     <>
-      <SecurityOverlay />
+      {/* <SecurityOverlay /> */}
       <WatermarkOverlay email={userEmail} fullName={userFullName} />
-      <div className="min-h-screen bg-background flex flex-col text-foreground select-none">
-        <header className="border-b border-border/40 bg-card/60 backdrop-blur-md px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-          <div className="flex items-center gap-4">
-            <KniButton variant="ghost" onClick={onExit}>
+      <div className="h-full w-full flex-1 min-h-0 bg-background flex flex-col text-foreground select-none overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs">
+        <header className="flex-none border-b border-border/40 bg-card/60 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between z-30">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <KniButton variant="ghost" onClick={onExit} className="size-8 p-0">
               <X className="w-5 h-5" />
             </KniButton>
             <div>
-              <h2 className="font-semibold text-lg">{subtestTitle}</h2>
+              <h2 className="font-bold text-base sm:text-lg text-slate-900">{subtestTitle}</h2>
               <p className="text-xs text-muted-foreground capitalize">
                 Folder: {folderId} • Question {currentIndex + 1} of {questions.length}
               </p>
@@ -169,8 +168,8 @@ export default function PracticeSession({
           </div>
         </header>
 
-        <main className="flex-1 max-w-4xl w-full mx-auto p-6 flex flex-col gap-6">
-          <div className="bg-card/40 border border-border/40 rounded-2xl p-6 sm:p-8 backdrop-blur-sm">
+        <div className="flex-1 min-h-0 w-full flex flex-col gap-3 p-3 sm:p-4 overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto rounded-xl">
             {questionRendererFactory.render(qData, {
               selectedAnswer: userAnswer,
               onAnswer: (val: unknown) => {
@@ -182,14 +181,14 @@ export default function PracticeSession({
             })}
           </div>
 
-          <div className="flex items-center justify-between border-t border-border/40 pt-6">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground mr-2 font-medium">Difficulty Rating:</span>
+          <div className="flex-none flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-3 bg-background z-20">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="text-xs text-muted-foreground mr-1 sm:mr-2 font-medium">Difficulty Rating:</span>
               <KniButton
                 variant={ratingMap[currentItem.id] === 'easy' ? 'primary' : 'outline'}
                 onClick={() => handleRatingSelect('easy')}
                 disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs px-2.5 py-1.5"
               >
                 <Smile className="w-3.5 h-3.5" /> Easy
               </KniButton>
@@ -197,7 +196,7 @@ export default function PracticeSession({
                 variant={ratingMap[currentItem.id] === 'medium' ? 'primary' : 'outline'}
                 onClick={() => handleRatingSelect('medium')}
                 disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs px-2.5 py-1.5"
               >
                 <Meh className="w-3.5 h-3.5" /> Medium
               </KniButton>
@@ -205,18 +204,18 @@ export default function PracticeSession({
                 variant={ratingMap[currentItem.id] === 'hard' ? 'primary' : 'outline'}
                 onClick={() => handleRatingSelect('hard')}
                 disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs"
+                className="gap-1.5 text-xs px-2.5 py-1.5"
               >
                 <Frown className="w-3.5 h-3.5" /> Hard
               </KniButton>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               <KniButton
                 variant="outline"
                 disabled={currentIndex === 0}
-                onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
-                className="gap-1.5"
+                onClick={() => handleGoToQuestion(Math.max(0, currentIndex - 1))}
+                className="gap-1.5 px-3 py-1.5 text-xs"
               >
                 <ChevronLeft className="w-4 h-4" /> Previous
               </KniButton>
@@ -226,16 +225,16 @@ export default function PracticeSession({
                   if (isLastQuestion) {
                     onExit();
                   } else {
-                    setCurrentIndex((prev) => prev + 1);
+                    handleGoToQuestion(currentIndex + 1);
                   }
                 }}
-                className="gap-1.5"
+                className="gap-1.5 px-3 py-1.5 text-xs"
               >
                 {isLastQuestion ? 'Finish Practice' : 'Next'} <ChevronRight className="w-4 h-4" />
               </KniButton>
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </>
   );

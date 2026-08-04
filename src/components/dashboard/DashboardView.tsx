@@ -20,6 +20,7 @@ import {
 } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
 import type { ModuleTestType, Profile } from '@/lib/types';
+import { isFullCompletion } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface DashboardViewProps {
@@ -145,7 +146,7 @@ export function DashboardView({
       total: 0,
     };
 
-  const completedAttempts = filteredPastExams.filter(attempt => attempt.status === 'completed');
+  const completedAttempts = filteredPastExams.filter(attempt => isFullCompletion(attempt));
   const inProgressAttempts = filteredPastExams.filter(attempt => attempt.status !== 'completed');
   const latestAttempt = filteredPastExams[0];
   const totalCorrect = radarStats.reduce((sum, item) => sum + item.correct, 0);
@@ -205,9 +206,9 @@ export function DashboardView({
                 <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
                   {profile?.format || 'Format not selected'}
                 </span>
-                <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
+                {/* <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
                   {profile?.status || 'Pending'}
-                </span>
+                </span> */}
               </div>
             </div>
 

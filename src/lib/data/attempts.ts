@@ -3,70 +3,11 @@ import 'server-only';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { requireApprovedUser } from '@/lib/auth/guards';
 import type { Database, Json } from '@/lib/supabase/database.types';
-
-export interface AttemptSectionScore {
-  key: string;
-  label: string;
-  correct: number;
-  total: number;
-}
-
-interface AnswerOutcome {
-  questionId: string;
-  isCorrect: boolean;
-}
+import type { CompletionReason } from '@/lib/types';
+import { buildAttemptSectionScores } from '@/lib/exam/attempt-results';
 
 type SectionRow = Database['public']['Tables']['sections']['Row'];
 type QuestionReference = Pick<Database['public']['Tables']['questions']['Row'], 'id' | 'section_id'>;
-
-function isRecord(value: Json): value is { [key: string]: Json | undefined } {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function extractAnswerOutcomes(detailedResults: Json | null): AnswerOutcome[] {
-  if (!detailedResults || !isRecord(detailedResults)) return [];
-
-  const answers = detailedResults.answers;
-  if (!Array.isArray(answers)) return [];
-
-  return answers.flatMap((answer): AnswerOutcome[] => {
-    if (!isRecord(answer)) return [];
-    const questionId = answer.question_id;
-    const isCorrect = answer.is_correct;
-    if (typeof questionId !== 'string' || typeof isCorrect !== 'boolean') return [];
-    return [{ questionId, isCorrect }];
-  });
-}
-
-function buildSectionScores(
-  detailedResults: Json | null,
-  questionSectionIds: ReadonlyMap<string, string>,
-  sectionsById: ReadonlyMap<string, SectionRow>,
-): AttemptSectionScore[] {
-  const scores = new Map<string, AttemptSectionScore>();
-
-  for (const answer of extractAnswerOutcomes(detailedResults)) {
-    const sectionId = questionSectionIds.get(answer.questionId);
-    const section = sectionId ? sectionsById.get(sectionId) : undefined;
-    if (!section) continue;
-
-    const current = scores.get(section.id) ?? {
-      key: section.id,
-      label: section.title,
-      correct: 0,
-      total: 0,
-    };
-    current.total += 1;
-    if (answer.isCorrect) current.correct += 1;
-    scores.set(section.id, current);
-  }
-
-  return [...scores.values()].sort((left, right) => {
-    const leftSection = sectionsById.get(left.key);
-    const rightSection = sectionsById.get(right.key);
-    return (leftSection?.sort_order ?? 0) - (rightSection?.sort_order ?? 0);
-  });
-}
 
 function toJson(value: unknown): Json {
   if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -148,7 +89,7 @@ export async function listAttempts() {
   const supabase = getAdminSupabaseClient();
   const { data, error } = await supabase
     .from('user_exams')
-    .select('id, user_id, exam_id, status, started_at, completed_at, total_score, max_score, created_at, detailed_results')
+    .select('id, user_id, exam_id, status, completion_reason, answered_count, started_at, completed_at, total_score, max_score, created_at, detailed_results')
     .eq('user_id', profile.id)
     .order('created_at', { ascending: false });
 
@@ -190,7 +131,7 @@ export async function listAttempts() {
   return attempts.map((attempt) => ({
     ...attempt,
     exam_format: examFormats.get(attempt.exam_id) ?? null,
-    section_scores: buildSectionScores(attempt.detailed_results, questionSectionIds, sectionsById),
+    section_scores: buildAttemptSectionScores(attempt.detailed_results, questionSectionIds, sectionsById),
   }));
 }
 
@@ -222,19 +163,23 @@ export async function updateAttemptProgress(attemptId: string, userAnswers: Reco
   return data;
 }
 
-export async function submitAttempt(attemptId: string, userAnswers: Record<string, unknown>) {
+export async function submitAttempt(
+  attemptId: string,
+  userAnswers: Record<string, unknown>,
+  completionReason: CompletionReason = 'finished',
+) {
   const { profile } = await requireApprovedUser();
   const supabase = getAdminSupabaseClient();
 
-  // Call the locked-down PostgreSQL RPC wrapper for atomic transactional scoring.
-  const { data, error } = await supabase.rpc('submit_attempt_transaction', {
+  const { data, error } = await supabase.rpc('submit_attempt_transaction_v2', {
     p_attempt_id: attemptId,
     p_user_id: profile.id,
     p_user_answers: toJson(userAnswers),
+    p_completion_reason: completionReason,
   });
 
   if (error) {
-    throw new Error(`Failed to submit attempt: ${error.message}`);
+    throw new Error(`Scoring failed: ${error.message}`);
   }
 
   return data;

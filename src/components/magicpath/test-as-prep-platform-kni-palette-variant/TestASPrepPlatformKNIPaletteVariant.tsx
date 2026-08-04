@@ -978,7 +978,7 @@ function AdminUsers({
             </div>
             {/* user email: text-slate-300 → text-slate-500 */}
             <p className="text-sm text-slate-500">{user.email}</p>
-            <StatusBadge status={user.status} />
+            {/* <StatusBadge status={user.status} /> */}
             <div className="flex flex-wrap gap-2">
               {['CS', 'Economics', 'Engineering'].map(module => <button key={module} type="button" className={classNames('rounded-full border px-3 py-1 text-xs transition', user.modules.includes(module) ? 'border-orange-300/60 bg-orange-600/20 text-orange-800' : 'border-orange-200 bg-orange-50 text-slate-500')}>
                   {module}

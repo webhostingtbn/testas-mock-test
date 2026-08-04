@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useExamStore } from '@/lib/store/exam-store';
@@ -13,13 +13,38 @@ import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
 import { ImageService } from '@/lib/services/image-service';
 
+interface DisplayQuestion {
+  id: string;
+  section_id?: string;
+  sort_order?: number;
+  question_type?: string;
+  content?: unknown;
+  isPassage?: boolean;
+  questions?: DisplayQuestion[];
+  passage_id?: string;
+}
+
+type RatingSaveState = 'idle' | 'saving' | 'error';
+
 export default function ExamPage() {
   const imageService = useMemo(() => new ImageService(), []);
   const router = useRouter();
   const { data: session } = useSession();
   const [hydrated, setHydrated] = useState(false);
-  const [sectionQuestions, setSectionQuestions] = useState<any[]>([]);
+  const [sectionQuestions, setSectionQuestions] = useState<DisplayQuestion[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+
+  // Rating persistence state — keyed to the question being rated.
+  // saveVersion serializes writes: only the latest version's completion is accepted.
+  const [ratingSaveState, setRatingSaveState] = useState<RatingSaveState>('idle');
+  const [ratingErrorMsg, setRatingErrorMsg] = useState<string | null>(null);
+  const [lastRatingPayload, setLastRatingPayload] = useState<{
+    questionIds: string[];
+    difficulty: 'easy' | 'medium' | 'hard';
+    forQuestionIndex: number;
+    forSectionIndex: number;
+  } | null>(null);
+  const saveVersionRef = useRef(0);
 
   const {
     currentExamId,
@@ -39,9 +64,9 @@ export default function ExamPage() {
     goToQuestion,
     getRating,
     setRating,
+    endExamEarly,
   } = useExamStore();
 
-  const [userId, setUserId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ email: string; fullName: string | null } | null>(null);
 
   useEffect(() => {
@@ -58,7 +83,6 @@ export default function ExamPage() {
               email: data.profile.email,
               fullName: data.profile.full_name,
             });
-            setUserId(data.profile.id);
             return;
           }
         }
@@ -66,7 +90,6 @@ export default function ExamPage() {
           email: email,
           fullName: session?.user?.name || null,
         });
-        if (session?.user?.id) setUserId(session.user.id);
       } catch (err) {
         console.error('Failed to fetch user profile for watermark:', err);
         setUserProfile({
@@ -108,7 +131,7 @@ export default function ExamPage() {
       const sectionPassages = (examData.passages || []).filter(
         (passage: { section_id?: string }) => passage.section_id === section.id,
       );
-      const displayQuestions = isModuleSection
+      const displayQuestions: DisplayQuestion[] = isModuleSection
         ? [
             ...sectionPassages
               .map((passage: { id: string; section_id?: string }) => ({
@@ -131,7 +154,7 @@ export default function ExamPage() {
     } finally {
       setIsLoadingQuestions(false);
     }
-  }, [currentExamId]);
+  }, [currentExamId, imageService]);
 
   useEffect(() => {
     if (!hydrated || !currentExamId) return;
@@ -159,6 +182,15 @@ export default function ExamPage() {
       startBreak(currentStep.breakDuration);
     }
   }, [hydrated, currentStep, startSection, startBreak]);
+
+  // Reset rating save state when question changes — but preserve error+retry if pending.
+  useEffect(() => {
+    if (ratingSaveState !== 'error') {
+      setRatingSaveState('idle');
+      setRatingErrorMsg(null);
+      // Don't clear lastRatingPayload — it's keyed to a specific question and still valid.
+    }
+  }, [currentQuestionIndex, currentSectionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!hydrated || !currentExamId || !currentStep) {
     return (
@@ -190,35 +222,93 @@ export default function ExamPage() {
     ? sectionQuestions.length
     : currentSection.questionCount;
 
-  const currentQuestion = sectionQuestions[currentQuestionIndex] || null;
+  const currentQuestion: DisplayQuestion | null = sectionQuestions[currentQuestionIndex] || null;
+
+  // Derive whether current question (or all passage children) is rated
+  const isCurrentQuestionRated = (() => {
+    if (!currentQuestion) return false;
+    if (currentQuestion.isPassage && currentQuestion.questions) {
+      return currentQuestion.questions.every(
+        (childQ) => getRating(currentSection.id, childQ.id) !== null,
+      );
+    }
+    return getRating(currentSection.id, currentQuestion.id) !== null;
+  })();
+
+  // Show End Test on non-final subtests
+  const showEndTest = currentSectionIndex < sections.length - 1;
+
+  // Combined navigation gate: rated + save not in-flight or failed
+  const canNavigate = isCurrentQuestionRated && ratingSaveState === 'idle';
+
+  const syncRatingToServer = async (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => {
+    saveVersionRef.current += 1;
+    const thisVersion = saveVersionRef.current;
+
+    setRatingSaveState('saving');
+    setRatingErrorMsg(null);
+    setLastRatingPayload({
+      questionIds,
+      difficulty,
+      forQuestionIndex: currentQuestionIndex,
+      forSectionIndex: currentSectionIndex,
+    });
+
+    try {
+      const results = await Promise.all(
+        questionIds.map((qId) =>
+          fetch(`/api/practice/${qId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ difficulty }),
+          }),
+        ),
+      );
+
+      // Stale: a newer write has started; ignore this completion.
+      if (thisVersion !== saveVersionRef.current) return;
+
+      const failedResults = results.filter((res) => !res.ok);
+      if (failedResults.length > 0) {
+        setRatingSaveState('error');
+        setRatingErrorMsg(`${failedResults.length} of ${results.length} rating(s) failed to sync`);
+        return;
+      }
+
+      setRatingSaveState('idle');
+      setRatingErrorMsg(null);
+      setLastRatingPayload(null);
+    } catch (err) {
+      // Stale: a newer write has started; ignore this completion.
+      if (thisVersion !== saveVersionRef.current) return;
+      console.error('Failed to sync difficulty rating to database:', err);
+      setRatingSaveState('error');
+      setRatingErrorMsg('Network error syncing rating');
+    }
+  };
 
   const handleDifficultySelect = async (difficulty: 'easy' | 'medium' | 'hard') => {
     if (!currentQuestion) return;
 
+    // Set rating in Zustand store immediately
+    const questionIdsToSync: string[] = [];
     if (currentQuestion.isPassage && currentQuestion.questions) {
-      currentQuestion.questions.forEach((childQ: any) => {
+      currentQuestion.questions.forEach((childQ) => {
         setRating(currentSection.id, childQ.id, difficulty);
+        questionIdsToSync.push(childQ.id);
       });
     } else {
       setRating(currentSection.id, currentQuestion.id, difficulty);
+      questionIdsToSync.push(currentQuestion.id);
     }
-    
-    if (userId) {
-      try {
-        const questionIdsToSync = currentQuestion.isPassage && currentQuestion.questions
-          ? currentQuestion.questions.map((childQ: any) => childQ.id)
-          : [currentQuestion.id];
 
-        for (const qId of questionIdsToSync) {
-          await fetch(`/api/practice/${qId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ difficulty }),
-          });
-        }
-      } catch (err) {
-        console.error('Failed to sync difficulty rating to database:', err);
-      }
+    // Persist to server
+    await syncRatingToServer(questionIdsToSync, difficulty);
+  };
+
+  const handleRetryRatingSave = async () => {
+    if (lastRatingPayload) {
+      await syncRatingToServer(lastRatingPayload.questionIds, lastRatingPayload.difficulty);
     }
   };
 
@@ -230,14 +320,27 @@ export default function ExamPage() {
     advanceFlowStep();
   };
 
+  const handleEndTest = () => {
+    endExamEarly();
+  };
+
   const buildQuestionData = (): QuestionData => {
-    const q = currentQuestion || {};
+    if (!currentQuestion) {
+      return {
+        id: `q-${currentQuestionIndex}`,
+        sectionId: currentSection.id,
+        sortOrder: currentQuestionIndex + 1,
+        questionType: currentSection.questionType,
+        content: {},
+      };
+    }
+
     return {
-      id: q.id || `q-${currentQuestionIndex}`,
-      sectionId: q.section_id || currentSection.id,
-      sortOrder: q.sort_order || currentQuestionIndex + 1,
-      questionType: q.question_type || currentSection.questionType,
-      content: q.content || q,
+      id: currentQuestion.id || `q-${currentQuestionIndex}`,
+      sectionId: currentQuestion.section_id || currentSection.id,
+      sortOrder: currentQuestion.sort_order || currentQuestionIndex + 1,
+      questionType: currentQuestion.question_type || currentSection.questionType,
+      content: currentQuestion.content || currentQuestion,
     };
   };
 
@@ -250,7 +353,15 @@ export default function ExamPage() {
     }
   };
 
-  const currentRating = currentQuestion ? getRating(currentSection.id, currentQuestion.id) : null;
+  // For passage questions, derive the displayed rating from the first child's rating
+  // (all children get the same rating via handleDifficultySelect)
+  const currentRating = (() => {
+    if (!currentQuestion) return null;
+    if (currentQuestion.isPassage && currentQuestion.questions && currentQuestion.questions.length > 0) {
+      return getRating(currentSection.id, currentQuestion.questions[0].id);
+    }
+    return getRating(currentSection.id, currentQuestion.id);
+  })();
 
   const answeredIndices = Object.keys(answers[currentSection.id] || {}).map((_, idx) => idx);
 
@@ -266,6 +377,7 @@ export default function ExamPage() {
           answeredQuestions={answeredIndices}
           onQuestionClick={(idx) => goToQuestion(idx)}
           onTimeUp={handleTimeUp}
+          isCurrentQuestionRated={canNavigate}
         />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center">
@@ -291,9 +403,15 @@ export default function ExamPage() {
           onBack={prevQuestion}
           onNext={nextQuestion}
           onEndSubtest={handleEndSubtest}
+          onEndTest={handleEndTest}
+          showEndTest={showEndTest}
           isFirstQuestion={currentQuestionIndex === 0}
           isLastQuestion={currentQuestionIndex === totalQuestions - 1}
           sectionTitle={currentSection.title}
+          isCurrentQuestionRated={canNavigate}
+          isRatingSaving={ratingSaveState === 'saving'}
+          ratingError={ratingErrorMsg}
+          onRetryRatingSave={handleRetryRatingSave}
           currentRating={currentRating}
           onRatingChange={(rating) => handleDifficultySelect(rating)}
         />

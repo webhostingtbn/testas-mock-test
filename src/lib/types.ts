@@ -30,6 +30,8 @@ export type QuestionType =
 
 export type ExamStatus = 'not_started' | 'in_progress' | 'completed';
 
+export type CompletionReason = 'finished' | 'ended_early';
+
 export type SectionStatus = 'not_started' | 'in_progress' | 'completed' | 'skipped';
 
 // ---- Database row types ----
@@ -102,6 +104,8 @@ export interface UserExam {
   user_id: string;
   exam_id: string;
   status: ExamStatus;
+  completion_reason: CompletionReason;
+  answered_count: number;
   started_at: string | null;
   completed_at: string | null;
   total_score: number | null;
@@ -206,4 +210,21 @@ export interface ExamFlow {
   userExamId: string;
   steps: ExamFlowStep[];
   sections: ExamSection[];
+}
+
+// ---- Attempt predicate helpers ----
+
+/** True when the attempt completed the entire exam (not ended early). */
+export function isFullCompletion(attempt: { status?: string; completion_reason?: string | null }): boolean {
+  return attempt.status === 'completed' && (attempt.completion_reason === 'finished' || !attempt.completion_reason);
+}
+
+/** True when the attempt is terminal (completed, whether finished or ended early). */
+export function isTerminalAttempt(attempt: { status?: string }): boolean {
+  return attempt.status === 'completed';
+}
+
+/** True when the attempt can still be resumed. */
+export function isResumableAttempt(attempt: { status?: string }): boolean {
+  return attempt.status === 'in_progress';
 }

@@ -159,7 +159,7 @@ function getNavigation(isAdmin?: boolean): AppNavItem[] {
 
   if (isAdmin) {
     nav.push({ id: 'users', icon: Users, label: 'Users' });
-    nav.push({ id: 'cms', icon: PenLine, label: 'CMS' });
+    // nav.push({ id: 'cms', icon: PenLine, label: 'CMS' });
   }
 
   return nav;
@@ -524,8 +524,8 @@ export function KniShell({
             onBack={backNavigation?.onBack}
             parentViewLabel={backNavigation?.label}
           />
-          <main className="relative z-10 flex-1 bg-[#fbfaf8] p-5 min-h-0">
-            <div className="h-[calc(100vh-180px)] sm:h-full overflow-y-auto custom-scrollbar">
+          <main className="relative z-10 flex-1 bg-[#fbfaf8] p-3 sm:p-5 min-h-0 flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
               {children}
             </div>
           </main>
