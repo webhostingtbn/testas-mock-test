@@ -172,6 +172,17 @@ function ExpandedHistory({ user }: { user: ProfileWithExams }) {
   );
 }
 
+const MODULE_OPTIONS = [
+  { value: 'economics', label: 'Economics' },
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'natural_computer_science', label: 'Natural & CS' },
+] as const;
+
+const FORMAT_OPTIONS = [
+  { value: 'Digital', label: 'Digital' },
+  { value: 'Paper', label: 'Paper' },
+] as const;
+
 export function AdminUsersPanel() {
   const [users, setUsers] = useState<ProfileWithExams[]>([]);
   const [exams, setExams] = useState<ExamConfig[]>([]);
@@ -283,7 +294,7 @@ export function AdminUsersPanel() {
     }
   };
 
-  const updateUser = async (userId: string, updates: Record<string, string | number>) => {
+  const updateUser = async (userId: string, updates: Partial<{ status: string; format: string; module_test: string; allow_test_limit: number }>) => {
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
@@ -363,18 +374,70 @@ export function AdminUsersPanel() {
         <div className="space-y-6">
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center"><div><h3 className="text-xl font-bold text-slate-900">{activeSubTab === 'pending' ? 'Pending Approvals' : 'Approved Users'}</h3><p className="mt-0.5 text-sm text-slate-500">Showing {filteredUsers.length} students</p></div><div className="flex flex-wrap gap-3"><label className="flex min-w-70 items-center gap-2 rounded-2xl border border-orange-200 bg-white px-4 py-2.5"><Search className="size-4 text-slate-400" /><input aria-label="Search users" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search name, email or phone..." className="w-full bg-transparent text-sm outline-none" /></label><KniButton variant="secondary" className="h-10 px-4 text-xs" disabled={isUpdatingLimit} onClick={updateAllUsersLimit}><Users className="size-4" />Set All Limits</KniButton><KniButton variant="primary" className="h-10 px-4 text-xs" onClick={exportUsers}><Download className="size-4" />Export CSV</KniButton></div></div>
           <KniCard className="overflow-hidden p-0">
-            <div className="hidden grid-cols-[1.4fr_1.1fr_1fr_1.2fr] gap-4 border-b border-orange-100 bg-orange-50/30 px-5 py-4 text-sm font-semibold text-slate-500 lg:grid"><span>User</span><span>Allocation</span><span>Attempts</span><span className="text-right">Actions</span></div>
+            <div className="hidden grid-cols-[1.1fr_0.9fr_0.5fr_1.9fr] gap-4 border-b border-orange-100 bg-orange-50/30 px-5 py-4 text-sm font-semibold text-slate-500 lg:grid"><span>User</span><span>Allocation</span><span>Attempts</span><span className="text-right">Actions</span></div>
             {filteredUsers.map((user) => {
               const expanded = expandedUserId === user.id;
               return (
                 <div key={user.id} className="border-b border-orange-100 last:border-b-0">
-                  <div className="grid cursor-pointer gap-4 px-5 py-5 transition hover:bg-orange-50/30 lg:grid-cols-[1.4fr_1.1fr_1fr_1.2fr] lg:items-center" onClick={() => setExpandedUserId(expanded ? null : user.id)}>
+                  <div className="grid cursor-pointer gap-4 px-5 py-5 transition hover:bg-orange-50/30 lg:grid-cols-[1.1fr_0.9fr_0.5fr_1.9fr] lg:items-center" onClick={() => setExpandedUserId(expanded ? null : user.id)}>
                     <div><p className="font-semibold text-slate-900">{user.full_name || 'No Name Provided'}</p><p className="text-sm text-slate-500">{user.email}</p></div>
                     <div className="text-sm text-slate-600">{user.module_test || 'Not selected'} · {user.format || 'Digital'}</div>
                     <div className="font-semibold text-slate-700">{user.user_exams.length}</div>
-                    <div className="flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
-                      {activeSubTab === 'pending' ? <><button type="button" className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-700" onClick={() => updateUser(user.id, { status: 'Approved' })}><Check className="mr-1 inline size-3" />Approve</button><button type="button" className="rounded-lg bg-rose-500/10 px-3 py-1.5 text-xs font-bold text-rose-700" onClick={() => updateUser(user.id, { status: 'Rejected' })}><X className="mr-1 inline size-3" />Reject</button></> : <><button type="button" className="rounded-lg border border-orange-200 px-2 py-1 text-xs" onClick={() => updateUser(user.id, { module_test: user.module_test === 'economics' ? 'engineering' : 'economics' })}>Module</button><button type="button" className="rounded-lg border border-orange-200 px-2 py-1 text-xs" onClick={() => updateUser(user.id, { format: user.format === 'Paper' ? 'Digital' : 'Paper' })}>Format</button><button type="button" className="rounded-lg border border-orange-200 px-2 py-1 text-xs" onClick={() => updateUserLimit(user.id, user.allow_test_limit ?? 1)}>Limit {user.allow_test_limit ?? 1}</button></>}
-                      <button type="button" className="grid size-8 place-items-center rounded-xl bg-orange-50 text-orange-600" onClick={() => setExpandedUserId(expanded ? null : user.id)}>{expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}</button>
+                    <div className="flex flex-wrap items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                      <select
+                        aria-label="Select module"
+                        value={user.module_test ?? ''}
+                        onChange={(event) => updateUser(user.id, { module_test: event.target.value })}
+                        className="h-8 rounded-lg border border-orange-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-orange-300 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      >
+                        <option value="" disabled>Select Module</option>
+                        {MODULE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label="Select format"
+                        value={user.format ?? 'Digital'}
+                        onChange={(event) => updateUser(user.id, { format: event.target.value })}
+                        className="h-8 rounded-lg border border-orange-200 bg-white px-2 text-xs font-medium text-slate-700 shadow-sm transition hover:border-orange-300 focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500"
+                      >
+                        {FORMAT_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      {activeSubTab === 'pending' ? (
+                        <>
+                          <button
+                            type="button"
+                            className="h-8 rounded-lg bg-emerald-500/10 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-500/20"
+                            onClick={() => updateUser(user.id, { status: 'Approved' })}
+                          >
+                            <Check className="mr-1 inline size-3" />Approve
+                          </button>
+                          <button
+                            type="button"
+                            className="h-8 rounded-lg bg-rose-500/10 px-3 text-xs font-bold text-rose-700 transition hover:bg-rose-500/20"
+                            onClick={() => updateUser(user.id, { status: 'Rejected' })}
+                          >
+                            <X className="mr-1 inline size-3" />Reject
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className="h-8 rounded-lg border border-orange-200 bg-white px-2.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-50/50"
+                          onClick={() => updateUserLimit(user.id, user.allow_test_limit ?? 1)}
+                        >
+                          Limit {user.allow_test_limit ?? 1}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="grid size-8 place-items-center rounded-xl bg-orange-50 text-orange-600 transition hover:bg-orange-100"
+                        onClick={() => setExpandedUserId(expanded ? null : user.id)}
+                      >
+                        {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                      </button>
                     </div>
                   </div>
                   {expanded && <ExpandedHistory user={user} />}

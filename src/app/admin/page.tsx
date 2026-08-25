@@ -29,7 +29,21 @@ interface ProfileWithExams {
   user_exams: UserExam[];
   phonenumber: string;
   allow_test_limit: number;
+  status?: string | null;
+  format?: string | null;
+  module_test?: string | null;
 }
+
+const MODULE_OPTIONS = [
+  { value: 'economics', label: 'Economics' },
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'natural_computer_science', label: 'Natural & CS' },
+] as const;
+
+const FORMAT_OPTIONS = [
+  { value: 'Digital', label: 'Digital' },
+  { value: 'Paper', label: 'Paper' },
+] as const;
 
 interface ExamConfig {
   id: string;
@@ -180,6 +194,20 @@ export default function AdminPage() {
       setError(err?.message || 'Failed to update exam activation.');
     } finally {
       setIsUpdatingExamId(null);
+    }
+  };
+
+  const updateUser = async (userId: string, updates: Partial<{ status: string; format: string; module_test: string; allow_test_limit: number }>) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Failed to update user');
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Failed to update user.');
     }
   };
 
@@ -401,6 +429,8 @@ export default function AdminPage() {
                     <th className="p-3">User</th>
                     <th className="p-3">Role</th>
                     <th className="p-3">Phone</th>
+                    <th className="p-3">Module</th>
+                    <th className="p-3">Format</th>
                     <th className="p-3">Attempts Used</th>
                     <th className="p-3">Allowed Limit</th>
                     <th className="p-3 text-right">Actions</th>
@@ -427,6 +457,31 @@ export default function AdminPage() {
                           </Badge>
                         </td>
                         <td className="p-3 text-slate-400">{user.phonenumber || '-'}</td>
+                        <td className="p-3">
+                          <select
+                            aria-label="Select module"
+                            value={user.module_test || ''}
+                            onChange={(e) => updateUser(user.id, { module_test: e.target.value })}
+                            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="" disabled>Select Module</option>
+                            {MODULE_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <select
+                            aria-label="Select format"
+                            value={user.format || 'Digital'}
+                            onChange={(e) => updateUser(user.id, { format: e.target.value })}
+                            className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          >
+                            {FORMAT_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+                        </td>
                         <td className="p-3 font-semibold">{user.user_exams.length}</td>
                         <td className="p-3 font-semibold text-indigo-400">{user.allow_test_limit}</td>
                         <td className="p-3 text-right space-x-2">
@@ -443,7 +498,7 @@ export default function AdminPage() {
                       </tr>
                       {expandedUserId === user.id && (
                         <tr>
-                          <td colSpan={6} className="bg-slate-900/90 p-4">
+                          <td colSpan={8} className="bg-slate-900/90 p-4">
                             <h4 className="font-semibold text-xs text-slate-400 uppercase tracking-wider mb-2">Exam History ({user.user_exams.length})</h4>
                             {user.user_exams.length === 0 ? (
                               <p className="text-xs text-slate-500">No exam attempts recorded.</p>
