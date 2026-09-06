@@ -387,10 +387,12 @@ export default function ExamPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : questionData ? (
-              questionRendererFactory.render(questionData, {
+              <div key={questionData.id} className="w-full">
+              {questionRendererFactory.render(questionData, {
                 selectedAnswer: currentAnswer,
                 onAnswer: handleAnswerChange,
-              })
+              })}
+              </div>
             ) : (
               <div className="flex h-64 items-center justify-center text-muted-foreground">
                 Question type &quot;{currentSection.questionType}&quot; coming soon.

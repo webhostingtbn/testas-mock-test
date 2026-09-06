@@ -76,6 +76,7 @@ export default function ModuleMCQ({
   onAnswer,
 }: ModuleMCQProps) {
   // State to track which question accordion is open. Default first one open.
+  // Parents pass key={passage.id} so navigating remounts and resets this.
   const [openQuestionId, setOpenQuestionId] = useState<string | null>(
     passage.questions && passage.questions.length > 0 ? passage.questions[0].id : null
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, Smile, Meh, Frown } from 'lucide-react';
 import { KniButton } from '@/components/KniPrimitives';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
@@ -72,28 +72,43 @@ export default function PracticeSession({
   const [timerActive, setTimerActive] = useState<boolean>(true);
 
   const currentItem = questions[currentIndex] || null;
-  const handleGoToQuestion = (newIndex: number) => {
-    setCurrentIndex(newIndex);
-    const nextItem = questions[newIndex];
-    setUserAnswer(nextItem ? answers[nextItem.id] ?? null : null);
-    const defaultSecs = QUESTION_TIME_LIMITS[subtestType] || 90;
-    setTimeRemaining(defaultSecs);
-    setTimerActive(true);
-  };
-
+  // Mirror answers for navigation handlers without closing over stale state.
+  const answersRef = useRef<Record<string, unknown>>({});
   useEffect(() => {
-    if (!timerActive || timeRemaining <= 0) return;
+    answersRef.current = answers;
+  }, [answers]);
+
+  const resetTimerForQuestion = useCallback(() => {
+    setTimeRemaining(QUESTION_TIME_LIMITS[subtestType] || 90);
+    setTimerActive(true);
+  }, [subtestType]);
+
+  const handleGoToQuestion = useCallback((newIndex: number) => {
+    const nextItem = questions[newIndex];
+    setCurrentIndex(newIndex);
+    setUserAnswer(nextItem ? (answersRef.current[nextItem.id] ?? null) : null);
+    resetTimerForQuestion();
+  }, [questions, resetTimerForQuestion]);
+
+  // Timer resets in handleGoToQuestion (event handler); initial mount uses
+  // the useState initializer above, so no reset effect is needed here.
+
+  // Single interval for the countdown — previously recreated every tick via
+  // [timerActive, timeRemaining] deps, which made back/forth feel sluggish.
+  useEffect(() => {
+    if (!timerActive) return;
     const interval = setInterval(() => {
       setTimeRemaining((prev) => {
-        const nextSec = Math.max(0, prev - 1);
-        if (nextSec <= 0) {
+        if (prev <= 1) {
+          window.clearInterval(interval);
           setTimerActive(false);
+          return 0;
         }
-        return nextSec;
+        return prev - 1;
       });
     }, 1000);
-    return () => clearInterval(interval);
-  }, [timerActive, timeRemaining]);
+    return () => window.clearInterval(interval);
+  }, [timerActive]);
 
   const updateRating = usePracticeStore((state) => state.updateRating);
 
@@ -168,8 +183,37 @@ export default function PracticeSession({
           </div>
         </header>
 
+        {/* Question switcher: direct jump via question number (restored old UI) */}
+        <div className="flex-none border-b border-border/40 bg-card/40 px-4 sm:px-6 py-2">
+          <div className="flex gap-2 overflow-x-auto py-1 px-2">
+            {questions.map((q, idx) => {
+              const isActive = currentIndex === idx;
+              const isAnswered = answers[q.id] !== undefined && answers[q.id] !== null;
+              const isRated = ratingMap[q.id] !== undefined;
+              const btnClass = isActive
+                ? 'bg-orange-500 border-orange-500 text-white font-extrabold shadow-sm scale-110 ring-2 ring-orange-200 ring-offset-1'
+                : isAnswered || isRated
+                  ? 'bg-orange-100/60 border-orange-200 text-orange-900 hover:bg-orange-100'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900';
+              return (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => handleGoToQuestion(idx)}
+                  aria-label={`Go to question ${idx + 1}`}
+                  aria-current={isActive ? 'true' : undefined}
+                  title={`Question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
+                  className={`w-7 h-7 rounded-md border text-[11px] font-bold flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer ${btnClass}`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex-1 min-h-0 w-full flex flex-col gap-3 p-3 sm:p-4 overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-y-auto rounded-xl">
+          <div key={currentItem.id} className="flex-1 min-h-0 overflow-y-auto rounded-xl">
             {questionRendererFactory.render(qData, {
               selectedAnswer: userAnswer,
               onAnswer: (val: unknown) => {
