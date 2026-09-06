@@ -2,13 +2,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { CanvasImage } from './CanvasImage';
+import { RichMarkdown } from './RichMarkdown';
 
 export interface ModuleQuestion {
   id: string;
@@ -32,13 +28,6 @@ interface ModuleMCQProps {
   passage: ModulePassage;
   selectedAnswers: Record<string, string>; // Maps questionId -> selected letter ('A', 'B', etc.)
   onAnswer: (questionId: string, answer: string) => void;
-}
-
-function prepareLatex(text: any) {
-  if (typeof text !== 'string') return '';
-  return text
-    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$') // inline: \( ... \) to $...$
-    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
 function normalizeOptions(options: any): { id: string; text?: string; image_url?: string }[] {
@@ -107,16 +96,11 @@ export default function ModuleMCQ({
         </div>
         <div className={`p-6 overflow-y-auto flex-col gap-4 flex-1 min-h-0 ${isPassageCollapsed ? 'hidden lg:flex' : 'flex'}`}>
           <div className="prose prose-orange max-w-none text-gray-800 prose-headings:font-bold prose-h1:text-2xl prose-h2:text-xl flex-none">
-            <ReactMarkdown
-              remarkPlugins={[remarkMath, remarkGfm]}
-              rehypePlugins={[rehypeKatex]}
-            >
-              {prepareLatex(passage.body_markdown)}
-            </ReactMarkdown>
+            <RichMarkdown content={passage.body_markdown} />
           </div>
           {passage.resolved_image_url && (
-            <div className="w-full flex-1 min-h-[200px] flex flex-col overflow-hidden">
-              <div className="w-full flex-1 min-h-[200px] flex flex-col overflow-hidden">
+            <div className="w-full h-full flex-1 min-h-50 flex flex-col overflow-hidden">
+              <div className="w-full flex-1 min-h-50 flex flex-col overflow-hidden">
               <CanvasImage src={passage.resolved_image_url} alt="Passage graphic" />
             </div>
             </div>
@@ -183,14 +167,11 @@ export default function ModuleMCQ({
                   <div className="prose prose-sm prose-orange max-w-none text-gray-800 mb-2 prose-p:leading-relaxed">
                     {/* Optional child question image */}
                     {(question.content as any).resolved_image_url && (
-                      <CanvasImage src={(question.content as any).resolved_image_url} alt="Question graphic" />
+                      <div className="w-full h-64 min-h-[240px] flex flex-col overflow-hidden mb-3 not-prose">
+                        <CanvasImage src={(question.content as any).resolved_image_url} alt="Question graphic" />
+                      </div>
                     )}
-                    <ReactMarkdown
-                      remarkPlugins={[remarkMath, remarkGfm]}
-                      rehypePlugins={[rehypeKatex]}
-                    >
-                      {prepareLatex(question.content.question_text)}
-                    </ReactMarkdown>
+                    <RichMarkdown content={question.content.question_text} />
                   </div>
 
                   <div className="space-y-2">
@@ -244,12 +225,7 @@ export default function ModuleMCQ({
                                 </div>
                               ) : (
                                 <div className="prose prose-sm prose-orange max-w-none flex-1 prose-p:my-0">
-                                  <ReactMarkdown
-                                    remarkPlugins={[remarkMath, remarkGfm]}
-                                    rehypePlugins={[rehypeKatex]}
-                                  >
-                                    {prepareLatex(option.text || '')}
-                                  </ReactMarkdown>
+                                  <RichMarkdown content={option.text || ''} />
                                 </div>
                               )}
                             </div>

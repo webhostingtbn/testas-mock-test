@@ -1,12 +1,8 @@
 'use client';
 
 import React from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import remarkGfm from 'remark-gfm';
-import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
 import { CanvasImage } from './CanvasImage';
+import { RichMarkdown } from './RichMarkdown';
 
 interface ModuleQuestionProps {
   question: {
@@ -23,13 +19,6 @@ interface ModuleQuestionProps {
   selectedAnswer: string | null;
   onAnswer: (optionId: string) => void;
   isSplitLayout?: boolean;
-}
-
-function prepareLatex(text: any) {
-  if (typeof text !== 'string') return '';
-  return text
-    .replace(/\\\(([\s\S]*?)\\\)/g, '$$$1$$') // inline: \( ... \) to $...$
-    .replace(/\\\[([\s\S]*?)\\\]/g, '$$$$$1$$$$'); // block: \[ ... \] to $$...$$
 }
 
 function normalizeOptions(options: any): { id: string; text?: string; image_url?: string }[] {
@@ -185,12 +174,7 @@ export default function ModuleQuestion({
                       <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
                         isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
                       }`}>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkMath, remarkGfm]}
-                          rehypePlugins={[rehypeKatex]}
-                        >
-                          {prepareLatex(option.text)}
-                        </ReactMarkdown>
+                        <RichMarkdown content={option.text} />
                       </div>
                     ) : null}
                   </div>
@@ -318,12 +302,7 @@ export default function ModuleQuestion({
                     <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
                       isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
                     }`}>
-                      <ReactMarkdown
-                        remarkPlugins={[remarkMath, remarkGfm]}
-                        rehypePlugins={[rehypeKatex]}
-                      >
-                        {prepareLatex(option.text)}
-                      </ReactMarkdown>
+                      <RichMarkdown content={option.text} />
                     </div>
                   ) : null}
                 </div>

@@ -54,7 +54,10 @@ export default function ExamBottomBar({
     { id: 'hard' as const, icon: Frown, title: 'Hard', activeClass: 'bg-rose-500 hover:bg-rose-400 text-white border-rose-550' },
   ];
 
-  const isActionDisabled = !isCurrentQuestionRated || isRatingSaving || !!ratingError;
+  // Navigation gates on the LOCAL rating only. Server sync runs in the
+  // background (isRatingSaving is display-only) and failures surface as a
+  // non-blocking retry banner.
+  const isActionDisabled = !isCurrentQuestionRated;
 
   return (
     <>
@@ -85,7 +88,7 @@ export default function ExamBottomBar({
               disabled={isFirstQuestion || isActionDisabled}
               variant="outline"
               className="h-11 px-6 text-sm font-medium border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 transition-all duration-150"
-              title={isActionDisabled && !isFirstQuestion ? 'Rating must be saved before navigating' : undefined}
+              title={isActionDisabled && !isFirstQuestion ? 'Rate the current question to navigate' : undefined}
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
@@ -105,8 +108,7 @@ export default function ExamBottomBar({
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => !isRatingSaving && onRatingChange(opt.id)}
-                  disabled={isRatingSaving}
+                  onClick={() => onRatingChange(opt.id)}
                   title={opt.title}
                   className={`p-2 flex gap-1 rounded-lg border transition-all duration-150 cursor-pointer ${
                     isActive 
@@ -119,6 +121,11 @@ export default function ExamBottomBar({
                 </button>
               );
             })}
+            {isRatingSaving && (
+              <span className="text-[10px] font-medium text-slate-400 animate-pulse px-1">
+                Syncing…
+              </span>
+            )}
           </div>
 
           {/* Right: End Test, End Subtest, Next */}

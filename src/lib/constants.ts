@@ -112,6 +112,14 @@ export const CORE_QUESTION_TYPES: Record<'Paper' | 'Digital', string[]> = {
   ]
 };
 
+/** Digital module question types — single source of truth for "is this a module row?" */
+export const DIGITAL_MODULE_QUESTION_TYPES: ReadonlyArray<string> = [
+  'module_mcq',
+  'interpreting_texts',
+  'representation_systems',
+  'linguistic_structures',
+];
+
 /** Paper module question types by category */
 export const PAPER_MODULE_QUESTION_TYPES: Record<'science' | 'engineering' | 'economics', string[]> = {
   science: ['sc_1', 'sc_2'],
@@ -155,13 +163,15 @@ export function filterSections(
       const allowedTypes = PAPER_MODULE_QUESTION_TYPES[category];
       return allowedTypes.includes(section.question_type);
     } else {
-      // For Digital, all module sections are grouped under the user's selected module title
+      // For Digital, only the user's chosen module — title must match AND
+      // the type must be a module type. (A bare `question_type ===
+      // 'module_mcq'` check would match every module section in the exam.)
       const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-      return (
+      if (!targetModuleTitle) return false;
+      const titleMatches =
         section.title === targetModuleTitle ||
-        (Boolean(targetModuleTitle) && section.title?.toLowerCase().includes((targetModuleTitle || '').toLowerCase())) ||
-        section.question_type === 'module_mcq'
-      );
+        section.title?.toLowerCase().includes(targetModuleTitle.toLowerCase());
+      return titleMatches && DIGITAL_MODULE_QUESTION_TYPES.includes(section.question_type);
     }
   });
 

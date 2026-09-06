@@ -24,7 +24,7 @@ export interface QuestionData {
 export interface RendererProps {
   question: QuestionData;
   selectedAnswer: unknown;
-  onAnswer: (answer: unknown) => void;
+  onAnswer: (answer: unknown, questionId?: string) => void;
   selectedAnswers?: Record<string, string>;
   passage?: QuestionData;
 }
@@ -299,8 +299,12 @@ class ModuleMCQRenderer implements QuestionRenderer {
 
   render(props: RendererProps): React.ReactNode {
     const passage = props.passage || props.question;
+    const providedAnswers =
+      props.selectedAnswers && Object.keys(props.selectedAnswers).length > 0
+        ? props.selectedAnswers
+        : undefined;
     const selectedAnswers =
-      (props.selectedAnswers as Record<string, string>) ||
+      providedAnswers ??
       (typeof props.selectedAnswer === 'object' && props.selectedAnswer !== null
         ? (props.selectedAnswer as Record<string, string>)
         : typeof props.selectedAnswer === 'string'
@@ -312,7 +316,7 @@ class ModuleMCQRenderer implements QuestionRenderer {
         passage={modulePassage}
         selectedAnswers={selectedAnswers}
         onAnswer={(questionId: string, val: string) => {
-          props.onAnswer(val);
+          props.onAnswer(val, questionId);
         }}
       />
     );

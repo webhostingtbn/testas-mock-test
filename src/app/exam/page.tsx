@@ -24,8 +24,6 @@ interface DisplayQuestion {
   passage_id?: string;
 }
 
-type RatingSaveState = 'idle' | 'saving' | 'error';
-
 export default function ExamPage() {
   const imageService = useMemo(() => new ImageService(), []);
   const router = useRouter();
@@ -34,17 +32,18 @@ export default function ExamPage() {
   const [sectionQuestions, setSectionQuestions] = useState<DisplayQuestion[]>([]);
   const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
 
-  // Rating persistence state — keyed to the question being rated.
-  // saveVersion serializes writes: only the latest version's completion is accepted.
-  const [ratingSaveState, setRatingSaveState] = useState<RatingSaveState>('idle');
-  const [ratingErrorMsg, setRatingErrorMsg] = useState<string | null>(null);
-  const [lastRatingPayload, setLastRatingPayload] = useState<{
-    questionIds: string[];
-    difficulty: 'easy' | 'medium' | 'hard';
-    forQuestionIndex: number;
-    forSectionIndex: number;
-  } | null>(null);
-  const saveVersionRef = useRef(0);
+  // Rating persistence is optimistic: navigation gates on the LOCAL rating
+  // only, while server sync runs in the background. Pending saves are
+  // flushed (best-effort) when ending a subtest/test. Failures accumulate in
+  // a keyed queue (one entry per question set) so nothing is ever stale.
+  const [pendingRatingSaves, setPendingRatingSaves] = useState(0);
+  // Every failed sync stays retryable, keyed by its own question ids — never
+  // a stale single payload tied to whatever question is on screen.
+  const [failedRatingSaves, setFailedRatingSaves] = useState<
+    Array<{ questionIds: string[]; difficulty: 'easy' | 'medium' | 'hard' }>
+  >([]);
+  // Tracks in-flight rating syncs so end-of-section/test can flush them.
+  const inFlightRatingSavesRef = useRef<Set<Promise<void>>>(new Set());
 
   const {
     currentExamId,
@@ -183,15 +182,6 @@ export default function ExamPage() {
     }
   }, [hydrated, currentStep, startSection, startBreak]);
 
-  // Reset rating save state when question changes — but preserve error+retry if pending.
-  useEffect(() => {
-    if (ratingSaveState !== 'error') {
-      setRatingSaveState('idle');
-      setRatingErrorMsg(null);
-      // Don't clear lastRatingPayload — it's keyed to a specific question and still valid.
-    }
-  }, [currentQuestionIndex, currentSectionIndex]); // eslint-disable-line react-hooks/exhaustive-deps
-
   if (!hydrated || !currentExamId || !currentStep) {
     return (
       <div className="flex h-screen items-center justify-center bg-background text-foreground">
@@ -238,59 +228,77 @@ export default function ExamPage() {
   // Show End Test on non-final subtests
   const showEndTest = currentSectionIndex < sections.length - 1;
 
-  // Combined navigation gate: rated + save not in-flight or failed
-  const canNavigate = isCurrentQuestionRated && ratingSaveState === 'idle';
+  // Navigation gates on the LOCAL rating only — server sync is backgrounded.
+  const canNavigate = isCurrentQuestionRated;
 
-  const syncRatingToServer = async (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => {
-    saveVersionRef.current += 1;
-    const thisVersion = saveVersionRef.current;
+  const failedKey = (questionIds: string[]): string => [...questionIds].sort().join('|');
 
-    setRatingSaveState('saving');
-    setRatingErrorMsg(null);
-    setLastRatingPayload({
-      questionIds,
-      difficulty,
-      forQuestionIndex: currentQuestionIndex,
-      forSectionIndex: currentSectionIndex,
-    });
+  const syncRatingToServer = (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => {
+    setPendingRatingSaves((count) => count + 1);
 
-    try {
-      const results = await Promise.all(
-        questionIds.map((qId) =>
-          fetch(`/api/practice/${qId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ difficulty }),
-          }),
-        ),
-      );
+    const savePromise = (async (): Promise<void> => {
+      try {
+        const results = await Promise.all(
+          questionIds.map((qId) =>
+            fetch(`/api/practice/${qId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ difficulty }),
+            }),
+          ),
+        );
 
-      // Stale: a newer write has started; ignore this completion.
-      if (thisVersion !== saveVersionRef.current) return;
-
-      const failedResults = results.filter((res) => !res.ok);
-      if (failedResults.length > 0) {
-        setRatingSaveState('error');
-        setRatingErrorMsg(`${failedResults.length} of ${results.length} rating(s) failed to sync`);
-        return;
+        const key = failedKey(questionIds);
+        if (results.every((res) => res.ok)) {
+          // Success clears this payload's failure entry (if any).
+          setFailedRatingSaves((queue) =>
+            queue.filter((entry) => failedKey(entry.questionIds) !== key),
+          );
+        } else {
+          setFailedRatingSaves((queue) =>
+            queue.some((entry) => failedKey(entry.questionIds) === key)
+              ? queue
+              : [...queue, { questionIds, difficulty }],
+          );
+        }
+      } catch (err) {
+        console.error('Failed to sync difficulty rating to database:', err);
+        const key = failedKey(questionIds);
+        setFailedRatingSaves((queue) =>
+          queue.some((entry) => failedKey(entry.questionIds) === key)
+            ? queue
+            : [...queue, { questionIds, difficulty }],
+        );
       }
+    })();
 
-      setRatingSaveState('idle');
-      setRatingErrorMsg(null);
-      setLastRatingPayload(null);
-    } catch (err) {
-      // Stale: a newer write has started; ignore this completion.
-      if (thisVersion !== saveVersionRef.current) return;
-      console.error('Failed to sync difficulty rating to database:', err);
-      setRatingSaveState('error');
-      setRatingErrorMsg('Network error syncing rating');
+    inFlightRatingSavesRef.current.add(savePromise);
+    void savePromise.finally(() => {
+      inFlightRatingSavesRef.current.delete(savePromise);
+      setPendingRatingSaves((count) => Math.max(0, count - 1));
+    });
+  };
+
+  // Best-effort flush of background rating syncs before leaving a section or
+  // finishing. Never blocks longer than the timeout — ratings are auxiliary
+  // (Practice folders), not scoring.
+  const flushRatingSaves = async (timeoutMs = 3000): Promise<void> => {
+    const pending = [...inFlightRatingSavesRef.current];
+    if (pending.length === 0) return;
+    try {
+      await Promise.race([
+        Promise.allSettled(pending),
+        new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+      ]);
+    } catch {
+      // Proceed regardless — failed syncs stay retryable via the banner.
     }
   };
 
-  const handleDifficultySelect = async (difficulty: 'easy' | 'medium' | 'hard') => {
+  const handleDifficultySelect = (difficulty: 'easy' | 'medium' | 'hard') => {
     if (!currentQuestion) return;
 
-    // Set rating in Zustand store immediately
+    // Set rating in Zustand store immediately so navigation unlocks at once.
     const questionIdsToSync: string[] = [];
     if (currentQuestion.isPassage && currentQuestion.questions) {
       currentQuestion.questions.forEach((childQ) => {
@@ -302,27 +310,51 @@ export default function ExamPage() {
       questionIdsToSync.push(currentQuestion.id);
     }
 
-    // Persist to server
-    await syncRatingToServer(questionIdsToSync, difficulty);
+    // Persist to server in the background — do not await.
+    syncRatingToServer(questionIdsToSync, difficulty);
   };
 
-  const handleRetryRatingSave = async () => {
-    if (lastRatingPayload) {
-      await syncRatingToServer(lastRatingPayload.questionIds, lastRatingPayload.difficulty);
-    }
+  const handleRetryRatingSave = () => {
+    const queue = failedRatingSaves;
+    setFailedRatingSaves([]);
+    queue.forEach((entry) => syncRatingToServer(entry.questionIds, entry.difficulty));
   };
+
+  // Banner text derives from the queue so navigation never shows a stale
+  // single-question error.
+  const ratingErrorMsg =
+    failedRatingSaves.length === 0
+      ? null
+      : failedRatingSaves.length === 1
+        ? '1 rating failed to sync'
+        : `${failedRatingSaves.length} ratings failed to sync`;
 
   const handleTimeUp = () => {
-    advanceFlowStep();
+    void flushRatingSaves(2000).finally(() => advanceFlowStep());
   };
 
   const handleEndSubtest = () => {
-    advanceFlowStep();
+    void flushRatingSaves().finally(() => advanceFlowStep());
   };
 
   const handleEndTest = () => {
-    endExamEarly();
+    void flushRatingSaves().finally(() => endExamEarly());
   };
+
+  // Maps a loaded row (question or passage) to renderer input, preserving
+  // nested passage children — dropping them makes ModuleMCQ render an empty
+  // single-question fallback ("Questions (1)" with no text/options).
+  const toQuestionData = (item: DisplayQuestion, index: number): QuestionData => ({
+    id: item.id || `q-${index}`,
+    sectionId: item.section_id || currentSection.id,
+    sortOrder: item.sort_order || index + 1,
+    questionType: item.question_type || currentSection.questionType,
+    content: item.content ?? item,
+    isPassage: item.isPassage,
+    ...(Array.isArray(item.questions)
+      ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
+      : {}),
+  });
 
   const buildQuestionData = (): QuestionData => {
     if (!currentQuestion) {
@@ -335,21 +367,28 @@ export default function ExamPage() {
       };
     }
 
-    return {
-      id: currentQuestion.id || `q-${currentQuestionIndex}`,
-      sectionId: currentQuestion.section_id || currentSection.id,
-      sortOrder: currentQuestion.sort_order || currentQuestionIndex + 1,
-      questionType: currentQuestion.question_type || currentSection.questionType,
-      content: currentQuestion.content || currentQuestion,
-    };
+    return toQuestionData(currentQuestion, currentQuestionIndex);
   };
 
   const questionData = currentQuestion ? buildQuestionData() : null;
   const currentAnswer = questionData ? getAnswer(currentSection.id, questionData.id) : null;
 
-  const handleAnswerChange = (value: unknown) => {
+  // Per-child answers for grouped (passage) questions, keyed by child id —
+  // this is what ModuleMCQ reads and what scoring looks up. Undefined (not
+  // `{}`) when nothing is answered so the renderer keeps its own fallback.
+  const passageChildAnswers = (() => {
+    if (!currentQuestion?.isPassage || !currentQuestion.questions) return undefined;
+    const entries: Array<[string, string]> = [];
+    for (const child of currentQuestion.questions) {
+      const childAnswer = getAnswer(currentSection.id, child.id);
+      if (typeof childAnswer === 'string') entries.push([child.id, childAnswer]);
+    }
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  })();
+
+  const handleAnswerChange = (value: unknown, questionId?: string) => {
     if (questionData) {
-      setAnswer(currentSection.id, questionData.id, value);
+      setAnswer(currentSection.id, questionId ?? questionData.id, value);
     }
   };
 
@@ -381,7 +420,7 @@ export default function ExamPage() {
         />
 
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center">
-          <div className="w-full max-w-4xl space-y-6">
+          <div className="w-full space-y-6">
             {isLoadingQuestions ? (
               <div className="flex h-64 items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -390,6 +429,7 @@ export default function ExamPage() {
               <div key={questionData.id} className="w-full">
               {questionRendererFactory.render(questionData, {
                 selectedAnswer: currentAnswer,
+                selectedAnswers: passageChildAnswers,
                 onAnswer: handleAnswerChange,
               })}
               </div>
@@ -411,7 +451,7 @@ export default function ExamPage() {
           isLastQuestion={currentQuestionIndex === totalQuestions - 1}
           sectionTitle={currentSection.title}
           isCurrentQuestionRated={canNavigate}
-          isRatingSaving={ratingSaveState === 'saving'}
+          isRatingSaving={pendingRatingSaves > 0}
           ratingError={ratingErrorMsg}
           onRetryRatingSave={handleRetryRatingSave}
           currentRating={currentRating}

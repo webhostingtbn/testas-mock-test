@@ -8,6 +8,7 @@ import {
 import { KniCard, KniProgress } from '@/components/KniPrimitives';
 import {
   CORE_QUESTION_TYPES,
+  DIGITAL_MODULE_QUESTION_TYPES,
   MODULE_TEST_LABELS,
   PAPER_MODULE_QUESTION_TYPES,
   getModuleCategory,
@@ -266,6 +267,26 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
           })
   ).sort((a: { order: number }, b: { order: number }) => a.order - b.order);
 
+  // Digital exams have one module per user — hide the other modules so the
+  // review only shows the user's chosen module alongside the core subtests.
+  // Backstop: if title matching removes every module row (label drift),
+  // fall back to showing all of them rather than an empty review.
+  const DIGITAL_MODULE_TYPES = new Set<string>(DIGITAL_MODULE_QUESTION_TYPES);
+  const reviewFormat = selectedAttempt.exams?.format || profile?.format || 'Digital';
+  const chosenModuleKey = profile?.module_test || selectedAttempt.exams?.major || null;
+  const chosenModuleLabel = chosenModuleKey ? MODULE_TEST_LABELS[chosenModuleKey] : undefined;
+  const moduleRows = sectionsList.filter((section) => DIGITAL_MODULE_TYPES.has(section.type));
+  const filteredModuleRows =
+    reviewFormat !== 'Paper' && chosenModuleLabel
+      ? moduleRows.filter((section) => section.title === chosenModuleLabel)
+      : moduleRows;
+  const visibleSections =
+    reviewFormat !== 'Paper' && chosenModuleLabel && filteredModuleRows.length > 0
+      ? sectionsList.filter(
+          (section) => !DIGITAL_MODULE_TYPES.has(section.type) || section.title === chosenModuleLabel
+        )
+      : sectionsList;
+
   const toggleSection = (sectionTitle: string) => {
     setExpandedSections(prev => ({
       ...prev,
@@ -448,7 +469,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
         </div>
 
         <div className="space-y-3">
-          {sectionsList.map((section) => {
+          {visibleSections.map((section) => {
             const isExpanded = expandedSections[section.title] || false;
 
             const sectionAnswers = section.answers || [];
@@ -472,7 +493,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                         {section.title}
                       </h4>
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        {MODULE_TEST_LABELS[section.type] || 'Core Subtest'}
+                        {DIGITAL_MODULE_TYPES.has(section.type) ? 'Module Subtest' : 'Core Subtest'}
                       </span>
                     </div>
                   </div>

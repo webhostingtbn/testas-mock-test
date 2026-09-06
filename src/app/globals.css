@@ -141,6 +141,21 @@
   }
 }
 
+/* KaTeX math inside question/passage markdown must never clip in narrow
+   panes — wide display equations scroll horizontally instead.
+   (No white-space rules here: KaTeX sets its own nowrap; overriding it
+   would only fight the renderer's line-breaking.) */
+.rich-markdown {
+  min-width: 0;
+  max-width: 100%;
+}
+.rich-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
 /* Shared product scrollbar */
 .custom-scrollbar {
   scrollbar-width: thin;

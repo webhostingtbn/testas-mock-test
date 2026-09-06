@@ -17,17 +17,22 @@ export function CanvasImage({
   maxZoom = 2,
   initialZoom = 1
 }: CanvasImageProps) {
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(initialZoom);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [startPosition, setStartPosition] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  // Set once the user zooms/pans manually — auto-fit must not fight them.
+  const userAdjustedRef = useRef(false);
 
-  // Auto-fit image to container on load using natural dimensions
+  // Auto-fit image to container using natural dimensions. Re-runs when the
+  // image source or container size changes (e.g. accordion opens, question
+  // switches), but never after the user has adjusted the view themselves.
   useEffect(() => {
     const fitImageToContainer = () => {
+      if (userAdjustedRef.current) return;
       if (containerRef.current) {
         const containerRect = containerRef.current.getBoundingClientRect();
         // Use natural dimensions if available, otherwise fallback to container
@@ -45,14 +50,27 @@ export function CanvasImage({
       }
     };
 
-    window.addEventListener('resize', fitImageToContainer);
+    // Fresh image: reset the view so the previous question's zoom never leaks.
+    userAdjustedRef.current = false;
     fitImageToContainer();
 
-    return () => window.removeEventListener('resize', fitImageToContainer);
-  }, []);
+    const container = containerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (container && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(fitImageToContainer);
+      observer.observe(container);
+    }
+    window.addEventListener('resize', fitImageToContainer);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', fitImageToContainer);
+    };
+  }, [src]);
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    userAdjustedRef.current = true;
 
     const zoomSensitivity = 0.002;
     const delta = -e.deltaY * zoomSensitivity;
@@ -161,7 +179,7 @@ export function CanvasImage({
     <div 
       ref={containerRef}
       className={`
-        relative w-full h-full overflow-hidden bg-gray-50/50 rounded-xl border border-gray-200
+        relative w-full h-full min-h-[240px] overflow-hidden bg-gray-50/50 rounded-xl border border-gray-200
         ${zoom > 1.1 ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}
       `}
       style={{ touchAction: 'none' }}
@@ -193,7 +211,10 @@ export function CanvasImage({
       {/* Zoom controls */}
       <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200 shadow-lg px-3 py-2">
         <button 
-          onClick={() => setZoom(Math.max(minZoom, zoom - 0.1))}
+          onClick={() => {
+            userAdjustedRef.current = true;
+            setZoom(Math.max(minZoom, zoom - 0.1));
+          }}
           disabled={zoom <= minZoom}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
         >
@@ -205,7 +226,10 @@ export function CanvasImage({
         </span>
         
         <button 
-          onClick={() => setZoom(Math.min(maxZoom, zoom + 0.1))}
+          onClick={() => {
+            userAdjustedRef.current = true;
+            setZoom(Math.min(maxZoom, zoom + 0.1));
+          }}
           disabled={zoom >= maxZoom}
           className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed text-gray-600"
         >
