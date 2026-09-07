@@ -4,15 +4,12 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { flattenExamAnswers, useExamStore } from "@/lib/store/exam-store";
 import {
-  GraduationCap,
-  CheckCircle2,
+  Check,
   Home,
-  Info,
   AlertTriangle,
   RefreshCw,
-  Clock,
+  ArrowRight,
 } from "lucide-react";
-import { KniCard, KniButton, KniBackground } from "@/components/KniPrimitives";
 import { calculateAccuracyPercentage, calculateCompletionPercentage } from "@/lib/exam/metrics";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -103,170 +100,180 @@ export default function ResultsPage() {
     setIsRetrying(false);
   };
 
+  const goDashboard = useCallback(() => {
+    resetExam();
+    router.push("/dashboard");
+  }, [resetExam, router]);
+
   const isEndedEarly = completionReason === 'ended_early';
 
   if (!hydrated || !currentExamId) {
     return (
-      <KniBackground className="min-h-screen flex items-center justify-center p-6 text-foreground">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground animate-pulse font-medium">
-            Loading...
-          </p>
+      <div className="min-h-screen bg-[#F4F4F5] flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18181B]"></div>
+          <p className="text-sm text-[#71717A] animate-pulse font-medium">Loading…</p>
         </div>
-      </KniBackground>
+      </div>
     );
   }
 
   // Show error state with retry
   if (submitError && !isCalculated) {
     return (
-      <KniBackground className="min-h-screen flex items-center justify-center p-6 text-foreground">
-        <KniCard className="p-8 sm:p-10 max-w-md w-full text-center space-y-4">
-          <div className="grid size-14 place-items-center rounded-full bg-rose-100 text-rose-600 mx-auto">
-            <AlertTriangle className="size-7" />
+      <div className="min-h-screen bg-[#F4F4F5] flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl border border-gray-200/80 p-8 max-w-md w-full text-center flex flex-col items-center gap-3">
+          <div className="grid size-12 place-items-center rounded-full bg-rose-50 text-rose-600">
+            <AlertTriangle className="size-6" />
           </div>
-          <h2 className="text-xl font-bold text-foreground">Scoring Failed</h2>
-          <p className="text-sm text-muted-foreground">{submitError}</p>
-          <KniButton
+          <h2 className="text-[18px] font-semibold text-[#18181B]">Scoring failed</h2>
+          <p className="text-sm text-[#71717A]">{submitError}</p>
+          <button
+            type="button"
             onClick={handleRetry}
             disabled={isRetrying}
-            className="gap-2"
+            className="mt-1 h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 disabled:opacity-40 transition-colors flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
-            {isRetrying ? 'Retrying...' : 'Retry Scoring'}
-          </KniButton>
-          <p className="text-xs text-muted-foreground mt-2">
-            Your answers are saved locally. Retry to complete scoring.
+            {isRetrying ? 'Retrying…' : 'Retry scoring'}
+          </button>
+          <p className="text-[13px] text-[#71717A]">
+            Your answers are saved. Retry to complete scoring.
           </p>
-        </KniCard>
-      </KniBackground>
+        </div>
+      </div>
     );
   }
 
   // Loading state
   if (!isCalculated) {
     return (
-      <KniBackground className="min-h-screen flex items-center justify-center p-6 text-foreground">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground animate-pulse font-medium">
-            Scoring exam on server...
+      <div className="min-h-screen bg-[#F4F4F5] flex items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18181B]"></div>
+          <p className="text-sm text-[#71717A] animate-pulse font-medium">
+            Scoring your exam…
           </p>
         </div>
-      </KniBackground>
+      </div>
     );
   }
 
   const accuracyPercentage = calculateAccuracyPercentage(totalCorrect, answeredCount);
   const completionPercentage = calculateCompletionPercentage(answeredCount, totalQuestions);
+  const wrongCount = Math.max(0, answeredCount - totalCorrect);
+  const skippedCount = Math.max(0, totalQuestions - answeredCount);
 
   return (
-    <KniBackground className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 text-foreground">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <KniCard className="p-8 sm:p-10 border-primary/20 bg-card/60 backdrop-blur-md shadow-2xl relative overflow-hidden">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 pb-8 border-b border-border/40">
-            <div className="flex items-center space-x-4">
-              <div className={`p-3.5 rounded-2xl ${isEndedEarly ? 'bg-amber-100 text-amber-600' : 'bg-primary/10 text-primary'}`}>
-                {isEndedEarly ? (
-                  <Clock className="w-10 h-10" />
-                ) : (
-                  <GraduationCap className="w-10 h-10" />
-                )}
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                  {isEndedEarly ? 'Test Ended Early' : 'Exam Completed'}
-                </h1>
-                <p className="text-muted-foreground text-sm mt-1">
-                  Server-verified result recorded
-                </p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#F4F4F5] py-8 sm:py-12 px-4 sm:px-6">
+      <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl border border-gray-200/80 p-6 sm:p-8 flex flex-col gap-6 sm:gap-8">
 
-            <div className="flex items-center space-x-3">
-              <KniButton
-                variant="outline"
-                onClick={() => {
-                  resetExam();
-                  router.push("/dashboard");
-                }}
-                className="gap-2"
-              >
-                <Home className="w-4 h-4" />
-                Dashboard
-              </KniButton>
+        {/* Header */}
+        <div className="flex items-start sm:items-center justify-between gap-4 pb-6 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600"><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>
+              <h2 className="text-xl font-semibold text-[#18181B]">Exam Results</h2>
+            </div>
+            <p className="text-sm text-[#71717A] mt-1.5">
+              You answered {answeredCount} of {totalQuestions} questions
+              {isEndedEarly ? ' · test ended early' : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={goDashboard}
+            className="shrink-0 h-10 px-4 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] transition-colors flex items-center gap-1.5"
+          >
+            <Home className="w-4 h-4" />
+            Dashboard
+          </button>
+        </div>
+
+        {/* Ended Early Banner */}
+        {isEndedEarly && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-px" />
+            <div className="text-sm">
+              <p className="font-semibold text-amber-800">Ended early</p>
+              <p className="text-amber-700 mt-0.5">
+                You ended this test before completing all subtests.
+                {answeredCount === 0
+                  ? ' No questions were answered.'
+                  : ` ${answeredCount} of ${totalQuestions} questions were answered.`}
+              </p>
             </div>
           </div>
+        )}
 
-          {/* Ended Early Banner */}
-          {isEndedEarly && (
-            <div className="mt-6 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
-              <div className="text-sm">
-                <p className="font-bold text-amber-800">Ended Early</p>
-                <p className="text-amber-700 mt-0.5">
-                  You ended this test before completing all subtests.
-                  {answeredCount === 0
-                    ? ' No questions were answered.'
-                    : ` ${answeredCount} of ${totalQuestions} questions were answered.`}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className={`grid grid-cols-1 ${isEndedEarly ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-6 my-8`}>
-            <div className="p-6 rounded-xl bg-primary/5 border border-primary/10 flex flex-col items-center text-center">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                Score
-              </span>
-              <span className="text-4xl font-extrabold text-primary mt-2">
-                {totalCorrect} / {isEndedEarly ? answeredCount : totalQuestions}
-              </span>
-            </div>
-
-            <div className="p-6 rounded-xl bg-primary/5 border border-primary/10 flex flex-col items-center text-center">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                {isEndedEarly ? 'Accuracy' : 'Percentage'}
-              </span>
-              <span className="text-4xl font-extrabold text-primary mt-2">
-                {isEndedEarly ? accuracyPercentage : calculateAccuracyPercentage(totalCorrect, totalQuestions)}%
-              </span>
-            </div>
-
-            {isEndedEarly && (
-              <div className="p-6 rounded-xl bg-amber-50 border border-amber-100 flex flex-col items-center text-center">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                  Completion
-                </span>
-                <span className="text-4xl font-extrabold text-amber-600 mt-2">
-                  {completionPercentage}%
-                </span>
-              </div>
+        {/* Metric strip */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Score</p>
+            <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
+              {totalCorrect} <span className="text-sm font-normal text-[#71717A]">/ {isEndedEarly ? answeredCount : totalQuestions}</span>
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Accuracy</p>
+            <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
+              {isEndedEarly ? accuracyPercentage : calculateAccuracyPercentage(totalCorrect, totalQuestions)}%
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Answered</p>
+            <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
+              {answeredCount} <span className="text-sm font-normal text-[#71717A]">/ {totalQuestions}</span>
+            </p>
+          </div>
+          <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Outcome</p>
+            {isEndedEarly ? (
+              <p className="text-lg font-semibold text-amber-600 mt-1.5">Ended early</p>
+            ) : (
+              <p className="text-lg font-semibold text-emerald-600 mt-1.5">Completed</p>
             )}
-
-            <div className="p-6 rounded-xl bg-primary/5 border border-primary/10 flex flex-col items-center text-center">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                Status
-              </span>
-              {isEndedEarly ? (
-                <span className="text-xl font-bold text-amber-600 mt-3 flex items-center gap-1.5">
-                  <Clock className="w-5 h-5" /> Ended Early
-                </span>
-              ) : (
-                <span className="text-xl font-bold text-emerald-500 mt-3 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-5 h-5" /> Completed
-                </span>
-              )}
-            </div>
+            <p className="text-[13px] text-[#71717A] mt-0.5">{completionPercentage}% of questions seen</p>
           </div>
+        </div>
 
-          <div className="mt-6 pt-6 border-t border-border/40 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-            <Info className="w-4 h-4" />
-            <span>Answer keys and scoring are secured server-side.</span>
-          </div>
-        </KniCard>
+        {/* Question summary */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <span className="flex items-center gap-1.5 text-[#18181B]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="font-semibold tabular-nums">{totalCorrect}</span> correct
+          </span>
+          <span className="flex items-center gap-1.5 text-[#18181B]">
+            <span className="w-2 h-2 rounded-full bg-rose-500" />
+            <span className="font-semibold tabular-nums">{wrongCount}</span> wrong
+          </span>
+          <span className="flex items-center gap-1.5 text-[#18181B]">
+            <span className="w-2 h-2 rounded-full bg-zinc-300" />
+            <span className="font-semibold tabular-nums">{skippedCount}</span> skipped
+          </span>
+        </div>
+
+        {/* Action bar */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-6 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={goDashboard}
+            className="h-10 px-4 text-sm font-medium rounded-[10px] text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5] transition-colors"
+          >
+            Back to Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={goDashboard}
+            title="Find this attempt in your test history to review each answer"
+            className="h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1.5"
+          >
+            Review Answers
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
       </div>
-    </KniBackground>
+    </div>
   );
 }
