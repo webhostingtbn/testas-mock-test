@@ -31,18 +31,29 @@ function isBareStoragePath(value: string): boolean {
   return value.length > 0 && !value.startsWith('http') && !value.startsWith('/') && !value.startsWith('data:');
 }
 
+/** How long a signed URL is trusted before re-signing (Supabase signatures are short-lived). */
+const SIGNED_URL_TTL_MS = 50 * 60 * 1000;
+
 export class ImageService {
-  private readonly signedCache = new Map<string, string>();
+  private readonly signedCache = new Map<string, { url: string; expiresAt: number }>();
+  private readonly inFlightSigns = new Map<string, Promise<string | undefined>>();
 
   /**
    * Resolves a single image path to a signed short-lived URL.
-   * Absolute URLs (http//) pass through untouched.
+   * Absolute URLs (http//) pass through untouched. Cached signatures are
+   * re-requested after TTL so lingering on a question can't 403.
    */
   async resolveImageUrl(path: string | null | undefined): Promise<string | undefined> {
     if (!path) return undefined;
 
     const cached = this.signedCache.get(path);
-    if (cached) return cached;
+    if (cached && Date.now() < cached.expiresAt) return cached.url;
+    if (cached) this.signedCache.delete(path);
+
+    // Dedupe concurrent signs for the same path (e.g. repeated passage
+    // images across grouped children resolving at once).
+    const inFlight = this.inFlightSigns.get(path);
+    if (inFlight) return inFlight;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
     const publicStoragePrefix = supabaseUrl
@@ -60,17 +71,25 @@ export class ImageService {
       return path;
     }
 
-    try {
-      const res = await fetch(`/api/storage/sign?path=${encodeURIComponent(path)}`);
-      if (!res.ok) return undefined;
-      const data: unknown = await res.json();
-      const signedUrl = isRecord(data) ? asString(data.signedUrl) : undefined;
-      if (signedUrl) this.signedCache.set(path, signedUrl);
-      return signedUrl;
-    } catch (error) {
-      console.error(`Failed to resolve image URL for path: ${path}`, error);
-      return undefined;
-    }
+    const signPromise = (async (): Promise<string | undefined> => {
+      try {
+        const res = await fetch(`/api/storage/sign?path=${encodeURIComponent(path)}`);
+        if (!res.ok) return undefined;
+        const data: unknown = await res.json();
+        const signedUrl = isRecord(data) ? asString(data.signedUrl) : undefined;
+        if (signedUrl) {
+          this.signedCache.set(path, { url: signedUrl, expiresAt: Date.now() + SIGNED_URL_TTL_MS });
+        }
+        return signedUrl;
+      } catch (error) {
+        console.error(`Failed to resolve image URL for path: ${path}`, error);
+        return undefined;
+      } finally {
+        this.inFlightSigns.delete(path);
+      }
+    })();
+    this.inFlightSigns.set(path, signPromise);
+    return signPromise;
   }
 
   private async resolveBarePath(value: unknown): Promise<string | undefined> {

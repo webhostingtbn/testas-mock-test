@@ -20,7 +20,10 @@ import { usePracticeStore } from '@/lib/store/practice-store';
 interface PracticeQuestion {
   id: string;
   section_id?: string;
+  sort_order?: number;
+  question_type?: string;
   content?: unknown;
+  passage_id?: string | null;
   isPassage?: boolean;
   questions?: PracticeQuestion[];
   [key: string]: unknown;
@@ -50,6 +53,7 @@ const QUESTION_TIME_LIMITS: Record<string, number> = {
   solving_quantitative: 120,
   inferring_relationships: 27,
   numerical_series: 68,
+  module_mcq: 122,
   interpreting_texts: 122,
   representation_systems: 150,
   linguistic_structures: 136,
@@ -188,18 +192,55 @@ export default function PracticeSession({
     );
   }
 
-  const isLastQuestion = currentIndex >= questions.length - 1;
-  const answeredCount = questions.filter((q) => {
-    const a = answers[q.id];
+  const isItemAnswered = (item: PracticeQuestion): boolean => {
+    if (item.isPassage && item.questions) {
+      return (
+        item.questions.length > 0 &&
+        item.questions.every((child) => answers[child.id] !== undefined && answers[child.id] !== null)
+      );
+    }
+    const a = answers[item.id];
     return a !== undefined && a !== null;
-  }).length;
+  };
 
-  const qData: QuestionData = {
-    id: currentItem.id,
-    sectionId: currentItem.section_id || 'practice',
-    sortOrder: 1,
-    questionType: subtestType,
-    content: currentItem.content || currentItem,
+  const isLastQuestion = currentIndex >= questions.length - 1;
+  const answeredCount = questions.filter((q) => isItemAnswered(q)).length;
+
+  // Maps a loaded row (question or grouped passage) to renderer input,
+  // preserving nested passage children — dropping them makes ModuleMCQ
+  // render one repeated single-question fallback per child.
+  const toQuestionData = (item: PracticeQuestion, index: number): QuestionData => ({
+    id: item.id || `q-${index}`,
+    sectionId: item.section_id || 'practice',
+    sortOrder: typeof item.sort_order === 'number' ? item.sort_order : index + 1,
+    questionType: item.question_type || subtestType,
+    content: item.content ?? item,
+    isPassage: item.isPassage,
+    ...(Array.isArray(item.questions)
+      ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
+      : {}),
+  });
+
+  const qData: QuestionData = toQuestionData(currentItem, currentIndex);
+
+  // Per-child answers for grouped (passage) items, keyed by child id — what
+  // ModuleMCQ reads. Undefined when nothing answered so the renderer keeps
+  // its own fallback.
+  const passageChildAnswers = (() => {
+    if (!currentItem.isPassage || !currentItem.questions) return undefined;
+    const entries: Array<[string, string]> = [];
+    for (const child of currentItem.questions) {
+      const childAnswer = answers[child.id];
+      if (typeof childAnswer === 'string') entries.push([child.id, childAnswer]);
+    }
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  })();
+
+  const handleAnswerChange = (value: unknown, questionId?: string) => {
+    if (timeRemaining <= 0) return;
+    const key = questionId ?? currentItem.id;
+    if (!questionId) setUserAnswer(value);
+    setAnswers((previous) => ({ ...previous, [key]: value }));
   };
 
   return (
@@ -243,12 +284,8 @@ export default function PracticeSession({
           <div key={currentItem.id} className="h-full min-h-0 overflow-y-auto custom-scrollbar">
             {questionRendererFactory.render(qData, {
               selectedAnswer: userAnswer,
-              onAnswer: (val: unknown) => {
-                if (timeRemaining > 0) {
-                  setUserAnswer(val);
-                  setAnswers((previous) => ({ ...previous, [currentItem.id]: val }));
-                }
-              },
+              selectedAnswers: passageChildAnswers,
+              onAnswer: handleAnswerChange,
             })}
           </div>
         </div>
@@ -319,7 +356,7 @@ export default function PracticeSession({
                 <div role="listbox" aria-label="Questions" className="grid grid-cols-7 gap-1.5 max-h-[240px] overflow-y-auto custom-scrollbar">
                   {questions.map((q, idx) => {
                     const isActive = currentIndex === idx;
-                    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== null;
+                    const isAnswered = isItemAnswered(q);
                     return (
                       <button
                         key={q.id}

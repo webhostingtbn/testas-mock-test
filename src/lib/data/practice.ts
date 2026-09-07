@@ -81,8 +81,24 @@ export async function fetchPracticeData() {
   return {
     sections: sections || [],
     questions: enrichedQuestions,
+    passages: passages || [],
     userPractices: userPractices || [],
   };
+}
+
+/** Lightweight ratings-only fetch for background reconciliation (no sections/questions). */
+export async function fetchPracticeRatings() {
+  const { profile } = await requireApprovedUser();
+  const supabase = getAdminSupabaseClient();
+
+  const { data: userPractices, error: pErr } = await supabase
+    .from('user_question_practices')
+    .select('*')
+    .eq('user_id', profile.id);
+
+  if (pErr) throw new Error(`Failed to fetch practice ratings: ${pErr.message}`);
+
+  return { userPractices: userPractices || [] };
 }
 
 export async function updatePracticeRating(questionId: string, difficulty: 'easy' | 'medium' | 'hard') {

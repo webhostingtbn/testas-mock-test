@@ -36,9 +36,18 @@ export interface UserQuestionPracticeRow {
   updated_at?: string;
 }
 
+export interface PracticePassage {
+  id: string;
+  section_id: string;
+  title: string;
+  body_markdown: string;
+  image_url?: string | null;
+}
+
 interface PracticeState {
   sections: PracticeSection[];
   questions: PracticeQuestionItem[];
+  passages: PracticePassage[];
   userRatings: Record<string, 'easy' | 'medium' | 'hard'>;
   userPracticeDates: string[];
   isLoaded: boolean;
@@ -47,12 +56,37 @@ interface PracticeState {
   error: string | null;
 
   fetchPracticeData: (options?: { force?: boolean }) => Promise<void>;
+  refreshRatings: () => Promise<void>;
   updateRating: (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => Promise<void>;
+}
+
+// Module-scope fetch coordination: dedupes concurrent callers (dashboard
+// prefetch + view mount + StrictMode). Only one full fetch runs at a time,
+// so a stale response can never overwrite fresher state.
+let inFlightFetch: Promise<void> | null = null;
+let inFlightRefresh: Promise<void> | null = null;
+const PRACTICE_TTL_MS = 5 * 60 * 1000;
+
+function toRatings(userPractices: UserQuestionPracticeRow[]): {
+  userRatings: Record<string, 'easy' | 'medium' | 'hard'>;
+  userPracticeDates: string[];
+} {
+  const userRatings: Record<string, 'easy' | 'medium' | 'hard'> = {};
+  const dateSet = new Set<string>();
+  userPractices.forEach((row) => {
+    userRatings[row.question_id] = row.difficulty;
+    if (row.updated_at) {
+      const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
+      dateSet.add(dateStr);
+    }
+  });
+  return { userRatings, userPracticeDates: Array.from(dateSet) };
 }
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
   sections: [],
   questions: [],
+  passages: [],
   userRatings: {},
   userPracticeDates: [],
   isLoaded: false,
@@ -61,54 +95,89 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   error: null,
 
   fetchPracticeData: async (options) => {
-    const { isLoaded, isLoading, lastFetchedAt } = get();
+    const { isLoaded, lastFetchedAt } = get();
     const now = Date.now();
 
-    if (isLoaded && !options?.force && lastFetchedAt && now - lastFetchedAt < 5 * 60 * 1000) {
+    if (isLoaded && !options?.force && lastFetchedAt && now - lastFetchedAt < PRACTICE_TTL_MS) {
       return;
     }
 
-    if (!isLoaded) {
-      set({ isLoading: true, error: null });
+    // Dedupe: a fetch is already in flight — piggyback on it instead of
+    // firing a second full `/api/practice` request.
+    if (inFlightFetch) {
+      return inFlightFetch;
     }
 
-    try {
-      const res = await fetch('/api/practice');
-      if (!res.ok) throw new Error('Failed to fetch practice data');
-      const data = await res.json();
+    set({ isLoading: true, error: null });
 
-      const sections = (data.sections || []) as PracticeSection[];
-      const questions = (data.questions || []) as PracticeQuestionItem[];
-      const userPractices = (data.userPractices || []) as UserQuestionPracticeRow[];
+    inFlightFetch = (async () => {
+      try {
+        const res = await fetch('/api/practice');
+        if (!res.ok) throw new Error('Failed to fetch practice data');
+        const data = await res.json();
 
-      const userRatings: Record<string, 'easy' | 'medium' | 'hard'> = {};
-      const dateSet = new Set<string>();
+        const sections = (data.sections || []) as PracticeSection[];
+        const questions = (data.questions || []) as PracticeQuestionItem[];
+        const passages = (data.passages || []) as PracticePassage[];
+        const userPractices = (data.userPractices || []) as UserQuestionPracticeRow[];
+        const { userRatings, userPracticeDates } = toRatings(userPractices);
 
-      userPractices.forEach((row) => {
-        userRatings[row.question_id] = row.difficulty;
-        if (row.updated_at) {
-          const dateStr = new Date(row.updated_at).toLocaleDateString('en-CA');
-          dateSet.add(dateStr);
-        }
-      });
+        set({
+          sections,
+          questions,
+          passages,
+          userRatings,
+          userPracticeDates,
+          isLoaded: true,
+          isLoading: false,
+          lastFetchedAt: Date.now(),
+          error: null,
+        });
+      } catch (err) {
+        console.error('Failed to load practice store data:', err);
+        set({
+          isLoading: false,
+          error: err instanceof Error ? err.message : 'Failed to load practice data',
+        });
+      } finally {
+        inFlightFetch = null;
+      }
+    })();
 
-      set({
-        sections,
-        questions,
-        userRatings,
-        userPracticeDates: Array.from(dateSet),
-        isLoaded: true,
-        isLoading: false,
-        lastFetchedAt: Date.now(),
-        error: null,
-      });
-    } catch (err) {
-      console.error('Failed to load practice store data:', err);
-      set({
-        isLoading: false,
-        error: err instanceof Error ? err.message : 'Failed to load practice data',
-      });
+    return inFlightFetch;
+  },
+
+  refreshRatings: async () => {
+    // Ratings are updated optimistically by `updateRating`; this background
+    // refresh only reconciles server truth without replacing sections or
+    // questions (so in-session lists never flicker or revert). It uses the
+    // lightweight ratings endpoint and never touches the full-fetch TTL.
+    // Coalesced with any in-flight full fetch or refresh so overlapping
+    // ratings can't reconcile out of order.
+    if (inFlightFetch) {
+      await inFlightFetch;
+      return;
     }
+    if (inFlightRefresh) {
+      return inFlightRefresh;
+    }
+
+    inFlightRefresh = (async () => {
+      try {
+        const res = await fetch('/api/practice/ratings');
+        if (!res.ok) throw new Error('Failed to refresh practice ratings');
+        const data = await res.json();
+        const userPractices = (data.userPractices || []) as UserQuestionPracticeRow[];
+        const { userRatings, userPracticeDates } = toRatings(userPractices);
+        set({ userRatings, userPracticeDates });
+      } catch (err) {
+        console.error('Failed to refresh practice ratings:', err);
+      } finally {
+        inFlightRefresh = null;
+      }
+    })();
+
+    return inFlightRefresh;
   },
 
   updateRating: async (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => {

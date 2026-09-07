@@ -143,6 +143,48 @@ export function getModuleCategory(activeModule: string | null): 'science' | 'eng
   return null;
 }
 
+/** Minimal shape needed for module-section matching (shared by exam + practice). */
+export interface ModuleMatchableSection {
+  question_type: string;
+  title: string;
+}
+
+/**
+ * Single source of truth for "does this digital section belong to the user's
+ * chosen module?". Title must match (exact or case-insensitive includes) AND
+ * the type must be a module type. A bare `question_type === 'module_mcq'`
+ * check would match every module section in the exam.
+ */
+export function isDigitalModuleSection(
+  section: ModuleMatchableSection,
+  activeModule: string | null
+): boolean {
+  if (!activeModule) return false;
+  const targetModuleTitle =
+    MODULE_TEST_LABELS[activeModule] ?? resolveModuleTitle(activeModule);
+  if (!targetModuleTitle) return false;
+  const title = section.title ?? '';
+  const titleMatches =
+    title === targetModuleTitle ||
+    title.toLowerCase().includes(targetModuleTitle.toLowerCase());
+  return (
+    titleMatches &&
+    DIGITAL_MODULE_QUESTION_TYPES.includes(section.question_type)
+  );
+}
+
+/** Resolves a user module value to its canonical section title. */
+export function resolveModuleTitle(mod: string | null): string {
+  if (!mod) return '';
+  if (MODULE_TEST_LABELS[mod]) return MODULE_TEST_LABELS[mod];
+  const m = mod.toLowerCase();
+  if (m.includes('econ')) return 'Economics';
+  if (m.includes('engin')) return 'Engineering';
+  if (m.includes('science') || m === 'cs')
+    return 'Natural Science and Computer Science';
+  return '';
+}
+
 /** Centralized helper to filter core and module sections based on format and active module */
 export function filterSections(
   sections: Section[],
@@ -163,15 +205,7 @@ export function filterSections(
       const allowedTypes = PAPER_MODULE_QUESTION_TYPES[category];
       return allowedTypes.includes(section.question_type);
     } else {
-      // For Digital, only the user's chosen module — title must match AND
-      // the type must be a module type. (A bare `question_type ===
-      // 'module_mcq'` check would match every module section in the exam.)
-      const targetModuleTitle = MODULE_TEST_LABELS[activeModule];
-      if (!targetModuleTitle) return false;
-      const titleMatches =
-        section.title === targetModuleTitle ||
-        section.title?.toLowerCase().includes(targetModuleTitle.toLowerCase());
-      return titleMatches && DIGITAL_MODULE_QUESTION_TYPES.includes(section.question_type);
+      return isDigitalModuleSection(section, activeModule);
     }
   });
 

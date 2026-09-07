@@ -31,6 +31,7 @@ import {
   SUBTEST_TITLES,
   type SubtestDefinition,
   getModuleCategory,
+  isDigitalModuleSection,
 } from '@/lib/constants';
 
 const SUBTEST_ICON_MAP: Record<SubtestDefinition['iconName'], LucideIcon> = {
@@ -41,7 +42,7 @@ const SUBTEST_ICON_MAP: Record<SubtestDefinition['iconName'], LucideIcon> = {
   Layers,
   Laptop,
 };
-import { filterPracticeQuestionsByRating } from '@/lib/exam/practice-helpers';
+import { filterPracticeQuestionsByRating, groupPracticeItemsByPassage } from '@/lib/exam/practice-helpers';
 
 interface PracticeViewProps {
   profile: Profile | null;
@@ -68,11 +69,13 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   const {
     sections,
     questions,
+    passages,
     userRatings,
     userPracticeDates: userPracticeDatesList,
     isLoaded,
     isLoading,
     fetchPracticeData,
+    refreshRatings,
   } = usePracticeStore();
 
   const userPracticeDates = useMemo(
@@ -116,6 +119,14 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   };
 
   const getMatchedSections = useCallback((subtest: SubtestType) => {
+    // Module MCQ must be scoped by the shared exam predicate BEFORE any bare
+    // question_type match — otherwise every module section leaks in.
+    // Digital-only: paper modules use sc_/eng_/econ_ subtests instead.
+    if (subtest === 'module_mcq') {
+      if (isPaper) return [];
+      return sections.filter((s) => isDigitalModuleSection(s, activeModule));
+    }
+
     // 1. Direct question_type match first
     const directMatches = sections.filter((s) => s.question_type === subtest);
     if (directMatches.length > 0) {
@@ -136,18 +147,6 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       subtest === 'linguistic_structures'
     ) {
       return sections.filter((s) => s.question_type === subtest);
-    }
-
-    if (subtest === 'module_mcq') {
-      const moduleTitle = getModuleTitle(activeModule);
-      return sections.filter(
-        (s) =>
-          (s.question_type === 'module_mcq' ||
-            s.question_type === 'interpreting_texts' ||
-            s.question_type === 'representation_systems' ||
-            s.question_type === 'linguistic_structures') &&
-          s.title === moduleTitle
-      );
     }
 
     if (subtest === 'figure_sequence') {
@@ -198,15 +197,6 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       onBackNavigation(undefined);
     };
   }, [selectedSubtest, selectedFolder, onBackNavigation, handleBackToPractice]);
-
-  const getModuleTitle = (mod: string | null) => {
-    if (!mod) return '';
-    const m = mod.toLowerCase();
-    if (m.includes('econ')) return 'Economics';
-    if (m.includes('engin')) return 'Engineering';
-    if (m.includes('science') || m === 'cs') return 'Natural Science and Computer Science';
-    return '';
-  };
 
   // Main subtest card list
   const subtests = useMemo(() => {
@@ -263,13 +253,21 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
-    const easy = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'easy').length;
-    const medium = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'medium').length;
-    const hard = filterPracticeQuestionsByRating(subtestQuestions, userRatings, 'hard').length;
+    // Count grouped session items (one per passage, not per child) so folder
+    // cards match the number of screens in the session.
+    const countFolder = (folder: 'easy' | 'medium' | 'hard'): number =>
+      groupPracticeItemsByPassage(
+        filterPracticeQuestionsByRating(subtestQuestions, userRatings, folder),
+        passages,
+      ).length;
+
+    const easy = countFolder('easy');
+    const medium = countFolder('medium');
+    const hard = countFolder('hard');
     const total = easy + medium + hard;
 
     return { easy, medium, hard, total };
-  }, [getMatchedSections, questions, userRatings]);
+  }, [getMatchedSections, questions, userRatings, passages]);
 
   const filteredSubtests = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -337,7 +335,12 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       const targetSet = new Set(targetIds);
       const allQ = questions.filter((q) => targetSet.has(q.id));
 
-      const resolved = await imageService.resolveQuestionImageUrls(allQ);
+      // Group passage children into one session item per passage (mirrors the
+      // exam), preserving encounter order. Only target-folder children are
+      // included so folder counts stay accurate.
+      const sessionItems = groupPracticeItemsByPassage(allQ, passages);
+
+      const resolved = await imageService.resolveQuestionImageUrls(sessionItems);
       setPracticeQuestions(resolved);
     } catch (err) {
       console.error('Failed to load practice questions:', err);
@@ -372,7 +375,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
         userEmail={profile?.email || ''}
         userFullName={profile?.full_name}
         onExit={handleExitPracticeSession}
-        onQuestionRated={() => fetchPracticeData({ force: true })}
+        onQuestionRated={() => void refreshRatings()}
         isPaper={isPaper}
         isPracticeOnly={true}
       />

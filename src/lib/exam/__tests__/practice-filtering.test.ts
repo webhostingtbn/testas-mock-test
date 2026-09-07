@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   filterPracticeQuestionsByRating,
   getPassageChildQuestionIds,
+  groupPracticeItemsByPassage,
 } from '../practice-helpers';
 import {
   calculateAccuracyPercentage,
@@ -88,6 +89,64 @@ describe('getPassageChildQuestionIds', () => {
   it('returns empty array when questions array is missing', () => {
     const passage = { isPassage: true };
     assert.deepStrictEqual(getPassageChildQuestionIds(passage), []);
+  });
+});
+
+// ---- groupPracticeItemsByPassage ----
+
+describe('groupPracticeItemsByPassage', () => {
+  const passages = [
+    { id: 'p1', title: 'Passage One', body_markdown: 'Body one', image_url: 'img1.png' },
+  ];
+
+  it('groups children of one passage into a single isPassage item', () => {
+    const items = [
+      { id: 'c1', section_id: 's1', passage_id: 'p1' },
+      { id: 'c2', section_id: 's1', passage_id: 'p1' },
+    ];
+    const result = groupPracticeItemsByPassage(items, passages);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].id, 'p1');
+    assert.strictEqual(result[0].isPassage, true);
+    assert.deepStrictEqual(
+      (result[0].questions ?? []).map((q) => q.id),
+      ['c1', 'c2'],
+    );
+    assert.strictEqual(result[0].title, 'Passage One');
+    assert.strictEqual(result[0].body_markdown, 'Body one');
+    assert.strictEqual(result[0].image_url, 'img1.png');
+  });
+
+  it('preserves encounter order, interleaving groups and standalone items', () => {
+    const items = [
+      { id: 'solo1', section_id: 's1', passage_id: null },
+      { id: 'c1', section_id: 's1', passage_id: 'p1' },
+      { id: 'solo2', section_id: 's1' },
+      { id: 'c2', section_id: 's1', passage_id: 'p1' },
+    ];
+    const result = groupPracticeItemsByPassage(items, passages);
+    assert.deepStrictEqual(
+      result.map((r) => r.id),
+      ['solo1', 'p1', 'solo2'],
+    );
+  });
+
+  it('passes standalone questions through unchanged', () => {
+    const items = [{ id: 'solo', section_id: 's1', passage_id: null }];
+    const result = groupPracticeItemsByPassage(items, passages);
+    assert.deepStrictEqual(result, items);
+  });
+
+  it('returns empty array for empty input', () => {
+    assert.deepStrictEqual(groupPracticeItemsByPassage([], passages), []);
+  });
+
+  it('still groups children whose passage row is missing', () => {
+    const items = [{ id: 'c1', section_id: 's1', passage_id: 'unknown' }];
+    const result = groupPracticeItemsByPassage(items, passages);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].isPassage, true);
+    assert.strictEqual(result[0].title, undefined);
   });
 });
 
