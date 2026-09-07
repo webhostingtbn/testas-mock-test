@@ -30,7 +30,7 @@ export default function QuestionPagination({
             onClick={() => onQuestionClick(i)}
             disabled={isDisabled}
             className={`
-              w-8 h-8 rounded-lg text-xs font-bold
+              w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-[11px] sm:text-xs font-bold
               transition-all duration-150 
               ${
                 isCurrent

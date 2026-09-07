@@ -84,25 +84,23 @@ export default function MathEquation({
   );
 
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-4" onKeyDown={handleKeyDown} tabIndex={0}>
-      {/* Question label */}
-      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex-none">
-        Solve the equations
+    <div className="flex flex-col h-full min-h-0" onKeyDown={handleKeyDown} tabIndex={0}>
+      {/* Pane label */}
+      <div className="flex-none pt-6 py-3">
+        <p className="text-[13px] font-medium text-[#71717A]">Solve the equations</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0 overflow-y-auto pr-1 custom-scrollbar pb-12 lg:pb-0">
-        {/* Left column: Equations */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
-            Equations
-          </h3>
-          <div className="space-y-4">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:divide-x lg:divide-[#E5E7EB]">
+        {/* Left pane: Equations — flat display rows, no nested card */}
+        <div className="flex-1 min-w-0 pb-6 lg:py-6 pr-6">
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">Equations</p>
+          <div className="flex flex-col gap-[10px]">
             {equations.map((eq, idx) => (
               <div
                 key={idx}
-                className="bg-gray-50 rounded-xl px-5 py-4 text-center"
+                className="bg-[#F4F4F5] rounded-[10px] px-5 py-4 text-center"
               >
-                <span className="text-lg font-mono font-semibold text-gray-800">
+                <span className="text-lg font-mono font-semibold text-[#18181B]">
                   {eq}
                 </span>
               </div>
@@ -110,12 +108,10 @@ export default function MathEquation({
           </div>
         </div>
 
-        {/* Middle column: Variable inputs */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
-            Your Answers
-          </h3>
-          <div className="space-y-3">
+        {/* Middle pane: Variable inputs */}
+        <div className="flex-1 min-w-0 px-6 sm:px-8 pb-6 lg:py-6">
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">Your answers</p>
+          <div className="flex flex-col gap-[10px]">
             {variables.map((variable) => {
               const isActive = activeVariable === variable;
               const value = answers[variable];
@@ -123,46 +119,42 @@ export default function MathEquation({
               return (
                 <button
                   key={variable}
+                  type="button"
                   onClick={() => setActiveVariable(variable)}
+                  aria-pressed={isActive}
                   className={`
-                    w-full flex items-center gap-4 px-4 py-3 rounded-xl border-2 text-left
-                    transition-all duration-150
+                    w-full flex items-center gap-4 px-[18px] py-3 rounded-[10px] border text-left
+                    transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40
                     ${
                       isActive
-                        ? 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100'
-                        : value !== undefined
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                        ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60'
+                        : 'border-[#E5E7EB] bg-white hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
                     }
                   `}
                 >
-                  <span className={`text-lg font-bold font-mono w-8 ${
-                    isActive ? 'text-orange-600' : 'text-gray-700'
+                  <span className={`text-lg font-bold font-mono w-8 shrink-0 ${
+                    isActive ? 'text-[#EA580C]' : 'text-[#18181B]'
                   }`}>
                     {variable}
                   </span>
-                  <span className="text-gray-400">=</span>
-                  <div className={`flex-1 min-h-7 rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
-                    isActive
-                      ? 'bg-white border border-orange-300 text-gray-900'
-                      : 'bg-white/50 text-gray-700'
+                  <span className="text-[#D1D5DB] shrink-0">=</span>
+                  <span className={`flex-1 min-h-7 rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
+                    value !== undefined ? 'text-[#18181B]' : 'text-[#D1D5DB]'
                   }`}>
-                    {value !== undefined ? value : ''}
+                    {value !== undefined ? value : '–'}
                     {isActive && (
-                      <span className="inline-block w-0.5 h-5 bg-orange-500 animate-pulse ml-0.5 align-middle" />
+                      <span className="inline-block w-0.5 h-5 bg-[#EA580C] animate-pulse ml-0.5 align-middle" />
                     )}
-                  </div>
+                  </span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Right column: Virtual keyboard */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
-            Scratchpad Calculator
-          </h3>
+        {/* Right pane: Virtual keyboard */}
+        <div className="w-full lg:w-[280px] shrink-0 pl-6 pb-6 sm:pb-8 lg:py-6">
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">Keypad</p>
           <VirtualKeyboard onKeyPress={handleKeyPress} />
         </div>
       </div>

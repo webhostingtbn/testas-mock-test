@@ -1,7 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, Smile, Meh, Frown } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Smile,
+  Meh,
+  Frown,
+  Eye,
+  EyeOff,
+  HelpCircle,
+} from 'lucide-react';
 import { KniButton } from '@/components/KniPrimitives';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
@@ -30,6 +40,8 @@ interface PracticeSessionProps {
   isPracticeOnly?: boolean;
 }
 
+type Difficulty = 'easy' | 'medium' | 'hard';
+
 const QUESTION_TIME_LIMITS: Record<string, number> = {
   figure_sequence: 75,
   completing_patterns: 75,
@@ -51,6 +63,12 @@ const QUESTION_TIME_LIMITS: Record<string, number> = {
   eng_3: 163,
 };
 
+const RATING_OPTIONS: Array<{ id: Difficulty; label: string; Icon: typeof Smile }> = [
+  { id: 'easy', label: 'Easy', Icon: Smile },
+  { id: 'medium', label: 'Medium', Icon: Meh },
+  { id: 'hard', label: 'Hard', Icon: Frown },
+];
+
 export default function PracticeSession({
   subtestType,
   subtestTitle,
@@ -65,11 +83,14 @@ export default function PracticeSession({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState<unknown>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [ratingMap, setRatingMap] = useState<Record<string, 'easy' | 'medium' | 'hard'>>({});
+  const [ratingMap, setRatingMap] = useState<Record<string, Difficulty>>({});
   const [timeRemaining, setTimeRemaining] = useState<number>(
     QUESTION_TIME_LIMITS[subtestType] || 90
   );
   const [timerActive, setTimerActive] = useState<boolean>(true);
+  const [timerHidden, setTimerHidden] = useState<boolean>(false);
+  const [navigatorOpen, setNavigatorOpen] = useState<boolean>(false);
+  const navigatorRef = useRef<HTMLDivElement>(null);
 
   const currentItem = questions[currentIndex] || null;
   // Mirror answers for navigation handlers without closing over stale state.
@@ -87,8 +108,28 @@ export default function PracticeSession({
     const nextItem = questions[newIndex];
     setCurrentIndex(newIndex);
     setUserAnswer(nextItem ? (answersRef.current[nextItem.id] ?? null) : null);
+    setNavigatorOpen(false);
     resetTimerForQuestion();
   }, [questions, resetTimerForQuestion]);
+
+  // Close the navigator dropdown on outside click / Escape.
+  useEffect(() => {
+    if (!navigatorOpen) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (navigatorRef.current && !navigatorRef.current.contains(e.target as Node)) {
+        setNavigatorOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavigatorOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [navigatorOpen]);
 
   // Timer resets in handleGoToQuestion (event handler); initial mount uses
   // the useState initializer above, so no reset effect is needed here.
@@ -112,7 +153,7 @@ export default function PracticeSession({
 
   const updateRating = usePracticeStore((state) => state.updateRating);
 
-  const handleRatingSelect = async (difficulty: 'easy' | 'medium' | 'hard') => {
+  const handleRatingSelect = async (difficulty: Difficulty) => {
     if (!currentItem || timeRemaining <= 0) return;
 
     const itemKey = currentItem.id;
@@ -148,6 +189,10 @@ export default function PracticeSession({
   }
 
   const isLastQuestion = currentIndex >= questions.length - 1;
+  const answeredCount = questions.filter((q) => {
+    const a = answers[q.id];
+    return a !== undefined && a !== null;
+  }).length;
 
   const qData: QuestionData = {
     id: currentItem.id,
@@ -161,59 +206,41 @@ export default function PracticeSession({
     <>
       {/* <SecurityOverlay /> */}
       <WatermarkOverlay email={userEmail} fullName={userFullName} />
-      <div className="h-full w-full flex-1 min-h-0 bg-background flex flex-col text-foreground select-none overflow-hidden rounded-2xl border border-slate-200/80 shadow-xs">
-        <header className="flex-none border-b border-border/40 bg-card/60 backdrop-blur-md px-4 sm:px-6 py-3 flex items-center justify-between z-30">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <KniButton variant="ghost" onClick={onExit} className="size-8 p-0">
-              <X className="w-5 h-5" />
-            </KniButton>
-            <div>
-              <h2 className="font-bold text-base sm:text-lg text-slate-900">{subtestTitle}</h2>
-              <p className="text-xs text-muted-foreground capitalize">
-                Folder: {folderId} • Question {currentIndex + 1} of {questions.length}
-              </p>
-            </div>
+      {/* Flat session view — no outer card. The view sits directly on the
+          page background; header/footer hairlines provide the structure. */}
+      <div className="h-full w-full flex-1 min-h-0 flex flex-col text-[#18181B] select-none overflow-hidden">
+        {/* Top utility header (64px): title + timer pill.
+            No exit button here — the dashboard shell's back navigation
+            ("Back to Folders") is the single exit path. */}
+        <header className="flex-none pb-4 border-b border-gray-100 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-[18px] leading-tight text-[#18181B] truncate">{subtestTitle}</h2>
+            <p className="text-[13px] text-[#71717A] capitalize truncate">
+              Folder: {folderId} • {answeredCount}/{questions.length} answered
+            </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border border-border/40">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <span className="font-mono text-sm font-semibold">{formatTime(timeRemaining)}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 bg-[#F3F4F6] rounded-lg pl-4 pr-2 py-1.5">
+              <span className="font-mono text-sm font-medium text-[#18181B] tabular-nums min-w-11 text-center">
+                {timerHidden ? '••:••' : formatTime(timeRemaining)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTimerHidden((v) => !v)}
+                aria-label={timerHidden ? 'Show timer' : 'Hide timer'}
+                title={timerHidden ? 'Show timer' : 'Hide timer'}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors"
+              >
+                {timerHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </header>
 
-        {/* Question switcher: direct jump via question number (restored old UI) */}
-        <div className="flex-none border-b border-border/40 bg-card/40 px-4 sm:px-6 py-2">
-          <div className="flex gap-2 overflow-x-auto py-1 px-2">
-            {questions.map((q, idx) => {
-              const isActive = currentIndex === idx;
-              const isAnswered = answers[q.id] !== undefined && answers[q.id] !== null;
-              const isRated = ratingMap[q.id] !== undefined;
-              const btnClass = isActive
-                ? 'bg-orange-500 border-orange-500 text-white font-extrabold shadow-sm scale-110 ring-2 ring-orange-200 ring-offset-1'
-                : isAnswered || isRated
-                  ? 'bg-orange-100/60 border-orange-200 text-orange-900 hover:bg-orange-100'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900';
-              return (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => handleGoToQuestion(idx)}
-                  aria-label={`Go to question ${idx + 1}`}
-                  aria-current={isActive ? 'true' : undefined}
-                  title={`Question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
-                  className={`w-7 h-7 rounded-md border text-[11px] font-bold flex items-center justify-center shrink-0 transition-all duration-150 cursor-pointer ${btnClass}`}
-                >
-                  {idx + 1}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0 w-full flex flex-col gap-3 p-3 sm:p-4 overflow-hidden">
-          <div key={currentItem.id} className="flex-1 min-h-0 overflow-y-auto rounded-xl">
+        {/* Split workspace */}
+        <div className="flex-1 min-h-0 w-full overflow-hidden">
+          <div key={currentItem.id} className="h-full min-h-0 overflow-y-auto custom-scrollbar">
             {questionRendererFactory.render(qData, {
               selectedAnswer: userAnswer,
               onAnswer: (val: unknown) => {
@@ -224,61 +251,127 @@ export default function PracticeSession({
               },
             })}
           </div>
+        </div>
 
-          <div className="flex-none flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-3 bg-background z-20">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-xs text-muted-foreground mr-1 sm:mr-2 font-medium">Difficulty Rating:</span>
-              <KniButton
-                variant={ratingMap[currentItem.id] === 'easy' ? 'primary' : 'outline'}
-                onClick={() => handleRatingSelect('easy')}
-                disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs px-2.5 py-1.5"
-              >
-                <Smile className="w-3.5 h-3.5" /> Easy
-              </KniButton>
-              <KniButton
-                variant={ratingMap[currentItem.id] === 'medium' ? 'primary' : 'outline'}
-                onClick={() => handleRatingSelect('medium')}
-                disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs px-2.5 py-1.5"
-              >
-                <Meh className="w-3.5 h-3.5" /> Medium
-              </KniButton>
-              <KniButton
-                variant={ratingMap[currentItem.id] === 'hard' ? 'primary' : 'outline'}
-                onClick={() => handleRatingSelect('hard')}
-                disabled={timeRemaining <= 0}
-                className="gap-1.5 text-xs px-2.5 py-1.5"
-              >
-                <Frown className="w-3.5 h-3.5" /> Hard
-              </KniButton>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-3">
-              <KniButton
-                variant="outline"
-                disabled={currentIndex === 0}
-                onClick={() => handleGoToQuestion(Math.max(0, currentIndex - 1))}
-                className="gap-1.5 px-3 py-1.5 text-xs"
-              >
-                <ChevronLeft className="w-4 h-4" /> Previous
-              </KniButton>
-
-              <KniButton
-                onClick={() => {
-                  if (isLastQuestion) {
-                    onExit();
-                  } else {
-                    handleGoToQuestion(currentIndex + 1);
-                  }
-                }}
-                className="gap-1.5 px-3 py-1.5 text-xs"
-              >
-                {isLastQuestion ? 'Finish Practice' : 'Next'} <ChevronRight className="w-4 h-4" />
-              </KniButton>
+        {/* Bottom dock (64px): help • navigator pill • rating + Back/Next */}
+        <footer className="flex-none min-h-16 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* <button
+              type="button"
+              title="Help"
+              aria-label="Help"
+              className="w-9 h-9 rounded-full border border-[#E5E7EB] hidden sm:flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:border-[#D1D5DB] transition-colors shrink-0"
+            >
+              <HelpCircle className="w-4 h-4" />
+            </button> */}
+            <span className="hidden md:inline text-[13px] font-medium text-[#71717A]">Rate:</span>
+            <div className="flex items-center gap-1.5">
+              {RATING_OPTIONS.map(({ id, label, Icon }) => {
+                const isActive = ratingMap[currentItem.id] === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => void handleRatingSelect(id)}
+                    disabled={timeRemaining <= 0}
+                    aria-pressed={isActive}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                      isActive
+                        ? 'bg-[#18181B] text-white border-[#18181B]'
+                        : 'bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#D1D5DB] hover:text-[#18181B]'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
+
+          {/* Question navigator pill with dropdown grid */}
+          <div ref={navigatorRef} className="relative order-first w-full sm:order-none sm:w-auto flex justify-center">
+            <button
+              type="button"
+              onClick={() => setNavigatorOpen((v) => !v)}
+              aria-expanded={navigatorOpen}
+              aria-haspopup="listbox"
+              className="flex items-center gap-1.5 bg-[#F4F4F5] rounded-full px-4 py-2 text-[13px] font-medium text-[#18181B] hover:bg-[#ECECEE] transition-colors"
+            >
+              Question {currentIndex + 1} of {questions.length}
+              <ChevronDown className={`w-3.5 h-3.5 text-[#71717A] transition-transform ${navigatorOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {navigatorOpen && (
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(420px,calc(100vw-3rem))] bg-white border border-[#E5E7EB] rounded-xl p-3 z-40">
+                <div className="flex items-center justify-between px-1 pb-2">
+                  <span className="text-[13px] font-medium text-[#71717A]">
+                    {answeredCount} of {questions.length} answered
+                  </span>
+                  <span className="flex items-center gap-3 text-[12px] text-[#71717A]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-[#18181B]" /> Answered
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full border border-[#D1D5DB]" /> Todo
+                    </span>
+                  </span>
+                </div>
+                <div role="listbox" aria-label="Questions" className="grid grid-cols-7 gap-1.5 max-h-[240px] overflow-y-auto custom-scrollbar">
+                  {questions.map((q, idx) => {
+                    const isActive = currentIndex === idx;
+                    const isAnswered = answers[q.id] !== undefined && answers[q.id] !== null;
+                    return (
+                      <button
+                        key={q.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isActive}
+                        onClick={() => handleGoToQuestion(idx)}
+                        aria-label={`Go to question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
+                        title={`Question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
+                        className={`h-8 rounded-lg border text-[12px] font-semibold flex items-center justify-center transition-colors ${
+                          isActive
+                            ? 'bg-[#18181B] border-[#18181B] text-white'
+                            : isAnswered
+                              ? 'bg-[#F4F4F5] border-[#E5E7EB] text-[#18181B] hover:border-[#D1D5DB]'
+                              : 'bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#D1D5DB] hover:text-[#18181B]'
+                        }`}
+                      >
+                        {idx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              disabled={currentIndex === 0}
+              onClick={() => handleGoToQuestion(Math.max(0, currentIndex - 1))}
+              className="h-10 px-5 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] disabled:opacity-40 transition-colors flex items-center gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (isLastQuestion) {
+                  onExit();
+                } else {
+                  handleGoToQuestion(currentIndex + 1);
+                }
+              }}
+              className="h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"
+            >
+              {isLastQuestion ? 'Finish' : 'Next'}
+              {!isLastQuestion && <ChevronRight className="w-4 h-4" />}
+            </button>
+          </div>
+        </footer>
       </div>
     </>
   );

@@ -253,7 +253,13 @@ export function useDashboardData(session: Session) {
   const handleResumeExam = async (userExamId: string) => {
     setIsStarting(true);
     try {
-      await orchestrator.resumeExam(userExamId, activeModule);
+      const normalizedFormat =
+        typeof profile?.format === 'string' && profile.format.toLowerCase() === 'paper'
+          ? 'Paper'
+          : typeof profile?.format === 'string' && profile.format.toLowerCase() === 'digital'
+            ? 'Digital'
+            : null;
+      await orchestrator.resumeExam(userExamId, activeModule, normalizedFormat);
       router.push('/exam');
     } catch (err) {
       console.error('Error resuming exam:', err);

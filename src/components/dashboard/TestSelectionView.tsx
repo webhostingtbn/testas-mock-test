@@ -339,21 +339,39 @@ export function TestSelectionView({
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
                   Complete this mock test once to see the review breakdown here.
                 </p>
-                {attempts.some((attempt) => attempt.status !== 'completed') && (
-                  <KniButton
-                    variant="secondary"
-                    onClick={() => {
-                      const latestInProgress = [...attempts]
-                        .filter((attempt) => attempt.status !== 'completed')
-                        .sort((a, b) => getAttemptTimestamp(b) - getAttemptTimestamp(a))[0];
-                      if (latestInProgress) onResumeAttempt(latestInProgress);
-                    }}
-                    className="mt-5 h-10 rounded-xl px-4 text-xs font-semibold"
-                  >
-                    <Clock className="mr-1.5 size-3.5" />
-                    Resume In-Progress Test
-                  </KniButton>
-                )}
+                {(() => {
+                  const inProgress = [...attempts]
+                    .filter((attempt) => attempt.status !== 'completed')
+                    .sort((a, b) => getAttemptTimestamp(b) - getAttemptTimestamp(a))[0];
+                  if (!inProgress) return null;
+                  // Never offer to resume an attempt whose exam format
+                  // differs from the profile format — the exam screen would
+                  // render the wrong format's sections.
+                  const examFormat = selectedExam.format;
+                  const profileFormat = profile?.format;
+                  const formatMismatch =
+                    typeof examFormat === 'string' &&
+                    typeof profileFormat === 'string' &&
+                    examFormat.toLowerCase() !== profileFormat.toLowerCase();
+                  if (formatMismatch) {
+                    return (
+                      <p className="mt-5 max-w-sm text-xs leading-5 text-slate-500">
+                        You have an in-progress {examFormat} attempt for this test, but your
+                        profile is set to {profileFormat}. Switch format to resume it.
+                      </p>
+                    );
+                  }
+                  return (
+                    <KniButton
+                      variant="secondary"
+                      onClick={() => onResumeAttempt(inProgress)}
+                      className="mt-5 h-10 rounded-xl px-4 text-xs font-semibold"
+                    >
+                      <Clock className="mr-1.5 size-3.5" />
+                      Resume In-Progress Test
+                    </KniButton>
+                  );
+                })()}
               </KniCard>
             )}
           </div>

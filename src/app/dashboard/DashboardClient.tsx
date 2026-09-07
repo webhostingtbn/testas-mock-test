@@ -192,7 +192,14 @@ export default function DashboardClient({ session }: { session: Session }) {
           getExamAttemptInfo={data.getExamAttemptInfo}
           selectedTestHistory={data.selectedTestHistory}
           onBackNavigation={handleBackNavigation}
-          onResumeAttempt={data.handleResumeExam}
+          onResumeAttempt={(attempt) => {
+            // Callers (TestSelectionView, DashboardView) pass the whole
+            // attempt object — unwrap the id (passing the object straight
+            // into handleResumeExam fetched `/api/attempts/[object Object]`).
+            if (attempt && typeof attempt.id === 'string') {
+              data.handleResumeExam(attempt.id);
+            }
+          }}
         />
       )}
 

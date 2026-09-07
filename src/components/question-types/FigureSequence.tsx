@@ -36,7 +36,7 @@ export default function FigureSequence({
 
   if (!imageUrl || optionsUrls.length < 6) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+      <div className="flex items-center justify-center h-48 text-sm text-[#71717A]">
         Loading question images...
       </div>
     );
@@ -54,40 +54,67 @@ export default function FigureSequence({
     return optionsUrls[idx];
   };
 
+  const renderChoice = (col: 1 | 2, row: 1 | 2 | 3) => {
+    const isSelected =
+      col === 1 ? currentAnswer.image1 === row : currentAnswer.image2 === row;
+    return (
+      <button
+        key={`img${col}-matrix${row}`}
+        type="button"
+        onClick={() => handleOptionClick(col, row)}
+        aria-pressed={isSelected}
+        aria-label={`Image ${col} Matrix ${row}${isSelected ? ' (selected)' : ''}`}
+        className={`
+          relative w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px]
+          border-[3px] transition-colors overflow-hidden
+          outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40
+          ${isSelected ? 'border-[#EA580C]' : 'border-black hover:border-[#EA580C]/60'}
+        `}
+      >
+        <img src={getOptionUrl(col, row)} alt={`Image ${col} Matrix ${row}`} className="w-full h-full object-cover" />
+        {isSelected && (
+          <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#EA580C] flex items-center justify-center">
+            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-4">
-      <div className="flex items-center gap-2 flex-none">
-        <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-          Complete the sequence
-        </span>
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex-none py-3">
+        <p className="text-[13px] font-medium text-[#71717A]">Complete the sequence</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 p-4 md:p-6 shadow-sm flex flex-col items-center justify-start w-full overflow-y-auto min-h-0 flex-1">
-        
-        {/* Unified 3-column Grid ensuring perfect vertical alignment everywhere */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-8 pb-6 sm:pb-8">
+        {/* Unified 3-column Grid ensuring perfect vertical alignment everywhere.
+            Thick black borders are test-content fidelity (real TestAS format), not chrome. */}
         <div className="grid grid-cols-[auto_auto_auto] gap-x-4 md:gap-x-8 gap-y-2 md:gap-y-4 items-center w-fit mx-auto pb-4">
-          
+
           {/* --- ROW 1: HEADERS --- */}
           {/* Main prompt sequence image (Col 1) */}
           <div className="justify-self-end mr-2 lg:mr-4 mb-4 mt-2">
-            <img 
-              src={imageUrl} 
-              alt="Sequence prompt" 
-              className="h-20 md:h-28 lg:h-[100px] object-contain block ring-1 ring-gray-200" 
+            <img
+              src={imageUrl}
+              alt="Sequence prompt"
+              className="h-20 md:h-28 lg:h-[100px] object-contain block ring-1 ring-[#E5E7EB]"
             />
           </div>
 
           {/* Image 1 Header Box (Col 2) */}
-          <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white shadow-sm relative mb-4 mt-2">
+          <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white relative mb-4 mt-2">
             <span className="text-xs md:text-sm font-medium absolute top-1">Image 1</span>
             <span className="text-3xl md:text-5xl font-light mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
               <svg className="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
             </div>
           </div>
-            
+
           {/* Image 2 Header Box (Col 3) */}
-          <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white shadow-sm relative mb-4 mt-2">
+          <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white relative mb-4 mt-2">
             <span className="text-xs md:text-sm font-medium absolute top-1">Image 2</span>
             <span className="text-3xl md:text-5xl font-light mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
@@ -100,56 +127,18 @@ export default function FigureSequence({
             <React.Fragment key={`row-${row}`}>
 
               {/* Matrix Label (Col 1) */}
-              <div className="text-gray-800 font-medium text-sm md:text-base pr-4 lg:pr-8 justify-self-end text-right">
+              <div className="text-[#18181B] font-medium text-sm md:text-base pr-4 lg:pr-8 justify-self-end text-right">
                 Matrix {row}
               </div>
 
               {/* Image 1 Choices (Col 2) */}
-              <button
-                onClick={() => handleOptionClick(1, row)}
-                className={`
-                  relative w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px] border-[3px] transition-all duration-200 overflow-hidden group
-                  ${
-                    currentAnswer.image1 === row
-                      ? 'border-orange-500 ring-4 ring-orange-200 z-10 scale-[1.02]'
-                      : 'border-black hover:border-orange-400 z-0'
-                  }
-                `}
-              >
-                <img src={getOptionUrl(1, row)} alt={`Image 1 Matrix ${row}`} className="w-full h-full object-cover" />
-                {currentAnswer.image1 === row && (
-                  <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-orange-600 flex items-center justify-center shadow-lg">
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </button>
+              {renderChoice(1, row)}
 
-              {/* Image 2 Choices (Col 4) */}
-              <button
-                onClick={() => handleOptionClick(2, row)}
-                className={`
-                  relative w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px] border-[3px] transition-all duration-200 overflow-hidden group
-                  ${
-                    currentAnswer.image2 === row
-                      ? 'border-orange-500 ring-4 ring-orange-200 z-10 scale-[1.02]'
-                      : 'border-black hover:border-orange-400 z-0'
-                  }
-                `}
-              >
-                <img src={getOptionUrl(2, row)} alt={`Image 2 Matrix ${row}`} className="w-full h-full object-cover" />
-                {currentAnswer.image2 === row && (
-                  <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-orange-600 flex items-center justify-center shadow-lg">
-                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                )}
-              </button>
+              {/* Image 2 Choices (Col 3) */}
+              {renderChoice(2, row)}
             </React.Fragment>
           ))}
-          
+
         </div>
 
       </div>

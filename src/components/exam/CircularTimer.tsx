@@ -56,7 +56,7 @@ export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProp
     : '#334155'; // slate-700
 
   return (
-    <div className="flex items-center gap-3 bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200 backdrop-blur-sm">
+    <div className="flex items-center gap-2 sm:gap-3 bg-slate-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-200 backdrop-blur-sm">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg
           width={size}
@@ -89,7 +89,7 @@ export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProp
       </div>
       {/* Time text */}
       <span
-        className="text-lg font-bold tabular-nums tracking-wider pr-1"
+        className="text-base sm:text-lg font-bold tabular-nums tracking-wider pr-1"
         style={{ color: textColor }}
       >
         {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}

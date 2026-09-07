@@ -1,17 +1,23 @@
 'use client';
 
+import { CanvasImage } from './CanvasImage';
+
+interface LatinSquareContent {
+  grid_image?: string;
+  grid_image_url?: string;
+  options?: string[];
+}
+
 interface LatinSquareProps {
   question: {
     id: string;
-    content: {
-      grid_image?: string;
-      grid_image_url?: string;
-      options?: string[];
-    };
+    content: LatinSquareContent;
   };
   selectedAnswer: string | null;
   onAnswer: (letter: string) => void;
 }
+
+const FALLBACK_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
 
 export default function LatinSquare({
   question,
@@ -20,55 +26,58 @@ export default function LatinSquare({
 }: LatinSquareProps) {
   const content = question.content ?? {};
   const imageUrl = content.grid_image_url || content.grid_image || '';
-  const options = content.options && content.options.length > 0 
-    ? content.options 
-    : ['A', 'B', 'C', 'D', 'E']; // Standard fallback options
+  const options =
+    content.options && content.options.length > 0 ? content.options : FALLBACK_OPTIONS;
 
   if (!imageUrl) {
     return (
-      <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+      <div className="flex items-center justify-center h-48 text-sm text-[#71717A]">
         Loading question...
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-4">
-      {/* Question label */}
-      <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider flex-none">
-        Find the missing letter
+    <div className="flex flex-col h-full min-h-0">
+      {/* Pane label */}
+      <div className="flex-none py-3">
+        <p className="text-[13px] font-medium text-[#71717A]">Find the missing letter</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 items-stretch justify-center flex-1 min-h-0">
-        {/* Left: The grid image */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex items-center justify-center w-full max-w-2xl flex-1 min-h-0 overflow-hidden">
-          <img
-            src={imageUrl}
-            alt="Latin square puzzle"
-            className="max-w-full max-h-full object-contain block ring-1 ring-gray-100 rounded-lg"
-          />
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:divide-x lg:divide-[#E5E7EB]">
+        {/* Left pane: grid puzzle — zoomable canvas, no nested card */}
+        <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-8 pb-6 lg:py-6">
+          <div className="w-full max-w-2xl mx-auto h-[320px] sm:h-[400px] lg:h-[440px] shrink-0 overflow-hidden rounded-xl">
+            <CanvasImage src={imageUrl} alt="Latin square puzzle" />
+          </div>
         </div>
 
-        {/* Right: Answer options */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm w-full lg:w-auto flex-none flex flex-col justify-center">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex-none">
-            Select Answer
-          </h3>
-          <div className="grid grid-cols-5 lg:grid-cols-2 gap-3 place-items-center flex-none">
+        {/* Right pane: answer options */}
+        <div className="w-full lg:w-[300px] shrink-0 flex flex-col px-6 sm:px-8 pb-6 sm:pb-8 lg:py-6">
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">Select answer</p>
+          <div
+            role="radiogroup"
+            aria-label="Answer options"
+            className="grid grid-cols-5 lg:grid-cols-2 gap-[10px]"
+          >
             {options.map((letter) => {
               const isSelected = selectedAnswer === letter;
 
               return (
                 <button
                   key={letter}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
                   onClick={() => onAnswer(letter)}
                   className={`
-                    w-12 h-12 md:w-16 md:h-16 rounded-xl text-xl md:text-2xl font-bold flex items-center justify-center
-                    transition-all duration-200
+                    h-12 md:h-14 rounded-[10px] border text-xl font-semibold
+                    flex items-center justify-center transition-colors
+                    outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40
                     ${
                       isSelected
-                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-200 scale-105 ring-4 ring-orange-200'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                        ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60 text-[#EA580C]'
+                        : 'border-[#E5E7EB] bg-white text-[#18181B] hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
                     }
                   `}
                 >

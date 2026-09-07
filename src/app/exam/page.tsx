@@ -406,7 +406,7 @@ export default function ExamPage() {
 
   return (
     <>
-      <SecurityOverlay />
+      {/* <SecurityOverlay /> */}
       <WatermarkOverlay email={userProfile?.email || session?.user?.email || ''} fullName={userProfile?.fullName || session?.user?.name || null} />
       <div className="flex flex-col h-screen bg-background text-foreground select-none">
         <ExamTopBar
@@ -419,14 +419,14 @@ export default function ExamPage() {
           isCurrentQuestionRated={canNavigate}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex justify-center">
-          <div className="w-full space-y-6">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center">
+          <div className="w-full h-full space-y-6">
             {isLoadingQuestions ? (
               <div className="flex h-64 items-center justify-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : questionData ? (
-              <div key={questionData.id} className="w-full">
+              <div key={questionData.id} className="w-full h-full">
               {questionRendererFactory.render(questionData, {
                 selectedAnswer: currentAnswer,
                 selectedAnswers: passageChildAnswers,

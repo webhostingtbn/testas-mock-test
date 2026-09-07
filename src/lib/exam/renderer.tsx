@@ -75,6 +75,7 @@ interface ModuleQuestionData {
   content: {
     question_text: string;
     options: Record<string, string>;
+    resolved_image_url?: string;
   };
 }
 
@@ -254,17 +255,30 @@ class ModuleMCQRenderer implements QuestionRenderer {
       questions = passage.questions.map((q) => {
         const qContent = isRecord(q.content) ? q.content : {};
         const qRecord = q as unknown as Record<string, unknown>;
+        const childResolved =
+          typeof qRecord.resolved_image_url === 'string'
+            ? qRecord.resolved_image_url
+            : typeof qContent.resolved_image_url === 'string'
+              ? qContent.resolved_image_url
+              : undefined;
         return {
           id: q.id,
           sort_order: typeof qRecord.sort_order === 'number' ? qRecord.sort_order : (q.sortOrder ?? 1),
           content: {
             question_text: typeof qContent.question_text === 'string' ? qContent.question_text : '',
             options: (isRecord(qContent.options) || Array.isArray(qContent.options) ? qContent.options : {}) as unknown as Record<string, string>,
+            ...(childResolved ? { resolved_image_url: childResolved } : {}),
           },
         };
       });
     } else {
       // Single question passed directly (e.g. Practice Mode)
+      const singleResolved =
+        typeof pRecord.resolved_image_url === 'string'
+          ? pRecord.resolved_image_url
+          : typeof content.resolved_image_url === 'string'
+            ? content.resolved_image_url
+            : undefined;
       questions = [
         {
           id: passage.id,
@@ -272,6 +286,7 @@ class ModuleMCQRenderer implements QuestionRenderer {
           content: {
             question_text: typeof content.question_text === 'string' ? content.question_text : (typeof passage.content === 'string' ? passage.content : ''),
             options: (isRecord(content.options) || Array.isArray(content.options) ? content.options : {}) as unknown as Record<string, string>,
+            ...(singleResolved ? { resolved_image_url: singleResolved } : {}),
           },
         },
       ];

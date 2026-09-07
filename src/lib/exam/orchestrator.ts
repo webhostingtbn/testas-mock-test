@@ -54,6 +54,7 @@ function isQuestion(value: unknown): value is ExamQuestionRecord {
 }
 
 function parseExamPayload(value: unknown): ExamPayload {
+
   if (!isRecord(value)) throw new Error('Invalid exam response');
   const sections = Array.isArray(value.sections) ? value.sections.filter(isSection) : [];
   const questions = Array.isArray(value.questions) ? value.questions.filter(isQuestion) : [];
@@ -157,6 +158,24 @@ function buildExamFlow(sections: StoredSection[], isPaper: boolean): ExamFlowSte
   return flowSteps;
 }
 
+/**
+ * Throws when the exam's own format disagrees with the format the caller
+ * expects (e.g. resuming a Paper attempt while the profile is Digital).
+ * Without this, the exam screen silently renders the wrong format's sections.
+ */
+function assertExamFormat(
+  examFormat: string | null | undefined,
+  expectedFormat: string | null | undefined,
+  action: 'start' | 'resume',
+): void {
+  if (!examFormat || !expectedFormat) return;
+  if (examFormat.toLowerCase() !== expectedFormat.toLowerCase()) {
+    throw new Error(
+      `Cannot ${action} this attempt: it belongs to a ${examFormat} test, but your profile is set to ${expectedFormat}. Switch format to ${action} it.`,
+    );
+  }
+}
+
 export async function startExam(
   examId: string,
   activeModule: ModuleTestType | null,
@@ -180,6 +199,7 @@ export async function startExam(
     const examRes = await fetch(`/api/exams/${examId}`);
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
+    assertExamFormat(examData.exam?.format, format, 'start');
 
     const targetFormat = format || examData.exam?.format || 'Digital';
     const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
@@ -202,20 +222,31 @@ export async function startExam(
 
 export async function resumeExam(
   userExamId: string,
-  activeModule: ModuleTestType | null
+  activeModule: ModuleTestType | null,
+  format: 'Digital' | 'Paper' | null
 ): Promise<void> {
   const { startExam: storeStartExam } = useExamStore.getState();
 
   try {
     const attemptRes = await fetch(`/api/attempts/${userExamId}`);
-    if (!attemptRes.ok) throw new Error('Failed to load attempt session');
+    if (!attemptRes.ok) {
+      const detail = await attemptRes.json().catch(() => null);
+      const serverError =
+        detail && typeof detail === 'object' && 'error' in detail && typeof detail.error === 'string'
+          ? detail.error
+          : null;
+      throw new Error(
+        `Failed to load attempt session (HTTP ${attemptRes.status}${serverError ? `: ${serverError}` : ''})`,
+      );
+    }
     const { attempt } = await attemptRes.json();
 
     const examRes = await fetch(`/api/exams/${attempt.exam_id}`);
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
+    assertExamFormat(examData.exam?.format, format, 'resume');
 
-    const targetFormat = examData.exam?.format || 'Digital';
+    const targetFormat = format || examData.exam?.format || 'Digital';
     const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
     const builtSections = buildStoredSections(examData, isPaper, activeModule);
     if (builtSections.length === 0) throw new Error('Exam has no questions for the selected format/module');
@@ -267,8 +298,9 @@ export function useExamOrchestrator() {
   async function handleResumeExam(
     userExamId: string,
     activeModule: ModuleTestType | null,
+    format: 'Digital' | 'Paper' | null,
   ): Promise<void> {
-    await resumeExam(userExamId, activeModule);
+    await resumeExam(userExamId, activeModule, format);
   }
 
   async function handleFinishExam(

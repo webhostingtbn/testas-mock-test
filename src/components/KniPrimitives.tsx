@@ -198,7 +198,7 @@ export function KniHeader({
   console.log("parentViewLabel", parentViewLabel);
 
   return (
-    <header className="relative z-20 flex min-h-20 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-5 md:px-8">
+    <header className="relative z-20 flex py-4 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-3 md:px-5">
       <div className="flex gap-4 items-center">
         {parentViewLabel ? (
             <div className="transition-opacity duration-200 ease-in-out animate-in fade-in slide-in-from-left-2 fill-mode-forwards">
@@ -215,7 +215,7 @@ export function KniHeader({
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
             TestAS Preparation
           </p>
-          <h1 className="mt-1 truncate text-lg font-black tracking-tight text-slate-950">
+          <h1 className="truncate text-lg font-black tracking-tight text-slate-950">
             {VIEW_LABELS[activeView]}
         </h1>
         </div>
@@ -524,7 +524,7 @@ export function KniShell({
             onBack={backNavigation?.onBack}
             parentViewLabel={backNavigation?.label}
           />
-          <main className="relative z-10 flex-1 bg-[#fbfaf8] p-3 sm:p-5 min-h-0 flex flex-col overflow-hidden">
+          <main className="relative z-10 flex-1 bg-white sm:p-5 min-h-0 flex flex-col overflow-hidden">
             <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
               {children}
             </div>
