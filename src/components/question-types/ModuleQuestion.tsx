@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { CanvasImage } from './CanvasImage';
+import { ResilientImage } from './ResilientImage';
 import { RichMarkdown } from './RichMarkdown';
 
 interface ModuleQuestionProps {
@@ -164,7 +165,7 @@ export default function ModuleQuestion({
                   <div className="flex-1">
                     {hasImage ? (
                       <div className="min-h-[60px] flex items-center justify-center">
-                        <img
+                        <ResilientImage
                           src={option.image_url}
                           alt={`Option ${letter}`}
                           className="max-h-24 object-contain"
@@ -292,7 +293,7 @@ export default function ModuleQuestion({
                 <div className="flex-1">
                   {hasImage ? (
                     <div className="min-h-[60px] flex items-center justify-center">
-                      <img
+                      <ResilientImage
                         src={option.image_url}
                         alt={`Option ${letter}`}
                         className="max-h-24 object-contain"

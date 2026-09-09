@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { ResilientImage } from './ResilientImage';
 
 interface CanvasImageProps {
   src: string;
@@ -195,8 +196,8 @@ export function CanvasImage({
         className="absolute top-0 left-0 w-full h-full flex items-center justify-center"
         style={{ transform: `translate(${position.x}px, ${position.y}px)`, pointerEvents: 'none' }}
       >
-        <img
-          ref={imageRef}
+        <ResilientImage
+          imgRef={imageRef}
           src={src}
           alt={alt}
           className="max-w-none object-contain pointer-events-none transition-transform duration-75 ease-out"

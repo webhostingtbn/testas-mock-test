@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { CanvasImage } from './CanvasImage';
+import { ResilientImage } from './ResilientImage';
 import { RichMarkdown } from './RichMarkdown';
 
 export interface ModuleQuestionContent {
@@ -251,7 +252,7 @@ export default function ModuleMCQ({
                             <span aria-hidden="true" className="text-[#D1D5DB] shrink-0">—</span>
                             {hasImage && option.image_url ? (
                               <span className="flex-1 min-h-[60px] flex items-center justify-center">
-                                <img
+                                <ResilientImage
                                   src={option.image_url}
                                   alt={`Option ${letter}`}
                                   className="max-h-24 object-contain"

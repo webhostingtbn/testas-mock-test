@@ -18,16 +18,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Storage object is not accessible' }, { status: 403 });
     }
 
+    // Full-length exams run up to ~4h (core + breaks + 150-min module), so
+    // signatures must outlive the session — a short expiry 403s images
+    // the user is still looking at.
+    const expiresIn = 5 * 60 * 60; // 5 hours
     const supabase = getAdminSupabaseClient();
     const { data, error } = await supabase.storage
       .from(getStorageBucket())
-      .createSignedUrl(path, 60); // 60 seconds expiry
+      .createSignedUrl(path, expiresIn);
 
     if (error || !data) {
       return NextResponse.json({ error: error?.message || 'Failed to sign URL' }, { status: 500 });
     }
 
-    return NextResponse.json({ signedUrl: data.signedUrl });
+    return NextResponse.json({ signedUrl: data.signedUrl, expiresIn });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message === 'UNAUTHORIZED') {

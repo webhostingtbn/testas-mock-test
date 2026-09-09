@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { ResilientImage } from './ResilientImage';
 
 interface FigureSequenceProps {
   question: {
@@ -71,7 +72,7 @@ export default function FigureSequence({
           ${isSelected ? 'border-[#EA580C]' : 'border-black hover:border-[#EA580C]/60'}
         `}
       >
-        <img src={getOptionUrl(col, row)} alt={`Image ${col} Matrix ${row}`} className="w-full h-full object-cover" />
+        <ResilientImage src={getOptionUrl(col, row)} alt={`Image ${col} Matrix ${row}`} className="w-full h-full object-cover" />
         {isSelected && (
           <div className="absolute top-1 right-1 w-6 h-6 rounded-full bg-[#EA580C] flex items-center justify-center">
             <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,7 +98,7 @@ export default function FigureSequence({
           {/* --- ROW 1: HEADERS --- */}
           {/* Main prompt sequence image (Col 1) */}
           <div className="justify-self-end mr-2 lg:mr-4 mb-4 mt-2">
-            <img
+            <ResilientImage
               src={imageUrl}
               alt="Sequence prompt"
               className="h-20 md:h-28 lg:h-[100px] object-contain block ring-1 ring-[#E5E7EB]"

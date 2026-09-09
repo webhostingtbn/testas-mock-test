@@ -31,28 +31,86 @@ function isBareStoragePath(value: string): boolean {
   return value.length > 0 && !value.startsWith('http') && !value.startsWith('/') && !value.startsWith('data:');
 }
 
-/** How long a signed URL is trusted before re-signing (Supabase signatures are short-lived). */
-const SIGNED_URL_TTL_MS = 50 * 60 * 1000;
+/**
+ * Safety margin subtracted from the server-provided signature lifetime.
+ * Cached URLs are re-signed this far before they actually expire so an
+ * image never 403s mid-render.
+ */
+const SIGN_EXPIRY_MARGIN_MS = 120 * 1000;
+
+function cacheTtlMs(expiresIn: unknown): number {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    return 0;
+  }
+  return Math.max(0, expiresIn * 1000 - SIGN_EXPIRY_MARGIN_MS);
+}
+
+// Module-scope shared state: every ImageService instance (one per component
+// mount) sees the same signatures, so re-signs are deduped app-wide.
+const signedCache = new Map<string, { url: string; expiresAt: number }>();
+const inFlightSigns = new Map<string, Promise<string | undefined>>();
+// Reverse lookup so a rendered <img> holding only a (possibly expired)
+// signed URL can be re-signed without knowing its storage path.
+const urlToPath = new Map<string, string>();
+
+async function signStoragePath(path: string): Promise<string | undefined> {
+  const signPromise = (async (): Promise<string | undefined> => {
+    try {
+      const res = await fetch(`/api/storage/sign?path=${encodeURIComponent(path)}`);
+      if (!res.ok) return undefined;
+      const data: unknown = await res.json();
+      const signedUrl = isRecord(data) ? asString(data.signedUrl) : undefined;
+      const ttlMs = isRecord(data) ? cacheTtlMs(data.expiresIn) : 0;
+      if (signedUrl) {
+        urlToPath.set(signedUrl, path);
+        if (ttlMs > 0) {
+          signedCache.set(path, { url: signedUrl, expiresAt: Date.now() + ttlMs });
+        }
+      }
+      return signedUrl;
+    } catch (error) {
+      console.error(`Failed to resolve image URL for path: ${path}`, error);
+      return undefined;
+    } finally {
+      inFlightSigns.delete(path);
+    }
+  })();
+  inFlightSigns.set(path, signPromise);
+  return signPromise;
+}
+
+/**
+ * Re-signs the storage object behind an already-rendered signed URL.
+ * Used by images that fail to load (e.g. the signature expired while the
+ * page sat open). Returns undefined when the URL isn't a known signature.
+ */
+export async function refreshSignedUrl(staleUrl: string): Promise<string | undefined> {
+  const path = urlToPath.get(staleUrl);
+  if (!path) return undefined;
+  const inFlight = inFlightSigns.get(path);
+  if (inFlight) return inFlight;
+  signedCache.delete(path);
+  return signStoragePath(path);
+}
 
 export class ImageService {
-  private readonly signedCache = new Map<string, { url: string; expiresAt: number }>();
-  private readonly inFlightSigns = new Map<string, Promise<string | undefined>>();
 
   /**
-   * Resolves a single image path to a signed short-lived URL.
-   * Absolute URLs (http//) pass through untouched. Cached signatures are
-   * re-requested after TTL so lingering on a question can't 403.
+   * Resolves a single image path to a signed URL. Absolute URLs (http//)
+   * pass through untouched. Cache lifetime is derived from the server's
+   * `expiresIn` (minus a safety margin); responses without a usable expiry
+   * are never cached, so a stale signature can't be served.
    */
   async resolveImageUrl(path: string | null | undefined): Promise<string | undefined> {
     if (!path) return undefined;
 
-    const cached = this.signedCache.get(path);
+    const cached = signedCache.get(path);
     if (cached && Date.now() < cached.expiresAt) return cached.url;
-    if (cached) this.signedCache.delete(path);
+    if (cached) signedCache.delete(path);
 
     // Dedupe concurrent signs for the same path (e.g. repeated passage
     // images across grouped children resolving at once).
-    const inFlight = this.inFlightSigns.get(path);
+    const inFlight = inFlightSigns.get(path);
     if (inFlight) return inFlight;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, '');
@@ -71,25 +129,7 @@ export class ImageService {
       return path;
     }
 
-    const signPromise = (async (): Promise<string | undefined> => {
-      try {
-        const res = await fetch(`/api/storage/sign?path=${encodeURIComponent(path)}`);
-        if (!res.ok) return undefined;
-        const data: unknown = await res.json();
-        const signedUrl = isRecord(data) ? asString(data.signedUrl) : undefined;
-        if (signedUrl) {
-          this.signedCache.set(path, { url: signedUrl, expiresAt: Date.now() + SIGNED_URL_TTL_MS });
-        }
-        return signedUrl;
-      } catch (error) {
-        console.error(`Failed to resolve image URL for path: ${path}`, error);
-        return undefined;
-      } finally {
-        this.inFlightSigns.delete(path);
-      }
-    })();
-    this.inFlightSigns.set(path, signPromise);
-    return signPromise;
+    return signStoragePath(path);
   }
 
   private async resolveBarePath(value: unknown): Promise<string | undefined> {

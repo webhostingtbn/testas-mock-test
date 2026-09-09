@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CanvasImage } from './CanvasImage';
+import { ResilientImage } from './ResilientImage';
 
 interface CompletingPatternsProps {
   question: {
@@ -107,7 +108,7 @@ export default function CompletingPatterns({
               className="group relative w-full max-w-full overflow-hidden rounded-xl border border-gray-150 bg-white shadow-sm"
             >
               {/* The unified image containing all options */}
-              <img
+              <ResilientImage
                 src={optionsUrl}
                 alt={isEightOptions ? "Answer options A through H" : "Answer options A through F"}
                 onLoad={(event) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ResilientImage } from './ResilientImage';
 
 interface ZoomableImageProps {
   src: string;
@@ -25,7 +26,7 @@ export function ZoomableImage({ src, alt = 'Graphic', scaleDirection = 'width' }
           ${isHeight ? 'flex-1 min-h-0' : 'min-h-[150px]'}
         `}
       >
-        <img
+        <ResilientImage
           src={src}
           alt={alt}
           style={
