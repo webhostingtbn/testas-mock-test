@@ -18,6 +18,7 @@ import { MockTestView } from '@/components/dashboard/MockTestView';
 import { ReviewView } from '@/components/dashboard/ReviewView';
 
 import { useCallback } from 'react';
+import { pickDefaultExam } from '@/lib/exam/exam-select';
 
 export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
@@ -54,17 +55,15 @@ export default function DashboardClient({ session }: { session: Session }) {
     }
   }, [data.profile?.format]);
 
-  // Reset briefing checklist and select the active exam when leaving mock view
+  // Reset briefing checklist and select the default exam when leaving mock view.
+  // The default is format-aware (Digital preferred when no format is chosen),
+  // never raw API order — otherwise a Paper exam wins by accident.
   useEffect(() => {
     if (activeView !== 'mock') {
       data.setBriefingChecklist([]);
-      if (data.exams.length > 0) {
-        data.setSelectedExam(data.exams[0]);
-      } else {
-        data.setSelectedExam(null);
-      }
+      data.setSelectedExam(pickDefaultExam(data.exams, data.profile?.format));
     }
-  }, [activeView, data.exams]);
+  }, [activeView, data.exams, data.profile?.format]);
 
   // --------------- Gate screens ---------------
 

@@ -8,6 +8,7 @@ import {
   BREAK_DURATION_TIME_OF_TEST,
   filterSections,
 } from '@/lib/constants';
+import { pickDefaultExam } from '@/lib/exam/exam-select';
 import type { Profile, ModuleTestType, Exam } from '@/lib/types';
 import { isFullCompletion } from '@/lib/types';
 import { signOut } from 'next-auth/react';
@@ -131,14 +132,7 @@ export function useDashboardData(session: Session) {
           const loadedExams = (examsJson.exams || []) as Exam[];
           setExams(loadedExams);
           setExamLimit(realProfile.role === 'admin' ? null : realProfile.allow_test_limit ?? 1);
-          const matchingExams = loadedExams.filter((e) =>
-            !realProfile.format || (e.format || '').toLowerCase() === realProfile.format.toLowerCase()
-          );
-          if (matchingExams.length > 0) {
-            setSelectedExam(matchingExams[0]);
-          } else if (loadedExams.length > 0) {
-            setSelectedExam(loadedExams[0]);
-          }
+          setSelectedExam(pickDefaultExam(loadedExams, realProfile.format));
         }
 
         const attemptsRes = await fetch('/api/attempts');
