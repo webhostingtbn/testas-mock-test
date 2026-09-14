@@ -188,7 +188,10 @@ export interface CompletingPatternsContent {
 
 // ---- Answer types ----
 
-export type FigureSequenceAnswer = number;          // Index of selected option
+export type FigureSequenceAnswer = {
+  image1: number | null;
+  image2: number | null;
+}; // Dual selection: matrix row for Image 1 and Image 2
 export type MathEquationAnswer = Record<string, number>; // { A: 3, B: 5, ... }
 export type LatinSquareAnswer = string;             // Selected letter
 export type ModuleMCQAnswer = string;               // Selected option ID
