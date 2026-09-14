@@ -6,17 +6,16 @@ import {
   Laptop, TrendingUp, Settings, Monitor, File, X
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
+import { DashboardLoadingShell } from '@/components/dashboard/DashboardSkeleton';
 import { MODULE_TEST_OPTIONS } from '@/lib/constants';
 import type { Profile, ModuleTestType } from '@/lib/types';
 
 // --------------- Loading Screen ---------------
+// Sidebar + header render immediately; only the main content area
+// shows a skeleton. This avoids the old full-screen spinner pop.
 
 export function LoadingScreen() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-orange-50">
-      <div className="w-8 h-8 border-3 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-    </div>
-  );
+  return <DashboardLoadingShell />;
 }
 
 // --------------- Module Selection Screen ---------------

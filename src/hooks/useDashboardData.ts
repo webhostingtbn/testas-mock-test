@@ -126,7 +126,11 @@ export function useDashboardData(session: Session) {
           return;
         }
 
-        const examsRes = await fetch('/api/exams');
+        const [examsRes, attemptsRes] = await Promise.all([
+          fetch('/api/exams'),
+          fetch('/api/attempts'),
+        ]);
+
         if (examsRes.ok) {
           const examsJson = await examsRes.json();
           const loadedExams = (examsJson.exams || []) as Exam[];
@@ -135,7 +139,6 @@ export function useDashboardData(session: Session) {
           setSelectedExam(pickDefaultExam(loadedExams, realProfile.format));
         }
 
-        const attemptsRes = await fetch('/api/attempts');
         if (attemptsRes.ok) {
           const attemptsJson = await attemptsRes.json();
           setPastExams((attemptsJson.attempts || []) as PastExam[]);
