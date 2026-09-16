@@ -15,6 +15,9 @@ export const proxy = auth((req) => {
   const cookiePresent = !!(sessionTokenDev || sessionTokenProd);
 
   const addDebugHeaders = (response: NextResponse, decision: string) => {
+    if (process.env.NODE_ENV !== 'development') {
+      return response;
+    }
     response.headers.set('x-auth-debug-path', req.nextUrl.pathname);
     response.headers.set('x-auth-debug-decision', decision);
     response.headers.set('x-auth-debug-logged-in', String(isLoggedIn));
@@ -25,7 +28,9 @@ export const proxy = auth((req) => {
     return response;
   };
 
-  console.log(`[Middleware] Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${cookiePresent}, Auth: ${!!req.auth?.user}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Middleware] Path: ${req.nextUrl.pathname}, LoggedIn: ${isLoggedIn}, CookiePresent: ${cookiePresent}, Auth: ${!!req.auth?.user}`);
+  }
 
   // Always allow auth API routes
   if (isOnAuthPage) {

@@ -42,7 +42,7 @@ next-env.d.ts
 
 # test folder
 /testpdf
-/pdf
+/pdf/*
 /pdf/
 
 # agent tools & configs
@@ -51,3 +51,6 @@ next-env.d.ts
 .impeccable/
 skills-lock.json
 /scripts/
+normalize-question-content-report.json
+plan.md
+search_ct_pages.py
