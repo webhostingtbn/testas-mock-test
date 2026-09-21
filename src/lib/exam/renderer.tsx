@@ -21,12 +21,20 @@ export interface QuestionData {
   questions?: QuestionData[];
 }
 
+export interface QuestionVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 export interface RendererProps {
   question: QuestionData;
   selectedAnswer: unknown;
   onAnswer: (answer: unknown, questionId?: string) => void;
   selectedAnswers?: Record<string, string>;
   passage?: QuestionData;
+  verification?: QuestionVerification;
+  verifications?: Record<string, QuestionVerification>;
 }
 
 // ---- Question Type Discriminator ----
@@ -67,6 +75,17 @@ export interface QuestionRenderer {
   render(props: RendererProps): React.ReactNode;
 }
 
+function getQuestionVerification(
+  questionId: string,
+  verification?: QuestionVerification,
+  verifications?: Record<string, QuestionVerification>
+): QuestionVerification | undefined {
+  if (verifications && verifications[questionId]) {
+    return verifications[questionId];
+  }
+  return verification;
+}
+
 // ---- Module Question Types for proper conversion ----
 
 interface ModuleQuestionData {
@@ -105,6 +124,7 @@ class FigureSequenceRenderer implements QuestionRenderer {
       };
     };
     const selectedAnswer = props.selectedAnswer as { image1: number | null; image2: number | null } | null;
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
     return (
       <FigureSequence
         question={{
@@ -113,6 +133,7 @@ class FigureSequenceRenderer implements QuestionRenderer {
         }}
         selectedAnswer={selectedAnswer}
         onAnswer={props.onAnswer}
+        verification={verification}
       />
     );
   }
@@ -131,6 +152,7 @@ class MathEquationRenderer implements QuestionRenderer {
       };
     };
     const currentAnswer = props.selectedAnswer as Record<string, number> | null;
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
     return (
       <MathEquation
         question={{
@@ -139,6 +161,7 @@ class MathEquationRenderer implements QuestionRenderer {
         }}
         currentAnswer={currentAnswer}
         onAnswer={props.onAnswer}
+        verification={verification}
       />
     );
   }
@@ -158,6 +181,7 @@ class LatinSquareRenderer implements QuestionRenderer {
       };
     };
     const selectedAnswer = props.selectedAnswer as string | null;
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
     return (
       <LatinSquare
         question={{
@@ -166,6 +190,7 @@ class LatinSquareRenderer implements QuestionRenderer {
         }}
         selectedAnswer={selectedAnswer}
         onAnswer={props.onAnswer}
+        verification={verification}
       />
     );
   }
@@ -185,6 +210,7 @@ class CompletingPatternsRenderer implements QuestionRenderer {
       };
     };
     const selectedAnswer = props.selectedAnswer as string | null;
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
     return (
       <CompletingPatterns
         question={{
@@ -193,6 +219,7 @@ class CompletingPatternsRenderer implements QuestionRenderer {
         }}
         selectedAnswer={selectedAnswer}
         onAnswer={props.onAnswer}
+        verification={verification}
       />
     );
   }
@@ -212,6 +239,7 @@ class NumericalSeriesRenderer implements QuestionRenderer {
       };
     };
     const selectedAnswer = props.selectedAnswer as string | null;
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
     return (
       <NumericalSeries
         question={{
@@ -220,6 +248,7 @@ class NumericalSeriesRenderer implements QuestionRenderer {
         }}
         selectedAnswer={selectedAnswer}
         onAnswer={props.onAnswer}
+        verification={verification}
       />
     );
   }
@@ -249,6 +278,29 @@ class ModuleMCQRenderer implements QuestionRenderer {
     const content = isRecord(passage.content) ? passage.content : {};
     const pRecord = passage as unknown as Record<string, unknown>;
 
+    let rawTitle = typeof pRecord.title === 'string' ? pRecord.title : (typeof content.title === 'string' ? content.title : (typeof content.passage_title === 'string' ? content.passage_title : undefined));
+    if (!rawTitle && passage.sectionId && !isUuidString(passage.sectionId)) {
+      rawTitle = passage.sectionId;
+    }
+    const title = rawTitle || 'Reference Information';
+
+    const bodyMarkdown = typeof pRecord.body_markdown === 'string' ? pRecord.body_markdown : (typeof content.body_markdown === 'string' ? content.body_markdown : (typeof content.passage_markdown === 'string' ? content.passage_markdown : (typeof content.passage_text === 'string' ? content.passage_text : '')));
+
+    // Passage graphic belongs strictly to the reference passage (left pane).
+    // In mock tests, passages have top-level image_url / resolved_image_url (isPassage: true).
+    // In practice mode, individual questions carry passage_image_url in their content.
+    const isMockPassage = Boolean(pRecord.isPassage);
+    const imageUrl = isMockPassage && typeof pRecord.image_url === 'string'
+      ? pRecord.image_url
+      : typeof content.passage_image_url === 'string'
+        ? content.passage_image_url
+        : undefined;
+    const resolvedImageUrl = isMockPassage && typeof pRecord.resolved_image_url === 'string'
+      ? pRecord.resolved_image_url
+      : typeof content.passage_image_url === 'string'
+        ? content.passage_image_url
+        : imageUrl;
+
     let questions: ModuleQuestionData[];
 
     if (passage.questions && passage.questions.length > 0) {
@@ -256,9 +308,11 @@ class ModuleMCQRenderer implements QuestionRenderer {
         const qContent = isRecord(q.content) ? q.content : {};
         const qRecord = q as unknown as Record<string, unknown>;
         const childResolved =
-          typeof qRecord.resolved_image_url === 'string'
-            ? qRecord.resolved_image_url
-            : typeof qContent.resolved_image_url === 'string'
+          typeof qContent.question_image === 'string'
+            ? qContent.question_image
+            : typeof qContent.resolved_image_url === 'string' &&
+              qContent.resolved_image_url !== resolvedImageUrl &&
+              qContent.resolved_image_url !== imageUrl
               ? qContent.resolved_image_url
               : undefined;
         return {
@@ -274,9 +328,11 @@ class ModuleMCQRenderer implements QuestionRenderer {
     } else {
       // Single question passed directly (e.g. Practice Mode)
       const singleResolved =
-        typeof pRecord.resolved_image_url === 'string'
-          ? pRecord.resolved_image_url
-          : typeof content.resolved_image_url === 'string'
+        typeof content.question_image === 'string'
+          ? content.question_image
+          : typeof content.resolved_image_url === 'string' &&
+            content.resolved_image_url !== resolvedImageUrl &&
+            content.resolved_image_url !== imageUrl
             ? content.resolved_image_url
             : undefined;
       questions = [
@@ -291,16 +347,6 @@ class ModuleMCQRenderer implements QuestionRenderer {
         },
       ];
     }
-
-    let rawTitle = typeof pRecord.title === 'string' ? pRecord.title : (typeof content.title === 'string' ? content.title : (typeof content.passage_title === 'string' ? content.passage_title : undefined));
-    if (!rawTitle && passage.sectionId && !isUuidString(passage.sectionId)) {
-      rawTitle = passage.sectionId;
-    }
-    const title = rawTitle || 'Reference Information';
-
-    const bodyMarkdown = typeof pRecord.body_markdown === 'string' ? pRecord.body_markdown : (typeof content.body_markdown === 'string' ? content.body_markdown : (typeof content.passage_markdown === 'string' ? content.passage_markdown : (typeof content.passage_text === 'string' ? content.passage_text : '')));
-    const imageUrl = typeof pRecord.image_url === 'string' ? pRecord.image_url : (typeof content.image_url === 'string' ? content.image_url : (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined));
-    const resolvedImageUrl = typeof pRecord.resolved_image_url === 'string' ? pRecord.resolved_image_url : (typeof content.resolved_image_url === 'string' ? content.resolved_image_url : imageUrl);
 
     return {
       id: passage.id,
@@ -326,6 +372,10 @@ class ModuleMCQRenderer implements QuestionRenderer {
         ? { [passage.id]: props.selectedAnswer }
         : {});
     const modulePassage = this.toModulePassage(passage);
+    const verifications =
+      props.verifications ||
+      (props.verification ? { [passage.id]: props.verification } : undefined);
+
     return (
       <ModuleMCQ
         passage={modulePassage}
@@ -333,6 +383,7 @@ class ModuleMCQRenderer implements QuestionRenderer {
         onAnswer={(questionId: string, val: string) => {
           props.onAnswer(val, questionId);
         }}
+        verifications={verifications}
       />
     );
   }
@@ -370,7 +421,7 @@ class ModuleQuestionRenderer implements QuestionRenderer {
         image_url?: string;
         environment_text?: string;
         environment_images?: string[];
-        options?: unknown;
+        options?: Record<string, unknown> | unknown[];
         grid_image?: string;
         grid_image_url?: string;
         options_image?: string;
@@ -379,6 +430,7 @@ class ModuleQuestionRenderer implements QuestionRenderer {
     };
     const selectedAnswer = props.selectedAnswer as string | null;
     const isCoreSection = ['solving_quantitative', 'inferring_relationships'].includes(question.questionType);
+    const verification = getQuestionVerification(question.id, props.verification, props.verifications);
 
     // Ensure required fields are always defined with fallbacks
     const contentWithFallbacks = {
@@ -396,6 +448,7 @@ class ModuleQuestionRenderer implements QuestionRenderer {
         selectedAnswer={selectedAnswer}
         onAnswer={(optionId: string) => props.onAnswer(optionId)}
         isSplitLayout={!isCoreSection}
+        verification={verification}
       />
     );
   }

@@ -5,6 +5,12 @@ import { CanvasImage } from './CanvasImage';
 import { ResilientImage } from './ResilientImage';
 import { RichMarkdown } from './RichMarkdown';
 
+export interface ModuleQuestionVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface ModuleQuestionProps {
   question: {
     id: string;
@@ -14,26 +20,40 @@ interface ModuleQuestionProps {
       image_url?: string;
       environment_text?: string;
       environment_images?: string[];
-      options: any;
+      options: Record<string, unknown> | unknown[];
     };
   };
   selectedAnswer: string | null;
   onAnswer: (optionId: string) => void;
   isSplitLayout?: boolean;
+  verification?: ModuleQuestionVerification;
 }
 
-function normalizeOptions(options: any): { id: string; text?: string; image_url?: string }[] {
+interface NormalizedOption {
+  id: string;
+  text?: string;
+  image_url?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeOptions(options: Record<string, unknown> | unknown[]): NormalizedOption[] {
   if (!options) return [];
   if (Array.isArray(options)) {
-    return options.map((opt) => {
+    return options.map((opt, idx) => {
       if (typeof opt === 'string') {
         return { id: opt, text: opt };
       }
-      return {
-        id: opt.id || '',
-        text: opt.text,
-        image_url: opt.image_url || opt.image,
-      };
+      if (isRecord(opt)) {
+        const text = typeof opt.text === 'string' ? opt.text : undefined;
+        const rawImg = opt.image_url ?? opt.image;
+        const image_url = typeof rawImg === 'string' ? rawImg : undefined;
+        const id = typeof opt.id === 'string' ? opt.id : `opt-${idx}`;
+        return { id, text, image_url };
+      }
+      return { id: `opt-${idx}` };
     });
   }
   if (typeof options === 'object') {
@@ -41,11 +61,13 @@ function normalizeOptions(options: any): { id: string; text?: string; image_url?
       if (typeof val === 'string') {
         return { id: key, text: val };
       }
-      return {
-        id: key,
-        text: (val as any)?.text,
-        image_url: (val as any)?.image_url || (val as any)?.image,
-      };
+      if (isRecord(val)) {
+        const text = typeof val.text === 'string' ? val.text : undefined;
+        const rawImg = val.image_url ?? val.image;
+        const image_url = typeof rawImg === 'string' ? rawImg : undefined;
+        return { id: key, text, image_url };
+      }
+      return { id: key };
     });
   }
   return [];
@@ -56,10 +78,13 @@ export default function ModuleQuestion({
   selectedAnswer,
   onAnswer,
   isSplitLayout = false,
+  verification,
 }: ModuleQuestionProps) {
   const { question_text, question_image, image_url, environment_text, environment_images, options } = question.content;
   const normalized = normalizeOptions(options);
   const displayImage = question_image || image_url;
+  const isVerified = Boolean(verification?.isVerified);
+  const correctAnswer = verification?.correctAnswer;
 
   if (isSplitLayout) {
     return (
@@ -132,30 +157,49 @@ export default function ModuleQuestion({
               const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
               const hasImage = !!option.image_url;
 
+              const isOptionCorrect =
+                isVerified &&
+                correctAnswer !== undefined &&
+                (String(option.id).trim().toUpperCase() === String(correctAnswer).trim().toUpperCase() ||
+                  letter.trim().toUpperCase() === String(correctAnswer).trim().toUpperCase());
+              const isOptionWrong = isVerified && isSelected && !isOptionCorrect;
+
+              let buttonClass = 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm';
+              let badgeClass = 'bg-gray-100 text-gray-600';
+
+              if (isVerified) {
+                if (isOptionCorrect) {
+                  buttonClass = 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-100/50 cursor-default';
+                  badgeClass = 'bg-emerald-600 text-white';
+                } else if (isOptionWrong) {
+                  buttonClass = 'border-rose-500 bg-rose-50/80 shadow-md shadow-rose-100/50 cursor-default';
+                  badgeClass = 'bg-rose-500 text-white';
+                } else {
+                  buttonClass = 'border-gray-200 bg-gray-50/50 opacity-60 cursor-default';
+                  badgeClass = 'bg-gray-100 text-gray-400';
+                }
+              } else if (isSelected) {
+                buttonClass = 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100';
+                badgeClass = 'bg-orange-500 text-white';
+              }
+
               return (
                 <button
                   key={option.id}
-                  onClick={() => onAnswer(option.id)}
+                  disabled={isVerified}
+                  onClick={() => !isVerified && onAnswer(option.id)}
                   className={`
                     w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 text-left
                     transition-all duration-200
-                    ${
-                      isSelected
-                        ? 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100'
-                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                    }
+                    ${buttonClass}
                   `}
                 >
                   {/* Letter marker */}
                   <div
                     className={`
                       w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
-                      transition-colors duration-205
-                      ${
-                        isSelected
-                          ? 'bg-orange-500 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }
+                      transition-colors duration-200
+                      ${badgeClass}
                     `}
                   >
                     {letter}
@@ -173,21 +217,41 @@ export default function ModuleQuestion({
                       </div>
                     ) : option.text ? (
                       <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
-                        isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
+                        isOptionCorrect
+                          ? 'text-emerald-950 font-medium'
+                          : isOptionWrong
+                          ? 'text-rose-950 font-medium'
+                          : isSelected
+                          ? 'text-orange-950 font-medium'
+                          : 'text-gray-700'
                       }`}>
                         <RichMarkdown content={option.text} />
                       </div>
                     ) : null}
                   </div>
 
-                  {/* Selection indicator */}
-                  {isSelected && (
+                  {/* Indicator */}
+                  {isVerified ? (
+                    isOptionCorrect ? (
+                      <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : isOptionWrong ? (
+                      <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center shrink-0">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    ) : null
+                  ) : isSelected ? (
                     <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
                       <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                       </svg>
                     </div>
-                  )}
+                  ) : null}
                 </button>
               );
             })}
@@ -260,30 +324,49 @@ export default function ModuleQuestion({
             const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
             const hasImage = !!option.image_url;
 
+            const isOptionCorrect =
+              isVerified &&
+              correctAnswer !== undefined &&
+              (String(option.id).trim().toUpperCase() === String(correctAnswer).trim().toUpperCase() ||
+                letter.trim().toUpperCase() === String(correctAnswer).trim().toUpperCase());
+            const isOptionWrong = isVerified && isSelected && !isOptionCorrect;
+
+            let buttonClass = 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm';
+            let badgeClass = 'bg-gray-100 text-gray-600';
+
+            if (isVerified) {
+              if (isOptionCorrect) {
+                buttonClass = 'border-emerald-500 bg-emerald-50/80 shadow-md shadow-emerald-100/50 cursor-default';
+                badgeClass = 'bg-emerald-600 text-white';
+              } else if (isOptionWrong) {
+                buttonClass = 'border-rose-500 bg-rose-50/80 shadow-md shadow-rose-100/50 cursor-default';
+                badgeClass = 'bg-rose-500 text-white';
+              } else {
+                buttonClass = 'border-gray-200 bg-gray-50/50 opacity-60 cursor-default';
+                badgeClass = 'bg-gray-100 text-gray-400';
+              }
+            } else if (isSelected) {
+              buttonClass = 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100';
+              badgeClass = 'bg-orange-500 text-white';
+            }
+
             return (
               <button
                 key={option.id}
-                onClick={() => onAnswer(option.id)}
+                disabled={isVerified}
+                onClick={() => !isVerified && onAnswer(option.id)}
                 className={`
                   w-full flex items-center gap-4 px-5 py-4 rounded-xl border-2 text-left
                   transition-all duration-200
-                  ${
-                    isSelected
-                      ? 'border-orange-400 bg-orange-50 shadow-md shadow-orange-100'
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
-                  }
+                  ${buttonClass}
                 `}
               >
                 {/* Letter marker */}
                 <div
                   className={`
                     w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
-                    transition-colors duration-205
-                    ${
-                      isSelected
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
-                    }
+                    transition-colors duration-200
+                    ${badgeClass}
                   `}
                 >
                   {letter}
@@ -301,21 +384,41 @@ export default function ModuleQuestion({
                     </div>
                   ) : option.text ? (
                     <div className={`prose prose-sm prose-orange max-w-none prose-p:my-0 text-inherit ${
-                      isSelected ? 'text-orange-950 font-medium' : 'text-gray-700'
+                      isOptionCorrect
+                        ? 'text-emerald-950 font-medium'
+                        : isOptionWrong
+                        ? 'text-rose-950 font-medium'
+                        : isSelected
+                        ? 'text-orange-950 font-medium'
+                        : 'text-gray-700'
                     }`}>
                       <RichMarkdown content={option.text} />
                     </div>
                   ) : null}
                 </div>
 
-                {/* Selection indicator */}
-                {isSelected && (
+                {/* Indicator */}
+                {isVerified ? (
+                  isOptionCorrect ? (
+                    <div className="w-6 h-6 rounded-full bg-emerald-600 flex items-center justify-center shrink-0">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : isOptionWrong ? (
+                    <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center shrink-0">
+                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                  ) : null
+                ) : isSelected ? (
                   <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
                     <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                )}
+                ) : null}
               </button>
             );
           })}

@@ -27,10 +27,17 @@ export interface ModulePassage {
   questions: ModuleQuestion[];
 }
 
+export interface ModuleMCQVerificationItem {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface ModuleMCQProps {
   passage: ModulePassage;
   selectedAnswers: Record<string, string>; // Maps questionId -> selected letter ('A', 'B', etc.)
   onAnswer: (questionId: string, answer: string) => void;
+  verifications?: Record<string, ModuleMCQVerificationItem>;
 }
 
 interface NormalizedOption {
@@ -86,6 +93,7 @@ export default function ModuleMCQ({
   passage,
   selectedAnswers,
   onAnswer,
+  verifications,
 }: ModuleMCQProps) {
   // State to track which question accordion is open. Default first one open.
   // Parents pass key={passage.id} so navigating remounts and resets this.
@@ -96,7 +104,10 @@ export default function ModuleMCQ({
   // State to track if passage is collapsed on mobile
   const [isPassageCollapsed, setIsPassageCollapsed] = useState(false);
 
+  const isSingle = (passage.questions || []).length <= 1;
+
   const toggleQuestion = (questionId: string) => {
+    if (isSingle) return;
     setOpenQuestionId((prev) => (prev === questionId ? null : questionId));
   };
 
@@ -152,27 +163,40 @@ export default function ModuleMCQ({
 
         <div className="flex flex-col gap-5">
         {(passage.questions || []).map((question, index) => {
-          const isOpen = openQuestionId === question.id;
+          const isOpen = isSingle ? true : openQuestionId === question.id;
           const selectedOption = selectedAnswers[question.id] || null;
           const isAnswered = selectedOption !== null;
           const questionNo = question.sort_order ?? (index + 1);
 
+          const qVerification = verifications?.[question.id];
+          const isVerified = Boolean(qVerification?.isVerified);
+          const isCorrect = Boolean(qVerification?.isCorrect);
+          const correctAnswer = qVerification?.correctAnswer;
+
           return (
             <section
               key={question.id}
-              className="border-b border-[#E5E7EB] pb-5 last:border-b-0 last:pb-0"
+              className={`border-b border-[#E5E7EB] pb-5 last:border-b-0 last:pb-0 ${isSingle ? 'border-b-0 pb-0' : ''}`}
             >
               {/* Question header row — accordion toggle keeps multi-question passages compact */}
               <button
                 type="button"
                 onClick={() => toggleQuestion(question.id)}
                 aria-expanded={isOpen}
-                className="w-full flex items-center justify-between gap-3 py-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40 rounded-md"
+                className={`w-full flex items-center justify-between gap-3 py-1 text-left focus:outline-none ${
+                  isSingle
+                    ? 'cursor-default'
+                    : 'focus-visible:ring-2 focus-visible:ring-[#EA580C]/40 rounded-md cursor-pointer'
+                }`}
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center font-semibold text-xs shrink-0 transition-colors ${
-                      isAnswered
+                      isVerified
+                        ? isCorrect
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-rose-500 text-white'
+                        : isAnswered
                         ? 'bg-[#18181B] text-white'
                         : isOpen
                         ? 'bg-[#FFF7ED] text-[#EA580C] border border-orange-200'
@@ -184,16 +208,28 @@ export default function ModuleMCQ({
                   <span className="font-semibold text-[#18181B] text-[15px] truncate">
                     Question {questionNo}
                   </span>
-                  {isAnswered && (
+                  {isVerified ? (
+                    isCorrect ? (
+                      <span className="text-[12px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-medium ml-1 shrink-0 flex items-center gap-1">
+                        ✓ Correct
+                      </span>
+                    ) : (
+                      <span className="text-[12px] bg-rose-50 text-rose-700 border border-rose-200 px-2.5 py-0.5 rounded-full font-medium ml-1 shrink-0 flex items-center gap-1">
+                        ✕ Incorrect
+                      </span>
+                    )
+                  ) : isAnswered ? (
                     <span className="text-[12px] bg-[#F4F4F5] text-[#71717A] border border-[#E5E7EB] px-2 py-0.5 rounded-full font-medium ml-1 shrink-0">
                       {selectedOption}
                     </span>
-                  )}
+                  ) : null}
                 </div>
-                {isOpen ? (
-                  <ChevronUp className="w-4 h-4 text-[#9CA3AF] shrink-0" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                {!isSingle && (
+                  isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-[#9CA3AF] shrink-0" />
+                  )
                 )}
               </button>
 
@@ -215,36 +251,64 @@ export default function ModuleMCQ({
                         const letter = option.id.length === 1 ? option.id : String.fromCharCode(65 + idx);
                         const hasImage = !!option.image_url;
 
+                        const isOptionCorrect =
+                          isVerified &&
+                          correctAnswer !== undefined &&
+                          (String(option.id).trim().toUpperCase() === String(correctAnswer).trim().toUpperCase() ||
+                            letter.trim().toUpperCase() === String(correctAnswer).trim().toUpperCase());
+                        const isOptionWrong = isVerified && isSelected && !isOptionCorrect;
+
+                        let optionContainerClass = 'border-[#E5E7EB] bg-white text-[#18181B] hover:border-[#D1D5DB] hover:bg-[#FAFAFA] cursor-pointer';
+                        let circleClass = 'border-[#D1D5DB] bg-white';
+
+                        if (isVerified) {
+                          if (isOptionCorrect) {
+                            optionContainerClass = 'border-emerald-500 bg-emerald-50/70 text-emerald-950 ring-1 ring-emerald-500/20 cursor-default';
+                            circleClass = 'border-emerald-600 bg-emerald-600 text-white';
+                          } else if (isOptionWrong) {
+                            optionContainerClass = 'border-rose-500 bg-rose-50/70 text-rose-950 ring-1 ring-rose-500/20 cursor-default';
+                            circleClass = 'border-rose-500 bg-rose-500 text-white';
+                          } else {
+                            optionContainerClass = 'border-[#E5E7EB] bg-gray-50/50 text-gray-500 opacity-60 cursor-default';
+                            circleClass = 'border-gray-300 bg-transparent';
+                          }
+                        } else if (isSelected) {
+                          optionContainerClass = 'border-[#EA580C]/40 bg-[#FFF7ED]/60 text-[#18181B]';
+                          circleClass = 'border-[#EA580C]';
+                        }
+
                         return (
                           <div
                             key={option.id}
                             role="radio"
                             aria-checked={isSelected}
                             tabIndex={0}
-                            onClick={() => onAnswer(question.id, option.id)}
+                            onClick={() => !isVerified && onAnswer(question.id, option.id)}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
+                              if (!isVerified && (e.key === 'Enter' || e.key === ' ')) {
                                 e.preventDefault();
                                 onAnswer(question.id, option.id);
                               }
                             }}
-                            className={`flex items-center gap-3 rounded-[10px] border px-[18px] py-[14px] min-h-[48px] cursor-pointer outline-none transition-colors text-[14px] leading-[1.5] focus-visible:ring-2 focus-visible:ring-[#EA580C]/40 ${
-                              isSelected
-                                ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60 text-[#18181B]'
-                                : 'border-[#E5E7EB] bg-white text-[#18181B] hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
-                            }`}
+                            className={`flex items-center gap-3 rounded-[10px] border px-[18px] py-[14px] min-h-[48px] outline-none transition-colors text-[14px] leading-[1.5] focus-visible:ring-2 focus-visible:ring-[#EA580C]/40 ${optionContainerClass}`}
                           >
                             <span
                               aria-hidden="true"
-                              className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${
-                                isSelected
-                                  ? 'border-[#EA580C]'
-                                  : 'border-[#D1D5DB] bg-white'
-                              }`}
+                              className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border transition-colors ${circleClass}`}
                             >
-                              {isSelected && (
+                              {isVerified ? (
+                                isOptionCorrect ? (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : isOptionWrong ? (
+                                  <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                ) : null
+                              ) : isSelected ? (
                                 <span className="h-2 w-2 rounded-full bg-[#EA580C]" />
-                              )}
+                              ) : null}
                             </span>
                             <span className="font-medium text-[#18181B] shrink-0">
                               {letter}

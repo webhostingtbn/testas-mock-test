@@ -11,6 +11,8 @@ import {
   Eye,
   EyeOff,
   HelpCircle,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { KniButton } from '@/components/KniPrimitives';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
@@ -73,6 +75,12 @@ const RATING_OPTIONS: Array<{ id: Difficulty; label: string; Icon: typeof Smile 
   { id: 'hard', label: 'Hard', Icon: Frown },
 ];
 
+export interface QuestionVerificationState {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer: unknown;
+}
+
 export default function PracticeSession({
   subtestType,
   subtestTitle,
@@ -87,7 +95,20 @@ export default function PracticeSession({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState<unknown>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
-  const [ratingMap, setRatingMap] = useState<Record<string, Difficulty>>({});
+  const [verifications, setVerifications] = useState<Record<string, QuestionVerificationState>>({});
+  const [isCheckingAnswer, setIsCheckingAnswer] = useState<boolean>(false);
+  const userRatings = usePracticeStore((state) => state.userRatings);
+  const [ratingMap, setRatingMap] = useState<Record<string, Difficulty>>(() => {
+    const initial: Record<string, Difficulty> = {};
+    for (const q of questions) {
+      if (userRatings[q.id]) {
+        initial[q.id] = userRatings[q.id];
+      } else if (folderId === 'easy' || folderId === 'medium' || folderId === 'hard') {
+        initial[q.id] = folderId;
+      }
+    }
+    return initial;
+  });
   const [timeRemaining, setTimeRemaining] = useState<number>(
     QUESTION_TIME_LIMITS[subtestType] || 90
   );
@@ -97,24 +118,51 @@ export default function PracticeSession({
   const navigatorRef = useRef<HTMLDivElement>(null);
 
   const currentItem = questions[currentIndex] || null;
-  // Mirror answers for navigation handlers without closing over stale state.
+  // Mirror answers and verifications for navigation handlers without closing over stale state.
   const answersRef = useRef<Record<string, unknown>>({});
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
 
-  const resetTimerForQuestion = useCallback(() => {
-    setTimeRemaining(QUESTION_TIME_LIMITS[subtestType] || 90);
-    setTimerActive(true);
-  }, [subtestType]);
+  const verificationsRef = useRef<Record<string, QuestionVerificationState>>({});
+  useEffect(() => {
+    verificationsRef.current = verifications;
+  }, [verifications]);
+
+  // Per-question remaining time: navigating away parks the current clock,
+  // navigating back restores it instead of granting a fresh full allocation.
+  const currentIndexRef = useRef(0);
+  const timeRemainingRef = useRef<number>(QUESTION_TIME_LIMITS[subtestType] || 90);
+  const remainingByQuestionRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    timeRemainingRef.current = timeRemaining;
+  }, [timeRemaining]);
 
   const handleGoToQuestion = useCallback((newIndex: number) => {
+    const currentItemId = questions[currentIndexRef.current]?.id;
+    if (currentItemId) {
+      remainingByQuestionRef.current[currentItemId] = timeRemainingRef.current;
+    }
     const nextItem = questions[newIndex];
+    currentIndexRef.current = newIndex;
     setCurrentIndex(newIndex);
     setUserAnswer(nextItem ? (answersRef.current[nextItem.id] ?? null) : null);
     setNavigatorOpen(false);
-    resetTimerForQuestion();
-  }, [questions, resetTimerForQuestion]);
+    const isAlreadyVerified = nextItem
+      ? (nextItem.isPassage && nextItem.questions
+          ? nextItem.questions.every((q) => verificationsRef.current[q.id]?.isVerified)
+          : Boolean(verificationsRef.current[nextItem.id]?.isVerified))
+      : false;
+    // Verified items stay paused; unverified items resume their parked clock
+    // (or a fresh allocation on first visit) instead of always resetting.
+    if (isAlreadyVerified) {
+      setTimerActive(false);
+    } else {
+      const parked = nextItem ? remainingByQuestionRef.current[nextItem.id] : undefined;
+      setTimeRemaining(parked ?? (QUESTION_TIME_LIMITS[subtestType] || 90));
+      setTimerActive(true);
+    }
+  }, [questions, subtestType]);
 
   // Close the navigator dropdown on outside click / Escape.
   useEffect(() => {
@@ -158,7 +206,7 @@ export default function PracticeSession({
   const updateRating = usePracticeStore((state) => state.updateRating);
 
   const handleRatingSelect = async (difficulty: Difficulty) => {
-    if (!currentItem || timeRemaining <= 0) return;
+    if (!currentItem) return;
 
     const itemKey = currentItem.id;
     setRatingMap((prev) => ({ ...prev, [itemKey]: difficulty }));
@@ -196,12 +244,48 @@ export default function PracticeSession({
     if (item.isPassage && item.questions) {
       return (
         item.questions.length > 0 &&
-        item.questions.every((child) => answers[child.id] !== undefined && answers[child.id] !== null)
+        item.questions.every((child) => isItemAnswered(child))
       );
     }
-    const a = answers[item.id];
-    return a !== undefined && a !== null;
+    const a = answers[item.id] ?? (item.id === currentItem?.id ? userAnswer : null);
+    if (a === undefined || a === null) return false;
+    // Figure sequence: dual selection requires both image1 and image2
+    if (typeof a === 'object' && a !== null && 'image1' in a && 'image2' in a) {
+      const fsObj = a as { image1: unknown; image2: unknown };
+      return fsObj.image1 !== null && fsObj.image1 !== undefined && fsObj.image2 !== null && fsObj.image2 !== undefined;
+    }
+    if (Array.isArray(a)) {
+      return a.length > 0 && a.every((v) => v !== null && v !== undefined);
+    }
+    if (typeof a === 'string') {
+      return a.trim().length > 0;
+    }
+    return true;
   };
+
+  const isItemVerified = (item: PracticeQuestion): boolean => {
+    if (item.isPassage && item.questions) {
+      return (
+        item.questions.length > 0 &&
+        item.questions.every((child) => verifications[child.id]?.isVerified)
+      );
+    }
+    return Boolean(verifications[item.id]?.isVerified);
+  };
+
+  const isItemCorrect = (item: PracticeQuestion): boolean => {
+    if (item.isPassage && item.questions) {
+      return (
+        item.questions.length > 0 &&
+        item.questions.every((child) => verifications[child.id]?.isCorrect)
+      );
+    }
+    return Boolean(verifications[item.id]?.isCorrect);
+  };
+
+  const currentIsAnswered = currentItem ? isItemAnswered(currentItem) : false;
+  const currentIsVerified = currentItem ? isItemVerified(currentItem) : false;
+  const currentIsCorrect = currentItem ? isItemCorrect(currentItem) : false;
 
   const isLastQuestion = currentIndex >= questions.length - 1;
   const answeredCount = questions.filter((q) => isItemAnswered(q)).length;
@@ -212,7 +296,7 @@ export default function PracticeSession({
   const toQuestionData = (item: PracticeQuestion, index: number): QuestionData => ({
     id: item.id || `q-${index}`,
     sectionId: item.section_id || 'practice',
-    sortOrder: typeof item.sort_order === 'number' ? item.sort_order : index + 1,
+    sortOrder: index + 1,
     questionType: item.question_type || subtestType,
     content: item.content ?? item,
     isPassage: item.isPassage,
@@ -239,8 +323,107 @@ export default function PracticeSession({
   const handleAnswerChange = (value: unknown, questionId?: string) => {
     if (timeRemaining <= 0) return;
     const key = questionId ?? currentItem.id;
-    if (!questionId) setUserAnswer(value);
+    if (verifications[key]?.isVerified) return; // Disallow modification after verification
+    if (!questionId || questionId === currentItem.id) setUserAnswer(value);
     setAnswers((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const handleCheckAnswer = async () => {
+    if (!currentItem || isCheckingAnswer || currentIsVerified || timeRemaining <= 0) return;
+
+    const itemsToVerify: Array<{ questionId: string; answer: unknown }> = [];
+    if (currentItem.isPassage && currentItem.questions) {
+      for (const child of currentItem.questions) {
+        if (answers[child.id] !== undefined && answers[child.id] !== null) {
+          itemsToVerify.push({ questionId: child.id, answer: answers[child.id] });
+        }
+      }
+    } else {
+      const ans = userAnswer ?? answers[currentItem.id];
+      if (ans !== undefined && ans !== null) {
+        itemsToVerify.push({ questionId: currentItem.id, answer: ans });
+      }
+    }
+
+    if (itemsToVerify.length === 0) return;
+
+    setIsCheckingAnswer(true);
+    try {
+      const res = await fetch('/api/practice/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToVerify }),
+      });
+
+      if (!res.ok) {
+        let errMessage = 'Failed to verify answer';
+        try {
+          const errData = await res.json();
+          if (errData && typeof errData === 'object' && 'error' in errData) {
+            errMessage = String((errData as { error: unknown }).error);
+          }
+        } catch {
+          // ignore error body parsing failure
+        }
+        console.error('Failed to verify answer:', errMessage);
+        return;
+      }
+
+      const rawData = await res.json().catch(() => null);
+      if (!rawData || typeof rawData !== 'object') {
+        console.error('Failed to verify answer: invalid response payload');
+        return;
+      }
+
+      const data = rawData as Record<string, unknown>;
+      const resultsList: Array<{
+        questionId: string;
+        isCorrect: boolean;
+        correctAnswer: unknown;
+      }> = [];
+
+      if (Array.isArray(data.results)) {
+        for (const item of data.results) {
+          if (item && typeof item === 'object' && 'questionId' in item && typeof (item as { questionId: unknown }).questionId === 'string') {
+            const typedItem = item as { questionId: string; isCorrect?: unknown; correctAnswer?: unknown };
+            resultsList.push({
+              questionId: typedItem.questionId,
+              isCorrect: Boolean(typedItem.isCorrect),
+              correctAnswer: typedItem.correctAnswer,
+            });
+          }
+        }
+      } else if (data.results && typeof data.results === 'object') {
+        for (const [qId, val] of Object.entries(data.results as Record<string, unknown>)) {
+          if (val && typeof val === 'object') {
+            const typedVal = val as { isCorrect?: unknown; correctAnswer?: unknown };
+            resultsList.push({
+              questionId: qId,
+              isCorrect: Boolean(typedVal.isCorrect),
+              correctAnswer: typedVal.correctAnswer,
+            });
+          }
+        }
+      }
+
+      setVerifications((prev) => {
+        const updated = { ...prev };
+        for (const item of resultsList) {
+          updated[item.questionId] = {
+            isVerified: true,
+            isCorrect: item.isCorrect,
+            correctAnswer: item.correctAnswer,
+          };
+        }
+        return updated;
+      });
+
+      setTimerActive(false);
+    } catch (err) {
+      console.error('Error verifying answer:', err);
+    } finally {
+      setIsCheckingAnswer(false);
+    }
   };
 
   return (
@@ -286,21 +469,15 @@ export default function PracticeSession({
               selectedAnswer: userAnswer,
               selectedAnswers: passageChildAnswers,
               onAnswer: handleAnswerChange,
+              verification: verifications[currentItem.id],
+              verifications: verifications,
             })}
           </div>
         </div>
 
-        {/* Bottom dock (64px): help • navigator pill • rating + Back/Next */}
+        {/* Bottom dock (64px): help • navigator pill • rating + Back/Check/Next */}
         <footer className="flex-none min-h-16 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            {/* <button
-              type="button"
-              title="Help"
-              aria-label="Help"
-              className="w-9 h-9 rounded-full border border-[#E5E7EB] hidden sm:flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:border-[#D1D5DB] transition-colors shrink-0"
-            >
-              <HelpCircle className="w-4 h-4" />
-            </button> */}
             <span className="hidden md:inline text-[13px] font-medium text-[#71717A]">Rate:</span>
             <div className="flex items-center gap-1.5">
               {RATING_OPTIONS.map(({ id, label, Icon }) => {
@@ -310,7 +487,6 @@ export default function PracticeSession({
                     key={id}
                     type="button"
                     onClick={() => void handleRatingSelect(id)}
-                    disabled={timeRemaining <= 0}
                     aria-pressed={isActive}
                     className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
                       isActive
@@ -339,12 +515,18 @@ export default function PracticeSession({
               <ChevronDown className={`w-3.5 h-3.5 text-[#71717A] transition-transform ${navigatorOpen ? 'rotate-180' : ''}`} />
             </button>
             {navigatorOpen && (
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(420px,calc(100vw-3rem))] bg-white border border-[#E5E7EB] rounded-xl p-3 z-40">
-                <div className="flex items-center justify-between px-1 pb-2">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(460px,calc(100vw-3rem))] bg-white border border-[#E5E7EB] rounded-xl p-3 z-40 shadow-lg">
+                <div className="flex items-center justify-between px-1 pb-2 border-b border-gray-100 mb-2">
                   <span className="text-[13px] font-medium text-[#71717A]">
                     {answeredCount} of {questions.length} answered
                   </span>
-                  <span className="flex items-center gap-3 text-[12px] text-[#71717A]">
+                  <span className="flex items-center gap-2.5 text-[11px] text-[#71717A]">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Correct
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> Wrong
+                    </span>
                     <span className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-[#18181B]" /> Answered
                     </span>
@@ -357,6 +539,26 @@ export default function PracticeSession({
                   {questions.map((q, idx) => {
                     const isActive = currentIndex === idx;
                     const isAnswered = isItemAnswered(q);
+                    const isVerified = isItemVerified(q);
+                    const isCorrect = isItemCorrect(q);
+
+                    let btnColor = 'bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#D1D5DB] hover:text-[#18181B]';
+                    if (isVerified) {
+                      if (isCorrect) {
+                        btnColor = isActive
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-800 ring-2 ring-emerald-600 ring-offset-1 font-semibold'
+                          : 'bg-emerald-50 border-emerald-400 text-emerald-700 hover:bg-emerald-100 font-semibold';
+                      } else {
+                        btnColor = isActive
+                          ? 'bg-rose-50 border-rose-500 text-rose-800 ring-2 ring-rose-600 ring-offset-1 font-semibold'
+                          : 'bg-rose-50 border-rose-400 text-rose-700 hover:bg-rose-100 font-semibold';
+                      }
+                    } else if (isActive) {
+                      btnColor = 'bg-[#18181B] border-[#18181B] text-white ring-2 ring-[#EA580C] ring-offset-1';
+                    } else if (isAnswered) {
+                      btnColor = 'bg-[#18181B] border-[#18181B] text-white hover:bg-zinc-800';
+                    }
+
                     return (
                       <button
                         key={q.id}
@@ -364,15 +566,25 @@ export default function PracticeSession({
                         role="option"
                         aria-selected={isActive}
                         onClick={() => handleGoToQuestion(idx)}
-                        aria-label={`Go to question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
-                        title={`Question ${idx + 1}${isAnswered ? ' (answered)' : ''}`}
-                        className={`h-8 rounded-lg border text-[12px] font-semibold flex items-center justify-center transition-colors ${
-                          isActive
-                            ? 'bg-[#18181B] border-[#18181B] text-white'
+                        aria-label={`Go to question ${idx + 1}${
+                          isVerified
+                            ? isCorrect
+                              ? ' (correct)'
+                              : ' (incorrect)'
                             : isAnswered
-                              ? 'bg-[#F4F4F5] border-[#E5E7EB] text-[#18181B] hover:border-[#D1D5DB]'
-                              : 'bg-white border-[#E5E7EB] text-[#71717A] hover:border-[#D1D5DB] hover:text-[#18181B]'
+                            ? ' (answered)'
+                            : ''
                         }`}
+                        title={`Question ${idx + 1}${
+                          isVerified
+                            ? isCorrect
+                              ? ' (correct)'
+                              : ' (incorrect)'
+                            : isAnswered
+                            ? ' (answered)'
+                            : ''
+                        }`}
+                        className={`h-8 rounded-lg border text-[12px] font-semibold flex items-center justify-center transition-colors relative ${btnColor}`}
                       >
                         {idx + 1}
                       </button>
@@ -388,11 +600,55 @@ export default function PracticeSession({
               type="button"
               disabled={currentIndex === 0}
               onClick={() => handleGoToQuestion(Math.max(0, currentIndex - 1))}
-              className="h-10 px-5 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] disabled:opacity-40 transition-colors flex items-center gap-1"
+              className="h-10 px-4 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] disabled:opacity-40 transition-colors flex items-center gap-1"
             >
               <ChevronLeft className="w-4 h-4" />
               Back
             </button>
+
+            {/* Check Answer Button */}
+            {!currentIsVerified ? (
+              <button
+                type="button"
+                disabled={!currentIsAnswered || isCheckingAnswer || timeRemaining <= 0}
+                onClick={handleCheckAnswer}
+                title={timeRemaining <= 0 ? 'Time expired for this question' : undefined}
+                className="h-10 px-4 text-sm font-medium rounded-[10px] border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition-colors flex items-center gap-1.5"
+              >
+                {isCheckingAnswer ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Check Answer
+                  </>
+                )}
+              </button>
+            ) : (
+              <div
+                className={`h-10 px-3.5 text-xs font-semibold rounded-[10px] flex items-center gap-1.5 border ${
+                  currentIsCorrect
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                    : 'bg-rose-50 text-rose-700 border-rose-300'
+                }`}
+              >
+                {currentIsCorrect ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Checked: Correct
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    Checked: Incorrect
+                  </>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -402,7 +658,7 @@ export default function PracticeSession({
                   handleGoToQuestion(currentIndex + 1);
                 }
               }}
-              className="h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"
+              className="h-10 px-5 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"
             >
               {isLastQuestion ? 'Finish' : 'Next'}
               {!isLastQuestion && <ChevronRight className="w-4 h-4" />}

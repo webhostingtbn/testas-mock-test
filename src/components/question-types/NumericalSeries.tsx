@@ -1,5 +1,11 @@
 'use client';
 
+export interface NumericalSeriesVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface NumericalSeriesProps {
   question: {
     id: string;
@@ -11,23 +17,33 @@ interface NumericalSeriesProps {
   };
   selectedAnswer: string | null;
   onAnswer: (val: string) => void;
+  verification?: NumericalSeriesVerification;
 }
 
 export default function NumericalSeries({
   question,
   selectedAnswer,
   onAnswer,
+  verification,
 }: NumericalSeriesProps) {
   const sequence = question?.content?.sequence || [];
   // Find index of '?' or fallback to target_index, otherwise fallback to last element
   const fallbackIndex = sequence.indexOf('?') !== -1 ? sequence.indexOf('?') : sequence.length - 1;
   const targetIndex = question?.content?.target_index ?? fallbackIndex;
   const prompt = question?.content?.prompt || 'Find the missing number in the numerical series.';
+
+  const isVerified = Boolean(verification?.isVerified);
+  const isCorrect = Boolean(verification?.isCorrect);
+  const correctVal =
+    isVerified && verification?.correctAnswer !== undefined && verification?.correctAnswer !== null
+      ? String(verification.correctAnswer)
+      : null;
   
   const currentChars = selectedAnswer ? selectedAnswer.split('') : [];
   const keys = ['-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   const toggleChar = (char: string) => {
+    if (isVerified) return;
     let nextChars: string[];
     if (currentChars.includes(char)) {
       nextChars = currentChars.filter(c => c !== char);
@@ -54,12 +70,35 @@ export default function NumericalSeries({
               const isTarget = idx === targetIndex;
               if (isTarget) {
                 const displayVal = currentChars.length > 0 ? currentChars.sort().join(', ') : '?';
+                const boxStyles = isVerified
+                  ? isCorrect
+                    ? 'border-2 border-emerald-500 bg-emerald-50/70 text-emerald-800'
+                    : 'border-2 border-rose-500 bg-rose-50/70 text-rose-800'
+                  : 'border-2 border-orange-500 bg-orange-50/50 text-orange-850';
+
                 return (
-                  <div key={idx} className="flex flex-col items-center gap-1.5 shrink-0">
-                    <div className="min-w-24 px-4 h-14 flex items-center justify-center text-xl font-bold font-mono border-2 border-orange-500 bg-orange-50/50 rounded-xl shadow-inner text-orange-850">
-                      {displayVal}
+                  <div key={idx} className="flex items-center gap-4">
+                    <div className="flex flex-col items-center gap-1.5 shrink-0">
+                      <div className={`min-w-24 px-4 h-14 flex items-center justify-center text-xl font-bold font-mono rounded-xl shadow-inner ${boxStyles}`}>
+                        {displayVal}
+                      </div>
+                      <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                        isVerified ? (isCorrect ? 'text-emerald-600' : 'text-rose-600') : 'text-orange-600'
+                      }`}>
+                        {isVerified ? (isCorrect ? '✓ Correct' : '✕ Your Marks') : 'Your Marks'}
+                      </span>
                     </div>
-                    <span className="text-[9px] font-bold text-orange-600 uppercase tracking-wider">Your Marks</span>
+
+                    {isVerified && !isCorrect && correctVal && (
+                      <div className="flex flex-col items-center gap-1.5 shrink-0 animate-scaleIn">
+                        <div className="min-w-24 px-4 h-14 flex items-center justify-center text-xl font-bold font-mono border-2 border-emerald-500 bg-emerald-50/70 rounded-xl shadow-inner text-emerald-800">
+                          {correctVal}
+                        </div>
+                        <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">
+                          Correct Solution
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -108,8 +147,11 @@ export default function NumericalSeries({
                     <button
                       key={key}
                       type="button"
+                      disabled={isVerified}
                       onClick={() => toggleChar(key)}
-                      className="flex-1 min-w-10 py-4 border-r last:border-r-0 border-slate-300 hover:bg-slate-50/50 transition-colors flex items-center justify-center cursor-pointer group"
+                      className={`flex-1 min-w-10 py-4 border-r last:border-r-0 border-slate-300 transition-colors flex items-center justify-center group ${
+                        isVerified ? 'cursor-default' : 'hover:bg-slate-50/50 cursor-pointer'
+                      }`}
                     >
                       <div className={`w-8 h-8 border-2 rounded flex items-center justify-center transition-all ${
                         isChecked 
@@ -129,7 +171,7 @@ export default function NumericalSeries({
           
           <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
             <span>Example: For answer <strong>40</strong>, mark <strong>4</strong> and <strong>0</strong>.</span>
-            {currentChars.length > 0 && (
+            {!isVerified && currentChars.length > 0 && (
               <button
                 type="button"
                 onClick={() => onAnswer('')}

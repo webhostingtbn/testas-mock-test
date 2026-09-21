@@ -28,7 +28,20 @@ function asString(value: unknown): string | undefined {
 }
 
 function isBareStoragePath(value: string): boolean {
-  return value.length > 0 && !value.startsWith('http') && !value.startsWith('/') && !value.startsWith('data:');
+  if (!value || value.startsWith('http') || value.startsWith('/') || value.startsWith('data:')) {
+    return false;
+  }
+  // Must look like an image asset file or storage path (e.g. "path/to/img" or "asset.webp")
+  return /\.(webp|png|jpe?g|svg|gif|avif)$/i.test(value) || value.includes('/');
+}
+
+function isAbsoluteOrDataUrl(value: string): boolean {
+  return (
+    value.startsWith('http') ||
+    value.startsWith('/') ||
+    value.startsWith('data:') ||
+    value.startsWith('blob:')
+  );
 }
 
 /**
@@ -134,7 +147,10 @@ export class ImageService {
 
   private async resolveBarePath(value: unknown): Promise<string | undefined> {
     const path = asString(value);
-    if (!path || !isBareStoragePath(path)) return undefined;
+    if (!path) return undefined;
+    // Skip plain text (option letters, answer copy) so it is never sent to
+    // the signer and never lands in a *_url field.
+    if (!isBareStoragePath(path) && !isAbsoluteOrDataUrl(path)) return undefined;
     return this.resolveImageUrl(path);
   }
 
@@ -208,8 +224,19 @@ export class ImageService {
       { source: 'options_image', target: 'options_image_url' },
     ];
     for (const { source, target } of aliasedKeys) {
-      const resolved = await this.resolveBarePath(content[source]);
-      if (resolved) newContent[target] = resolved;
+      const raw = content[source];
+      const resolved = await this.resolveBarePath(raw);
+      if (resolved) {
+        newContent[target] = resolved;
+      } else if (
+        typeof raw === 'string' &&
+        raw &&
+        (isBareStoragePath(raw) || isAbsoluteOrDataUrl(raw))
+      ) {
+        // Preserve already-usable URLs the signer could not improve, but
+        // never copy plain text into an image field.
+        newContent[target] = raw;
+      }
     }
 
     // In-place single paths (question + embedded passage)
@@ -229,14 +256,12 @@ export class ImageService {
 
     await this.resolveOptionsField(content, newContent);
 
-    // Surface embedded passage image as `resolved_image_url` so the
-    // renderer (`toModulePassage`) picks it up without extra mapping.
-    const embeddedPassageImage =
-      asString(newContent.resolved_image_url) ??
-      asString(newContent.passage_image_url) ??
-      asString(newContent.image_url);
-    if (embeddedPassageImage && typeof newContent.resolved_image_url !== 'string') {
-      newContent.resolved_image_url = embeddedPassageImage;
+    // If the question has its own graphic (question_image), surface it as resolved_image_url.
+    // Passage images (passage_image_url) must NEVER be assigned to resolved_image_url,
+    // otherwise the passage graphic duplicates into every child/single question body.
+    const questionGraphic = asString(newContent.question_image);
+    if (questionGraphic && typeof newContent.resolved_image_url !== 'string') {
+      newContent.resolved_image_url = questionGraphic;
     }
 
     return newContent;

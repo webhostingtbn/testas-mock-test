@@ -8,6 +8,12 @@ const STORAGE_BUCKET = 'ExamDataset';
 function collectStrings(value: unknown, output: Set<string>): void {
   if (typeof value === 'string') {
     output.add(value);
+    // Collect the bare storage path alongside full URLs, excluding any
+    // query string or hash so signed URLs still match their object.
+    const match = value.match(/\/ExamDataset\/([^?#]+)/);
+    if (match && match[1]) {
+      output.add(match[1]);
+    }
     return;
   }
   if (Array.isArray(value)) {

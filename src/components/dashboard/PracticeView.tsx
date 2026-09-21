@@ -42,7 +42,7 @@ const SUBTEST_ICON_MAP: Record<SubtestDefinition['iconName'], LucideIcon> = {
   Layers,
   Laptop,
 };
-import { filterPracticeQuestionsByRating, groupPracticeItemsByPassage } from '@/lib/exam/practice-helpers';
+import { filterPracticeQuestionsByRating } from '@/lib/exam/practice-helpers';
 
 interface PracticeViewProps {
   profile: Profile | null;
@@ -69,7 +69,6 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   const {
     sections,
     questions,
-    passages,
     userRatings,
     userPracticeDates: userPracticeDatesList,
     isLoaded,
@@ -253,13 +252,9 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     const matchedSectionIds = new Set(matchedSections.map(s => s.id));
     const subtestQuestions = questions.filter(q => matchedSectionIds.has(q.section_id));
 
-    // Count grouped session items (one per passage, not per child) so folder
-    // cards match the number of screens in the session.
+    // Count individual rated questions so folder cards match the number of questions in the session.
     const countFolder = (folder: 'easy' | 'medium' | 'hard'): number =>
-      groupPracticeItemsByPassage(
-        filterPracticeQuestionsByRating(subtestQuestions, userRatings, folder),
-        passages,
-      ).length;
+      filterPracticeQuestionsByRating(subtestQuestions, userRatings, folder).length;
 
     const easy = countFolder('easy');
     const medium = countFolder('medium');
@@ -267,7 +262,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
     const total = easy + medium + hard;
 
     return { easy, medium, hard, total };
-  }, [getMatchedSections, questions, userRatings, passages]);
+  }, [getMatchedSections, questions, userRatings]);
 
   const filteredSubtests = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -335,12 +330,9 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       const targetSet = new Set(targetIds);
       const allQ = questions.filter((q) => targetSet.has(q.id));
 
-      // Group passage children into one session item per passage (mirrors the
-      // exam), preserving encounter order. Only target-folder children are
-      // included so folder counts stay accurate.
-      const sessionItems = groupPracticeItemsByPassage(allQ, passages);
-
-      const resolved = await imageService.resolveQuestionImageUrls(sessionItems);
+      // Practice mode presents questions individually (not grouped into multi-question
+      // passage screens like the mock test), allowing per-question rating and verification.
+      const resolved = await imageService.resolveQuestionImageUrls(allQ);
       setPracticeQuestions(resolved);
     } catch (err) {
       console.error('Failed to load practice questions:', err);

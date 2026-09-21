@@ -12,8 +12,15 @@ import SecurityOverlay from '@/components/exam/SecurityOverlay';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
 import { ImageService } from '@/lib/services/image-service';
+import { FigureSequenceSkeleton } from '@/components/question-types/FigureSequence';
+import {
+  extractQuestionImageUrls,
+  preloadImage,
+  preloadQuestionImages,
+  type QuestionWithContent,
+} from '@/lib/exam/image-preloader';
 
-interface DisplayQuestion {
+interface DisplayQuestion extends QuestionWithContent {
   id: string;
   section_id?: string;
   sort_order?: number;
@@ -54,6 +61,7 @@ export default function ExamPage() {
     currentQuestionIndex,
     answers,
     startSection,
+    startSectionTimer,
     startBreak,
     advanceFlowStep,
     setAnswer,
@@ -113,6 +121,7 @@ export default function ExamPage() {
 
   const fetchQuestionsForSection = useCallback(async (section: typeof sections[0]) => {
     setIsLoadingQuestions(true);
+    let hasQuestions = false;
     try {
       const res = await fetch(`/api/exams/${currentExamId}`);
       if (!res.ok) throw new Error('Failed to load questions from server API');
@@ -147,13 +156,48 @@ export default function ExamPage() {
 
       const resolved = await imageService.resolveQuestionImageUrls(displayQuestions);
       setSectionQuestions(resolved);
+      hasQuestions = resolved.length > 0;
+
+      // Preload the active question's images before dismissing the loader and
+      // starting the timer. A mid-section resume lands on question K > 0, so
+      // preloading index 0 would gate the timer on the wrong images.
+      const storedIndex = useExamStore.getState().currentQuestionIndex;
+      const activeIndex = hasQuestions
+        ? Math.min(Math.max(storedIndex, 0), resolved.length - 1)
+        : 0;
+      const activeQ = resolved[activeIndex];
+      if (activeQ) {
+        await preloadQuestionImages(activeQ, 2500);
+      }
     } catch (err) {
       console.error('Failed to load questions:', err);
-      setSectionQuestions(getMockQuestions(section.questionType, section.questionCount));
+      const fallback = getMockQuestions(section.questionType, section.questionCount);
+      setSectionQuestions(fallback);
+      hasQuestions = fallback.length > 0;
     } finally {
       setIsLoadingQuestions(false);
+      // Only start the clock when there is actually something to answer.
+      if (hasQuestions) startSectionTimer();
     }
-  }, [currentExamId, imageService]);
+  }, [currentExamId, imageService, startSectionTimer]);
+
+  // Predictive preloading: preload upcoming questions (N+1, N+2) into browser cache
+  useEffect(() => {
+    if (sectionQuestions.length === 0) return;
+
+    const upcomingQuestions = [
+      sectionQuestions[currentQuestionIndex + 1],
+      sectionQuestions[currentQuestionIndex + 2],
+    ];
+
+    upcomingQuestions.forEach((q) => {
+      if (!q) return;
+      const urls = extractQuestionImageUrls(q);
+      urls.forEach((url) => {
+        void preloadImage(url);
+      });
+    });
+  }, [currentQuestionIndex, sectionQuestions]);
 
   useEffect(() => {
     if (!hydrated || !currentExamId) return;
@@ -422,9 +466,13 @@ export default function ExamPage() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 flex justify-center">
           <div className="w-full h-full space-y-6">
             {isLoadingQuestions ? (
-              <div className="flex h-64 items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
+              currentSection.questionType === 'figure_sequence' ? (
+                <FigureSequenceSkeleton />
+              ) : (
+                <div className="flex h-64 items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              )
             ) : questionData ? (
               <div key={questionData.id} className="w-full h-full">
               {questionRendererFactory.render(questionData, {

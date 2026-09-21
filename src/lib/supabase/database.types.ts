@@ -125,7 +125,29 @@ export interface Database {
         };
         Returns: Json;
       };
+      get_practice_question_answers: {
+        Args: {
+          p_question_ids: string[];
+        };
+        Returns: Array<{
+          question_id: string;
+          correct_answer: Json;
+        }>;
+      };
     };
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+  private: {
+    Tables: {
+      question_answers: TableDefinition<{
+        question_id: string;
+        correct_answer: Json;
+        updated_at: string;
+      }>;
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

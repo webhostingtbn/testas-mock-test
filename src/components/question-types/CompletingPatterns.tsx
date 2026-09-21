@@ -4,6 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { CanvasImage } from './CanvasImage';
 import { ResilientImage } from './ResilientImage';
 
+export interface CompletingPatternsVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface CompletingPatternsProps {
   question: {
     id: string;
@@ -19,12 +25,14 @@ interface CompletingPatternsProps {
   };
   selectedAnswer: string | null;
   onAnswer: (letter: string) => void;
+  verification?: CompletingPatternsVerification;
 }
 
 export default function CompletingPatterns({
   question,
   selectedAnswer,
   onAnswer,
+  verification,
 }: CompletingPatternsProps) {
   const content = question.content ?? {};
   const gridUrl = content.grid_image_url || '';
@@ -133,16 +141,23 @@ export default function CompletingPatterns({
               >
                 {layout.options.map((opt) => {
                   const isSelected = selectedAnswer === opt;
+                  const isVerified = Boolean(verification?.isVerified);
+                  const correctOpt = isVerified && verification?.correctAnswer ? String(verification.correctAnswer).trim().toUpperCase() : null;
+                  const isCorrectChoice = isVerified && opt === correctOpt;
+                  const isWrongChoice = isVerified && isSelected && opt !== correctOpt;
                   
                   return (
                     <button
                       key={opt}
-                      onClick={() => onAnswer(opt)}
+                      type="button"
+                      disabled={isVerified}
+                      onClick={isVerified ? undefined : () => onAnswer(opt)}
                       className={`
-                        group/cell relative h-full w-full cursor-pointer focus:outline-none
+                        group/cell relative h-full w-full focus:outline-none
                         focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-inset
+                        ${isVerified ? 'cursor-default' : 'cursor-pointer'}
                       `}
-                      aria-label={`Option ${opt}`}
+                      aria-label={`Option ${opt}${isSelected ? ' (selected)' : ''}${isCorrectChoice ? ' (correct)' : ''}${isWrongChoice ? ' (incorrect)' : ''}`}
                       aria-pressed={isSelected}
                     >
                       {/* Highlight only the illustration area, not the printed answer label. */}
@@ -151,9 +166,15 @@ export default function CompletingPatterns({
                         className={`
                           pointer-events-none absolute inset-x-[3%] top-[3%] bottom-[21%] rounded-md border-2 transition-all duration-200
                           ${
-                            isSelected
-                              ? 'border-orange-500 bg-orange-500/10 shadow-inner'
-                              : 'border-transparent group-hover/cell:border-orange-400/50 group-hover/cell:bg-orange-500/5'
+                            isCorrectChoice
+                              ? 'border-emerald-600 bg-emerald-500/20 shadow-md ring-2 ring-emerald-500/30'
+                              : isWrongChoice
+                                ? 'border-rose-600 bg-rose-500/20 shadow-md ring-2 ring-rose-500/30'
+                                : isSelected
+                                  ? 'border-orange-500 bg-orange-500/10 shadow-inner'
+                                  : isVerified
+                                    ? 'border-transparent opacity-40'
+                                    : 'border-transparent group-hover/cell:border-orange-400/50 group-hover/cell:bg-orange-500/5'
                           }
                         `}
                       />
@@ -162,22 +183,38 @@ export default function CompletingPatterns({
                       <span className={`
                         absolute left-[7%] top-[7%] rounded px-2 py-0.5 text-[10px] font-extrabold shadow-sm transition-all duration-150 md:text-xs
                         ${
-                          isSelected
-                            ? 'bg-orange-600 text-white opacity-100 scale-105'
-                            : 'bg-slate-700/80 text-white backdrop-blur-xs opacity-0 group-hover/cell:opacity-90 group-hover:opacity-40'
+                          isCorrectChoice
+                            ? 'bg-emerald-600 text-white opacity-100 scale-105'
+                            : isWrongChoice
+                              ? 'bg-rose-600 text-white opacity-100 scale-105'
+                              : isSelected
+                                ? 'bg-orange-600 text-white opacity-100 scale-105'
+                                : 'bg-slate-700/80 text-white backdrop-blur-xs opacity-0 group-hover/cell:opacity-90 group-hover:opacity-40'
                         }
                       `}>
                         {opt}
                       </span>
 
-                      {/* Active Selected Checkmark */}
-                      {isSelected && (
-                        <div className="animate-scaleIn absolute right-[7%] top-[7%] flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-white shadow-md md:h-6 md:w-6">
+                      {/* Verification / Active Selected Checkmark */}
+                      {isCorrectChoice ? (
+                        <div className="animate-scaleIn absolute right-[7%] top-[7%] flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md md:h-6 md:w-6 z-10">
                           <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                      )}
+                      ) : isWrongChoice ? (
+                        <div className="animate-scaleIn absolute right-[7%] top-[7%] flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white shadow-md md:h-6 md:w-6 z-10">
+                          <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      ) : isSelected ? (
+                        <div className="animate-scaleIn absolute right-[7%] top-[7%] flex h-5 w-5 items-center justify-center rounded-full bg-orange-600 text-white shadow-md md:h-6 md:w-6 z-10">
+                          <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : null}
                     </button>
                   );
                 })}

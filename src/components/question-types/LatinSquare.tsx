@@ -8,6 +8,12 @@ interface LatinSquareContent {
   options?: string[];
 }
 
+export interface LatinSquareVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface LatinSquareProps {
   question: {
     id: string;
@@ -15,6 +21,7 @@ interface LatinSquareProps {
   };
   selectedAnswer: string | null;
   onAnswer: (letter: string) => void;
+  verification?: LatinSquareVerification;
 }
 
 const FALLBACK_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
@@ -23,11 +30,15 @@ export default function LatinSquare({
   question,
   selectedAnswer,
   onAnswer,
+  verification,
 }: LatinSquareProps) {
   const content = question.content ?? {};
   const imageUrl = content.grid_image_url || content.grid_image || '';
   const options =
     content.options && content.options.length > 0 ? content.options : FALLBACK_OPTIONS;
+
+  const isVerified = Boolean(verification?.isVerified);
+  const correctLetter = isVerified && verification?.correctAnswer ? String(verification.correctAnswer).trim().toUpperCase() : null;
 
   if (!imageUrl) {
     return (
@@ -62,22 +73,31 @@ export default function LatinSquare({
           >
             {options.map((letter) => {
               const isSelected = selectedAnswer === letter;
+              const isCorrectChoice = isVerified && letter === correctLetter;
+              const isWrongChoice = isVerified && isSelected && letter !== correctLetter;
 
               return (
                 <button
                   key={letter}
                   type="button"
                   role="radio"
+                  disabled={isVerified}
                   aria-checked={isSelected}
-                  onClick={() => onAnswer(letter)}
+                  onClick={isVerified ? undefined : () => onAnswer(letter)}
                   className={`
                     h-12 md:h-14 rounded-[10px] border text-xl font-semibold
-                    flex items-center justify-center transition-colors
+                    flex items-center justify-center transition-all
                     outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40
                     ${
-                      isSelected
-                        ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60 text-[#EA580C]'
-                        : 'border-[#E5E7EB] bg-white text-[#18181B] hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
+                      isCorrectChoice
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/30 font-bold'
+                        : isWrongChoice
+                          ? 'border-rose-600 bg-rose-50 text-rose-700 ring-2 ring-rose-500/30 line-through'
+                          : isSelected
+                            ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60 text-[#EA580C]'
+                            : isVerified
+                              ? 'border-[#E5E7EB] bg-white text-slate-400 opacity-50'
+                              : 'border-[#E5E7EB] bg-white text-[#18181B] hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
                     }
                   `}
                 >

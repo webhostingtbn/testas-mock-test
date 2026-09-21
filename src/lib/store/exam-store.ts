@@ -67,6 +67,7 @@ interface ExamState {
   }) => void;
 
   startSection: (sectionIndex: number) => void;
+  startSectionTimer: () => void;
   startBreak: (duration: number) => void;
 
   setAnswer: (sectionId: string, questionId: string, answer: unknown) => void;
@@ -145,18 +146,28 @@ export const useExamStore = create<ExamState>()(
         });
       },
 
-      // ---- Start a section (sets timer) ----
+      // ---- Start a section ----
       startSection: (sectionIndex: number) => {
-        const { sections } = get();
+        const { sections, currentSectionIndex, sectionStartTime } = get();
         const section = sections[sectionIndex];
         if (!section) return;
 
+        const isSameSection = currentSectionIndex === sectionIndex;
         set({
           currentSectionIndex: sectionIndex,
-          currentQuestionIndex: 0,
-          sectionStartTime: Date.now(),
+          currentQuestionIndex: isSameSection ? get().currentQuestionIndex : 0,
+          // Preserve ongoing timer if already started for this section (e.g. page refresh)
+          sectionStartTime: isSameSection && sectionStartTime ? sectionStartTime : null,
           sectionDuration: section.durationSeconds,
         });
+      },
+
+      // ---- Start section timer (invoked when questions/images finish loading) ----
+      startSectionTimer: () => {
+        const { sectionStartTime } = get();
+        if (!sectionStartTime) {
+          set({ sectionStartTime: Date.now() });
+        }
       },
 
       // ---- Start a break ----

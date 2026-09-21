@@ -9,13 +9,20 @@ interface CircularTimerProps {
 }
 
 export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProps) {
-  const { getRemainingTime, sectionDuration } = useExamStore();
+  // Selective subscriptions: re-render only when timer inputs change, and
+  // never recreate the interval because of an unstable parent callback.
+  const getRemainingTime = useExamStore((s) => s.getRemainingTime);
+  const sectionDuration = useExamStore((s) => s.sectionDuration);
+  const sectionStartTime = useExamStore((s) => s.sectionStartTime);
   const [remaining, setRemaining] = useState(getRemainingTime());
   const hasCalledTimeUp = useRef(false);
+  const onTimeUpRef = useRef(onTimeUp);
+  onTimeUpRef.current = onTimeUp;
 
   useEffect(() => {
     hasCalledTimeUp.current = false;
-  }, [sectionDuration]);
+    setRemaining(getRemainingTime());
+  }, [sectionDuration, sectionStartTime, getRemainingTime]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -25,12 +32,12 @@ export default function CircularTimer({ onTimeUp, size = 32 }: CircularTimerProp
       if (time <= 0 && !hasCalledTimeUp.current) {
         hasCalledTimeUp.current = true;
         clearInterval(interval);
-        onTimeUp();
+        onTimeUpRef.current();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [getRemainingTime, onTimeUp]);
+  }, [getRemainingTime]);
 
   const minutes = Math.floor(remaining / 60);
   const seconds = Math.floor(remaining % 60);

@@ -4,6 +4,12 @@ import { useState, useCallback } from 'react';
 // import VirtualCalculator from './VirtualCalculator';
 import VirtualKeyboard from './VirtualKeyboard';
 
+export interface MathEquationVerification {
+  isVerified: boolean;
+  isCorrect: boolean;
+  correctAnswer?: unknown;
+}
+
 interface MathEquationProps {
   question: {
     id: string;
@@ -14,21 +20,37 @@ interface MathEquationProps {
   };
   currentAnswer: Record<string, number> | null;
   onAnswer: (answer: Record<string, number>) => void;
+  verification?: MathEquationVerification;
 }
 
 export default function MathEquation({
   question,
   currentAnswer,
   onAnswer,
+  verification,
 }: MathEquationProps) {
   const equations = question?.content?.equations || [];
   const variables = question?.content?.variables || [];
   const [activeVariable, setActiveVariable] = useState<string | null>(() => variables[0] || null);
   const answers = currentAnswer || {};
 
+  const isVerified = Boolean(verification?.isVerified);
+  const correctMap: Record<string, number | string> | null = (() => {
+    if (!isVerified || !verification?.correctAnswer || typeof verification.correctAnswer !== 'object' || Array.isArray(verification.correctAnswer)) {
+      return null;
+    }
+    const result: Record<string, number | string> = {};
+    for (const [key, val] of Object.entries(verification.correctAnswer as Record<string, unknown>)) {
+      if (typeof val === 'number' || typeof val === 'string') {
+        result[key] = val;
+      }
+    }
+    return result;
+  })();
+
   const handleKeyPress = useCallback(
     (key: string) => {
-      if (!activeVariable) return;
+      if (isVerified || !activeVariable) return;
 
       const currentValue = answers[activeVariable];
       let newValue: number | undefined;
@@ -69,6 +91,7 @@ export default function MathEquation({
   // handle physical keyboard
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (isVerified) return;
       if (e.key >= '0' && e.key <= '9') {
         handleKeyPress(e.key);
       } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -80,7 +103,7 @@ export default function MathEquation({
         setActiveVariable(variables[nextIdx]);
       }
     },
-    [handleKeyPress, activeVariable, variables]
+    [isVerified, handleKeyPress, activeVariable, variables]
   );
 
   return (
@@ -113,39 +136,93 @@ export default function MathEquation({
           <p className="text-[13px] font-medium text-[#71717A] mb-4">Your answers</p>
           <div className="flex flex-col gap-[10px]">
             {variables.map((variable) => {
-              const isActive = activeVariable === variable;
+              const isActive = !isVerified && activeVariable === variable;
               const value = answers[variable];
+              
+              const expectedVal =
+                correctMap &&
+                (correctMap[variable] ??
+                  correctMap[variable.toLowerCase()] ??
+                  correctMap[variable.toUpperCase()]);
+              const isVarCorrect =
+                isVerified &&
+                expectedVal !== undefined &&
+                value !== undefined &&
+                String(value).trim() === String(expectedVal).trim();
+              const isVarWrong =
+                isVerified &&
+                expectedVal !== undefined &&
+                (!isVarCorrect);
+
+              let borderBgClass = 'border-[#E5E7EB] bg-white hover:border-[#D1D5DB] hover:bg-[#FAFAFA]';
+              if (isVerified) {
+                if (isVarCorrect) {
+                  borderBgClass = 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500/20';
+                } else if (isVarWrong) {
+                  borderBgClass = 'border-rose-500 bg-rose-50/60 ring-1 ring-rose-500/20';
+                } else {
+                  borderBgClass = 'border-gray-200 bg-gray-50 opacity-70';
+                }
+              } else if (isActive) {
+                borderBgClass = 'border-[#EA580C]/40 bg-[#FFF7ED]/60';
+              }
 
               return (
                 <button
                   key={variable}
                   type="button"
-                  onClick={() => setActiveVariable(variable)}
+                  disabled={isVerified}
+                  onClick={() => !isVerified && setActiveVariable(variable)}
                   aria-pressed={isActive}
                   className={`
-                    w-full flex items-center gap-4 px-[18px] py-3 rounded-[10px] border text-left
+                    w-full flex items-center justify-between gap-4 px-[18px] py-3 rounded-[10px] border text-left
                     transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#EA580C]/40
-                    ${
-                      isActive
-                        ? 'border-[#EA580C]/40 bg-[#FFF7ED]/60'
-                        : 'border-[#E5E7EB] bg-white hover:border-[#D1D5DB] hover:bg-[#FAFAFA]'
-                    }
+                    ${borderBgClass}
+                    ${isVerified ? 'cursor-default' : 'cursor-pointer'}
                   `}
                 >
-                  <span className={`text-lg font-bold font-mono w-8 shrink-0 ${
-                    isActive ? 'text-[#EA580C]' : 'text-[#18181B]'
-                  }`}>
-                    {variable}
-                  </span>
-                  <span className="text-[#D1D5DB] shrink-0">=</span>
-                  <span className={`flex-1 min-h-7 rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
-                    value !== undefined ? 'text-[#18181B]' : 'text-[#D1D5DB]'
-                  }`}>
-                    {value !== undefined ? value : '–'}
-                    {isActive && (
-                      <span className="inline-block w-0.5 h-5 bg-[#EA580C] animate-pulse ml-0.5 align-middle" />
-                    )}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`text-lg font-bold font-mono w-8 shrink-0 ${
+                        isVarCorrect
+                          ? 'text-emerald-700'
+                          : isVarWrong
+                          ? 'text-rose-700'
+                          : isActive
+                          ? 'text-[#EA580C]'
+                          : 'text-[#18181B]'
+                      }`}
+                    >
+                      {variable}
+                    </span>
+                    <span className="text-[#D1D5DB] shrink-0">=</span>
+                    <span
+                      className={`min-h-7 rounded-lg px-3 py-1 text-center text-xl font-bold font-mono ${
+                        isVarCorrect
+                          ? 'text-emerald-700'
+                          : isVarWrong
+                          ? 'text-rose-700 line-through'
+                          : value !== undefined
+                          ? 'text-[#18181B]'
+                          : 'text-[#D1D5DB]'
+                      }`}
+                    >
+                      {value !== undefined ? value : '–'}
+                      {isActive && (
+                        <span className="inline-block w-0.5 h-5 bg-[#EA580C] animate-pulse ml-0.5 align-middle" />
+                      )}
+                    </span>
+                  </div>
+
+                  {isVerified && isVarWrong && expectedVal !== undefined && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold">
+                      <span>Answer:</span>
+                      <span className="text-sm font-bold">{String(expectedVal)}</span>
+                    </div>
+                  )}
+                  {isVerified && isVarCorrect && (
+                    <div className="text-emerald-600 text-sm font-bold">✓</div>
+                  )}
                 </button>
               );
             })}
@@ -155,7 +232,9 @@ export default function MathEquation({
         {/* Right pane: Virtual keyboard */}
         <div className="w-full lg:w-[280px] shrink-0 pl-6 pb-6 sm:pb-8 lg:py-6">
           <p className="text-[13px] font-medium text-[#71717A] mb-4">Keypad</p>
-          <VirtualKeyboard onKeyPress={handleKeyPress} />
+          <div className={isVerified ? 'opacity-40 pointer-events-none' : ''}>
+            <VirtualKeyboard onKeyPress={handleKeyPress} />
+          </div>
         </div>
       </div>
     </div>
