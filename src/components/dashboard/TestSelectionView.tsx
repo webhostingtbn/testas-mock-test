@@ -220,8 +220,8 @@ export function TestSelectionView({
   const latestCompleted = completedAttempts[completedAttempts.length - 1] ?? null;
 
   return (
-    <div className="mx-auto grid min-h-0 w-full max-w-full gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:gap-6 lg:pb-0 xl:grid-cols-[360px_1fr]">
-        <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-0 lg:max-h-[calc(100vh-120px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
+    <div className="mx-auto grid min-h-0 w-full max-w-full items-start gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:gap-6 lg:pb-0 xl:grid-cols-[360px_1fr]">
+        <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-120px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-950">Available Tests</h2>
             <p className="mt-1 text-xs text-slate-500">Choose an active test to view details or start.</p>
@@ -243,7 +243,7 @@ export function TestSelectionView({
             ))}
           </div> */}
 
-          <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100vh-280px)] lg:overflow-y-auto lg:pr-1">
+          <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100dvh-280px)] lg:overflow-y-auto lg:pr-1">
             {filteredExams.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center">
                 <p className="text-xs font-semibold text-slate-500">No tests match this filter</p>

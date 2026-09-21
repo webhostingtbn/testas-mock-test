@@ -496,7 +496,7 @@ export function KniShell({
   };
 
   return (
-    <div className="h-screen max-h-screen w-full overflow-hidden bg-orange-50 text-slate-950 flex flex-col relative">
+    <div className="h-dvh max-h-dvh w-full overflow-hidden bg-orange-50 text-slate-950 flex flex-col relative">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 bg-kni-canvas"
@@ -525,7 +525,9 @@ export function KniShell({
             parentViewLabel={backNavigation?.label}
           />
           <main className="relative z-10 flex-1 bg-white sm:p-5 min-h-0 flex flex-col overflow-hidden">
-            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar">
+            {/* pb-24 on mobile clears the fixed bottom nav so the last card
+                can scroll fully into view; desktop has no overlay nav. */}
+            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto custom-scrollbar pb-24 md:pb-0">
               {children}
             </div>
           </main>
