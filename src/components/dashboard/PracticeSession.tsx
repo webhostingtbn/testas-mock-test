@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,6 +17,7 @@ import {
 import { KniButton } from '@/components/KniPrimitives';
 import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
+import { ImageService } from '@/lib/services/image-service';
 import { usePracticeStore } from '@/lib/store/practice-store';
 
 interface PracticeQuestion {
@@ -46,28 +47,6 @@ interface PracticeSessionProps {
 }
 
 type Difficulty = 'easy' | 'medium' | 'hard';
-
-const QUESTION_TIME_LIMITS: Record<string, number> = {
-  figure_sequence: 75,
-  completing_patterns: 75,
-  math_equation: 75,
-  latin_square: 90,
-  solving_quantitative: 120,
-  inferring_relationships: 27,
-  numerical_series: 68,
-  module_mcq: 122,
-  interpreting_texts: 122,
-  representation_systems: 150,
-  linguistic_structures: 136,
-  sc_1: 163,
-  sc_2: 231,
-  econ_1: 163,
-  econ_2: 231,
-  eng_1: 163,
-  eng_2_2d: 122,
-  eng_2_3d: 122,
-  eng_3: 163,
-};
 
 const RATING_OPTIONS: Array<{ id: Difficulty; label: string; Icon: typeof Smile }> = [
   { id: 'easy', label: 'Easy', Icon: Smile },
@@ -109,15 +88,46 @@ export default function PracticeSession({
     }
     return initial;
   });
-  const [timeRemaining, setTimeRemaining] = useState<number>(
-    QUESTION_TIME_LIMITS[subtestType] || 90
-  );
+  const [timeElapsed, setTimeElapsed] = useState<number>(0);
   const [timerActive, setTimerActive] = useState<boolean>(true);
   const [timerHidden, setTimerHidden] = useState<boolean>(false);
   const [navigatorOpen, setNavigatorOpen] = useState<boolean>(false);
   const navigatorRef = useRef<HTMLDivElement>(null);
 
   const currentItem = questions[currentIndex] || null;
+
+  // Image URLs resolve lazily: only the current question (+ a prefetch of
+  // the next) is signed, so opening a 50-question folder costs ~7 sign
+  // requests instead of ~350. Resolved rows accumulate by id for the
+  // lifetime of the session; the shared service cache dedupes repeats.
+  const imageService = useMemo(() => new ImageService(), []);
+  const [resolvedById, setResolvedById] = useState<Record<string, PracticeQuestion>>({});
+  const requestedImageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const targets = [questions[currentIndex], questions[currentIndex + 1]];
+    for (const target of targets) {
+      if (!target || requestedImageIdsRef.current.has(target.id)) continue;
+      requestedImageIdsRef.current.add(target.id);
+      void imageService
+        .resolveQuestionImageUrls([target])
+        .then(([resolved]) => {
+          if (resolved) {
+            setResolvedById((prev) =>
+              prev[target.id] ? prev : { ...prev, [target.id]: resolved },
+            );
+          }
+        })
+        .catch((err: unknown) => {
+          // Render the raw row now (its images degrade to error tiles) but
+          // allow a later navigation to retry the resolution.
+          requestedImageIdsRef.current.delete(target.id);
+          console.error('Failed to resolve practice images:', err);
+          setResolvedById((prev) =>
+            prev[target.id] ? prev : { ...prev, [target.id]: target },
+          );
+        });
+    }
+  }, [currentIndex, questions, imageService]);
   // Mirror answers and verifications for navigation handlers without closing over stale state.
   const answersRef = useRef<Record<string, unknown>>({});
   useEffect(() => {
@@ -129,19 +139,19 @@ export default function PracticeSession({
     verificationsRef.current = verifications;
   }, [verifications]);
 
-  // Per-question remaining time: navigating away parks the current clock,
-  // navigating back restores it instead of granting a fresh full allocation.
+  // Per-question elapsed time: navigating away parks the current clock,
+  // navigating back restores it instead of resetting to zero.
   const currentIndexRef = useRef(0);
-  const timeRemainingRef = useRef<number>(QUESTION_TIME_LIMITS[subtestType] || 90);
-  const remainingByQuestionRef = useRef<Record<string, number>>({});
+  const timeElapsedRef = useRef<number>(0);
+  const elapsedByQuestionRef = useRef<Record<string, number>>({});
   useEffect(() => {
-    timeRemainingRef.current = timeRemaining;
-  }, [timeRemaining]);
+    timeElapsedRef.current = timeElapsed;
+  }, [timeElapsed]);
 
   const handleGoToQuestion = useCallback((newIndex: number) => {
     const currentItemId = questions[currentIndexRef.current]?.id;
     if (currentItemId) {
-      remainingByQuestionRef.current[currentItemId] = timeRemainingRef.current;
+      elapsedByQuestionRef.current[currentItemId] = timeElapsedRef.current;
     }
     const nextItem = questions[newIndex];
     currentIndexRef.current = newIndex;
@@ -154,15 +164,17 @@ export default function PracticeSession({
           : Boolean(verificationsRef.current[nextItem.id]?.isVerified))
       : false;
     // Verified items stay paused; unverified items resume their parked clock
-    // (or a fresh allocation on first visit) instead of always resetting.
+    // (or start at 0 on first visit) instead of always resetting.
     if (isAlreadyVerified) {
+      const parked = nextItem ? elapsedByQuestionRef.current[nextItem.id] : undefined;
+      setTimeElapsed(parked ?? 0);
       setTimerActive(false);
     } else {
-      const parked = nextItem ? remainingByQuestionRef.current[nextItem.id] : undefined;
-      setTimeRemaining(parked ?? (QUESTION_TIME_LIMITS[subtestType] || 90));
+      const parked = nextItem ? elapsedByQuestionRef.current[nextItem.id] : undefined;
+      setTimeElapsed(parked ?? 0);
       setTimerActive(true);
     }
-  }, [questions, subtestType]);
+  }, [questions]);
 
   // Close the navigator dropdown on outside click / Escape.
   useEffect(() => {
@@ -186,19 +198,11 @@ export default function PracticeSession({
   // Timer resets in handleGoToQuestion (event handler); initial mount uses
   // the useState initializer above, so no reset effect is needed here.
 
-  // Single interval for the countdown — previously recreated every tick via
-  // [timerActive, timeRemaining] deps, which made back/forth feel sluggish.
+  // Single interval for counting up elapsed time
   useEffect(() => {
     if (!timerActive) return;
     const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(interval);
-          setTimerActive(false);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeElapsed((prev) => prev + 1);
     }, 1000);
     return () => window.clearInterval(interval);
   }, [timerActive]);
@@ -226,8 +230,12 @@ export default function PracticeSession({
   };
 
   const formatTime = (totalSecs: number) => {
-    const mins = Math.floor(totalSecs / 60);
+    const hours = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
     const secs = totalSecs % 60;
+    if (hours > 0) {
+      return `${hours}:${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
@@ -305,7 +313,8 @@ export default function PracticeSession({
       : {}),
   });
 
-  const qData: QuestionData = toQuestionData(currentItem, currentIndex);
+  const resolvedCurrent = resolvedById[currentItem.id] ?? null;
+  const qData: QuestionData = toQuestionData(resolvedCurrent ?? currentItem, currentIndex);
 
   // Per-child answers for grouped (passage) items, keyed by child id — what
   // ModuleMCQ reads. Undefined when nothing answered so the renderer keeps
@@ -321,7 +330,6 @@ export default function PracticeSession({
   })();
 
   const handleAnswerChange = (value: unknown, questionId?: string) => {
-    if (timeRemaining <= 0) return;
     const key = questionId ?? currentItem.id;
     if (verifications[key]?.isVerified) return; // Disallow modification after verification
     if (!questionId || questionId === currentItem.id) setUserAnswer(value);
@@ -329,7 +337,7 @@ export default function PracticeSession({
   };
 
   const handleCheckAnswer = async () => {
-    if (!currentItem || isCheckingAnswer || currentIsVerified || timeRemaining <= 0) return;
+    if (!currentItem || isCheckingAnswer || currentIsVerified) return;
 
     const itemsToVerify: Array<{ questionId: string; answer: unknown }> = [];
     if (currentItem.isPassage && currentItem.questions) {
@@ -419,6 +427,10 @@ export default function PracticeSession({
       });
 
       setTimerActive(false);
+      const currentItemId = questions[currentIndexRef.current]?.id;
+      if (currentItemId) {
+        elapsedByQuestionRef.current[currentItemId] = timeElapsedRef.current;
+      }
     } catch (err) {
       console.error('Error verifying answer:', err);
     } finally {
@@ -447,7 +459,7 @@ export default function PracticeSession({
           <div className="flex items-center gap-2 shrink-0">
             <div className="flex items-center gap-2 bg-[#F3F4F6] rounded-lg pl-4 pr-2 py-1.5">
               <span className="font-mono text-sm font-medium text-[#18181B] tabular-nums min-w-11 text-center">
-                {timerHidden ? '••:••' : formatTime(timeRemaining)}
+                {timerHidden ? '••:••' : formatTime(timeElapsed)}
               </span>
               <button
                 type="button"
@@ -610,9 +622,8 @@ export default function PracticeSession({
             {!currentIsVerified ? (
               <button
                 type="button"
-                disabled={!currentIsAnswered || isCheckingAnswer || timeRemaining <= 0}
+                disabled={!currentIsAnswered || isCheckingAnswer}
                 onClick={handleCheckAnswer}
-                title={timeRemaining <= 0 ? 'Time expired for this question' : undefined}
                 className="h-10 px-4 text-sm font-medium rounded-[10px] border border-emerald-600 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:opacity-40 transition-colors flex items-center gap-1.5"
               >
                 {isCheckingAnswer ? (

@@ -66,8 +66,34 @@ const inFlightSigns = new Map<string, Promise<string | undefined>>();
 // signed URL can be re-signed without knowing its storage path.
 const urlToPath = new Map<string, string>();
 
+// Cap concurrent signature fetches: resolving a 50-question folder fans out
+// to hundreds of paths, and an unbounded Promise.all stampedes both the
+// browser connection pool and the sign endpoint. Queued acquirers are woken
+// FIFO as slots free up.
+const MAX_CONCURRENT_SIGNS = 8;
+let activeSigns = 0;
+const signQueue: Array<() => void> = [];
+
+async function withSignSlot<T>(task: () => Promise<T>): Promise<T> {
+  if (activeSigns >= MAX_CONCURRENT_SIGNS) {
+    await new Promise<void>((resolve) => signQueue.push(resolve));
+  }
+  activeSigns++;
+  try {
+    return await task();
+  } finally {
+    activeSigns--;
+    signQueue.shift()?.();
+  }
+}
+
+export function __resetSignQueueForTesting(): void {
+  activeSigns = 0;
+  signQueue.length = 0;
+}
+
 async function signStoragePath(path: string): Promise<string | undefined> {
-  const signPromise = (async (): Promise<string | undefined> => {
+  const signPromise = withSignSlot(async (): Promise<string | undefined> => {
     try {
       const res = await fetch(`/api/storage/sign?path=${encodeURIComponent(path)}`);
       if (!res.ok) return undefined;
@@ -87,7 +113,7 @@ async function signStoragePath(path: string): Promise<string | undefined> {
     } finally {
       inFlightSigns.delete(path);
     }
-  })();
+  });
   inFlightSigns.set(path, signPromise);
   return signPromise;
 }

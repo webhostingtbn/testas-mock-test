@@ -18,7 +18,6 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { KniCard, KniButton, KniProgress } from '@/components/KniPrimitives';
-import { ImageService } from '@/lib/services/image-service';
 import { cn } from '@/lib/utils';
 import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
@@ -65,7 +64,6 @@ interface DifficultySegment {
 }
 
 export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
-  const imageService = useMemo(() => new ImageService(), []);
   const {
     sections,
     questions,
@@ -330,10 +328,10 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
       const targetSet = new Set(targetIds);
       const allQ = questions.filter((q) => targetSet.has(q.id));
 
-      // Practice mode presents questions individually (not grouped into multi-question
-      // passage screens like the mock test), allowing per-question rating and verification.
-      const resolved = await imageService.resolveQuestionImageUrls(allQ);
-      setPracticeQuestions(resolved);
+      // No image resolution here: PracticeSession signs the current
+      // question on arrival (+ prefetches the next), so opening a folder
+      // costs no sign requests at all.
+      setPracticeQuestions(allQ);
     } catch (err) {
       console.error('Failed to load practice questions:', err);
     } finally {
