@@ -311,7 +311,7 @@ export function TestSelectionView({
         </div>
 
         {selectedExam && (
-          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} min-h-0 w-full min-w-0 flex-col gap-5 bg-white px-5 py-5 transition duration-200 lg:gap-6 rounded-xl lg:border lg:border-slate-100 lg:p-6 lg:shadow-sm`}>
+          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} min-h-0 w-full min-w-0 flex-col gap-5 bg-white px-5 py-5 transition duration-200 lg:gap-6 rounded-xl lg:border lg:border-slate-100 lg:p-6 lg:shadow-sm lg:max-h-[calc(100dvh-120px)] lg:overflow-y-auto`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
                 {selectedExam.title}

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import { ImageOff } from 'lucide-react';
 import { ResilientImage } from './ResilientImage';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -81,6 +82,20 @@ export function FigureSequenceSkeleton() {
   );
 }
 
+/** Tiny terminal-failure mark: loading is over and the image is not there. */
+function ImageErrorMark({ label }: { label: string }) {
+  return (
+    <span
+      className="flex items-center justify-center gap-1 px-2 text-center text-[10px] font-medium leading-tight text-slate-400"
+      role="img"
+      aria-label={label}
+    >
+      <ImageOff className="size-3.5 shrink-0" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
 export default function FigureSequence({
   question,
   selectedAnswer,
@@ -88,6 +103,20 @@ export default function FigureSequence({
   verification,
 }: FigureSequenceProps) {
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  const markImageLoaded = (url: string) => {
+    setLoadedImages((prev) => ({ ...prev, [url]: true }));
+    setFailedImages((prev) => {
+      if (!prev[url]) return prev;
+      const next = { ...prev };
+      delete next[url];
+      return next;
+    });
+  };
+
+  const markImageFailed = (url: string) =>
+    setFailedImages((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
 
   const content = question.content ?? {};
   const imageUrl = content.prompt_image_url || (typeof content.prompt_image === 'string' ? content.prompt_image : '');
@@ -127,7 +156,7 @@ export default function FigureSequence({
 
   const handleImageRef = (node: HTMLImageElement | null, url: string) => {
     if (node && node.complete && node.naturalWidth > 0 && !loadedImages[url]) {
-      setLoadedImages((prev) => ({ ...prev, [url]: true }));
+      markImageLoaded(url);
     }
   };
 
@@ -158,6 +187,7 @@ export default function FigureSequence({
   };
 
   const isPromptLoaded = Boolean(loadedImages[imageUrl]);
+  const isPromptFailed = !isPromptLoaded && Boolean(failedImages[imageUrl]);
 
   const renderChoice = (col: 1 | 2, row: 1 | 2 | 3) => {
     const isSelected =
@@ -178,6 +208,7 @@ export default function FigureSequence({
       );
     }
     const isChoiceLoaded = Boolean(loadedImages[optUrl]);
+    const isChoiceFailed = !isChoiceLoaded && Boolean(failedImages[optUrl]);
 
     const targetCorrectRow = col === 1 ? correctRow1 : correctRow2;
     const isCorrectChoice = isVerified && targetCorrectRow === row;
@@ -208,18 +239,25 @@ export default function FigureSequence({
           }
         `}
       >
-        {!isChoiceLoaded && (
+        {!isChoiceLoaded && !isChoiceFailed && (
           <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
         )}
-        <ResilientImage
-          src={optUrl}
-          alt={`Image ${col} Matrix ${row}`}
-          onLoad={() => setLoadedImages((prev) => ({ ...prev, [optUrl]: true }))}
-          imgRef={(node) => handleImageRef(node, optUrl)}
-          className={`w-full h-full object-cover transition-opacity duration-200 ${
-            isChoiceLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
+        {isChoiceFailed ? (
+          <span className="absolute inset-0 flex items-center justify-center p-1">
+            <ImageErrorMark label={`Image ${col} Matrix ${row} unavailable`} />
+          </span>
+        ) : (
+          <ResilientImage
+            src={optUrl}
+            alt={`Image ${col} Matrix ${row}`}
+            onLoad={() => markImageLoaded(optUrl)}
+            onError={() => markImageFailed(optUrl)}
+            imgRef={(node) => handleImageRef(node, optUrl)}
+            className={`w-full h-full object-cover transition-opacity duration-200 ${
+              isChoiceLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+        )}
 
         {/* Badges: correct, wrong, or regular selection */}
         {isCorrectChoice ? (
@@ -259,18 +297,23 @@ export default function FigureSequence({
           {/* --- ROW 1: HEADERS --- */}
           {/* Main prompt sequence image (Col 1) */}
           <div className="justify-self-end mr-2 lg:mr-4 mb-4 mt-2 relative min-w-[280px] sm:min-w-[360px] md:min-w-[420px] h-20 md:h-28 lg:h-[100px] flex items-center justify-center bg-slate-50 rounded ring-1 ring-[#E5E7EB] overflow-hidden">
-            {!isPromptLoaded && (
+            {!isPromptLoaded && !isPromptFailed && (
               <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
             )}
-            <ResilientImage
-              src={imageUrl}
-              alt="Sequence prompt"
-              onLoad={() => setLoadedImages((prev) => ({ ...prev, [imageUrl]: true }))}
-              imgRef={(node) => handleImageRef(node, imageUrl)}
-              className={`h-20 md:h-28 lg:h-[100px] w-auto max-w-full object-contain block ring-1 ring-[#E5E7EB] transition-opacity duration-200 ${
-                isPromptLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-            />
+            {isPromptFailed ? (
+              <ImageErrorMark label="Sequence prompt unavailable" />
+            ) : (
+              <ResilientImage
+                src={imageUrl}
+                alt="Sequence prompt"
+                onLoad={() => markImageLoaded(imageUrl)}
+                onError={() => markImageFailed(imageUrl)}
+                imgRef={(node) => handleImageRef(node, imageUrl)}
+                className={`h-20 md:h-28 lg:h-[100px] w-auto max-w-full object-contain block ring-1 ring-[#E5E7EB] transition-opacity duration-200 ${
+                  isPromptLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            )}
           </div>
 
           {/* Image 1 Header Box (Col 2) */}
