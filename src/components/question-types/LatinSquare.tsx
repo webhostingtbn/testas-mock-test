@@ -1,6 +1,7 @@
 'use client';
 
 import { CanvasImage } from './CanvasImage';
+import { isAbsoluteOrDataUrl } from '@/lib/services/image-service';
 
 interface LatinSquareContent {
   grid_image?: string;
@@ -33,7 +34,7 @@ export default function LatinSquare({
   verification,
 }: LatinSquareProps) {
   const content = question.content ?? {};
-  const imageUrl = content.grid_image_url || content.grid_image || '';
+  const imageUrl = content.grid_image_url || (content.grid_image && isAbsoluteOrDataUrl(content.grid_image) ? content.grid_image : '');
   const options =
     content.options && content.options.length > 0 ? content.options : FALLBACK_OPTIONS;
 

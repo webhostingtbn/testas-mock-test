@@ -33,10 +33,10 @@ export function ResilientImage({ src, imgRef, onError, fallbackLabel, className,
   const isFailed = failedSrc !== null && failedSrc === normalizedSrc;
 
   const handleError = (event: SyntheticEvent<HTMLImageElement, Event>) => {
-    onError?.(event);
     if (retry !== null && retry.forSrc === normalizedSrc) {
       // The retried URL failed as well — loading is over.
       setFailedSrc(normalizedSrc);
+      onError?.(event);
       return;
     }
     const failedUrl = currentSrc;
@@ -45,6 +45,7 @@ export function ResilientImage({ src, imgRef, onError, fallbackLabel, className,
         setRetry({ forSrc: normalizedSrc, url: freshUrl });
       } else {
         setFailedSrc(normalizedSrc);
+        onError?.(event);
       }
     });
   };
@@ -63,6 +64,10 @@ export function ResilientImage({ src, imgRef, onError, fallbackLabel, className,
         </span>
       </div>
     );
+  }
+
+  if (!normalizedSrc) {
+    return null;
   }
 
   // eslint-disable-next-line @next/next/no-img-element

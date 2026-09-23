@@ -27,7 +27,7 @@ function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-function isBareStoragePath(value: string): boolean {
+export function isBareStoragePath(value: string): boolean {
   if (!value || value.startsWith('http') || value.startsWith('/') || value.startsWith('data:')) {
     return false;
   }
@@ -35,7 +35,7 @@ function isBareStoragePath(value: string): boolean {
   return /\.(webp|png|jpe?g|svg|gif|avif)$/i.test(value) || value.includes('/');
 }
 
-function isAbsoluteOrDataUrl(value: string): boolean {
+export function isAbsoluteOrDataUrl(value: string): boolean {
   return (
     value.startsWith('http') ||
     value.startsWith('/') ||
@@ -124,7 +124,7 @@ async function signStoragePath(path: string): Promise<string | undefined> {
  * page sat open). Returns undefined when the URL isn't a known signature.
  */
 export async function refreshSignedUrl(staleUrl: string): Promise<string | undefined> {
-  const path = urlToPath.get(staleUrl);
+  const path = urlToPath.get(staleUrl) ?? (isBareStoragePath(staleUrl) ? staleUrl : undefined);
   if (!path) return undefined;
   const inFlight = inFlightSigns.get(path);
   if (inFlight) return inFlight;

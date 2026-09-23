@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ImageService, refreshSignedUrl } from '../image-service';
+import { ImageService, refreshSignedUrl, isBareStoragePath, isAbsoluteOrDataUrl } from '../image-service';
 
 const originalFetch = globalThis.fetch;
 const originalEnv = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -93,5 +93,29 @@ describe('refreshSignedUrl', () => {
   it('returns undefined for unknown URLs without signing', async () => {
     assert.strictEqual(await refreshSignedUrl('https://signed.example/unknown'), undefined);
     assert.strictEqual(fetchCalls, 0);
+  });
+
+  it('signs a bare storage path directly if passed to refreshSignedUrl', async () => {
+    nextResponse = { signedUrl: 'https://signed.example/bare', expiresIn: 3600 };
+    const fresh = await refreshSignedUrl('figure_sequence_web/2.webp');
+    assert.strictEqual(fresh, 'https://signed.example/bare');
+    assert.strictEqual(fetchCalls, 1);
+  });
+});
+
+describe('URL helper classification', () => {
+  it('correctly identifies bare storage paths vs absolute URLs', () => {
+    assert.strictEqual(isBareStoragePath('2.webp'), true);
+    assert.strictEqual(isBareStoragePath('figure_sequence_web/2_1.webp'), true);
+    assert.strictEqual(isBareStoragePath('https://example.com/2.webp'), false);
+    assert.strictEqual(isBareStoragePath('/images/2.webp'), false);
+    assert.strictEqual(isBareStoragePath(''), false);
+
+    assert.strictEqual(isAbsoluteOrDataUrl('https://example.com/2.webp'), true);
+    assert.strictEqual(isAbsoluteOrDataUrl('http://example.com/2.webp'), true);
+    assert.strictEqual(isAbsoluteOrDataUrl('/images/2.webp'), true);
+    assert.strictEqual(isAbsoluteOrDataUrl('data:image/webp;base64,abc'), true);
+    assert.strictEqual(isAbsoluteOrDataUrl('2.webp'), false);
+    assert.strictEqual(isAbsoluteOrDataUrl('figure_sequence_web/2.webp'), false);
   });
 });

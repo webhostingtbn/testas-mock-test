@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { ResilientImage } from './ResilientImage';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isAbsoluteOrDataUrl } from '@/lib/services/image-service';
 
 export interface FigureSequenceVerification {
   isVerified: boolean;
@@ -105,6 +106,13 @@ export default function FigureSequence({
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
+  const [prevQuestionId, setPrevQuestionId] = useState(question.id);
+  if (prevQuestionId !== question.id) {
+    setPrevQuestionId(question.id);
+    setLoadedImages({});
+    setFailedImages({});
+  }
+
   const markImageLoaded = (url: string) => {
     setLoadedImages((prev) => ({ ...prev, [url]: true }));
     setFailedImages((prev) => {
@@ -119,11 +127,11 @@ export default function FigureSequence({
     setFailedImages((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
 
   const content = question.content ?? {};
-  const imageUrl = content.prompt_image_url || (typeof content.prompt_image === 'string' ? content.prompt_image : '');
+  const imageUrl = content.prompt_image_url || (content.prompt_image && isAbsoluteOrDataUrl(content.prompt_image) ? content.prompt_image : '');
   const optionsUrls = content.options_urls && content.options_urls.length >= 6
     ? content.options_urls
-    : Array.isArray(content.options)
-      ? content.options.filter((opt): opt is string => typeof opt === 'string')
+    : Array.isArray(content.options) && content.options.length >= 6 && content.options.every((opt) => typeof opt === 'string' && isAbsoluteOrDataUrl(opt))
+      ? (content.options as string[])
       : [];
 
   // Parse verification state if available
