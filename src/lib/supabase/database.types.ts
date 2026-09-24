@@ -78,6 +78,8 @@ export interface Database {
         id: string;
         user_id: string;
         exam_id: string;
+        attempt_kind: 'mock' | 'drill';
+        section_ids: string[] | null;
         status: string;
         completion_reason: string;
         answered_count: number;
@@ -105,6 +107,8 @@ export interface Database {
           p_exam_id: string;
           p_user_id: string;
           p_attempt_limit: number | null;
+          p_section_ids: string[] | null;
+          p_attempt_kind: 'mock' | 'drill';
         };
         Returns: Json;
       };

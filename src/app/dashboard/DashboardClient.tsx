@@ -15,7 +15,8 @@ import {
 import { DashboardView as DashboardOverview } from '@/components/dashboard/DashboardView';
 import { PracticeView } from '@/components/dashboard/PracticeView';
 import { MockTestView } from '@/components/dashboard/MockTestView';
-import { ReviewView } from '@/components/dashboard/ReviewView';
+import { ReviewView, type ExamAttemptReview } from '@/components/dashboard/ReviewView';
+import { SubtestDrillsView } from '@/components/dashboard/SubtestDrillsView';
 
 import { useCallback } from 'react';
 import { pickDefaultExam } from '@/lib/exam/exam-select';
@@ -23,7 +24,7 @@ import { pickDefaultExam } from '@/lib/exam/exam-select';
 export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
   const [activeView, setActiveView] = useState<DashboardView>('dashboard');
-  const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<any | null>(null);
+  const [selectedAttemptForReview, setSelectedAttemptForReview] = useState<ExamAttemptReview | null>(null);
   const [backNavigation, setBackNavigation] = useState<{ label: string; onBack: () => void } | undefined>(undefined);
   const [reviewSourceView, setReviewSourceView] = useState<DashboardView>('dashboard');
 
@@ -31,7 +32,12 @@ export default function DashboardClient({ session }: { session: Session }) {
   useEffect(() => {
     if (activeView === 'review' && selectedAttemptForReview) {
       setBackNavigation({
-        label: reviewSourceView === 'mock' ? 'Back to Mock Test' : 'Back to Dashboard',
+        label:
+          reviewSourceView === 'mock'
+            ? 'Back to Mock Test'
+            : reviewSourceView === 'subtest-drills'
+            ? 'Back to Subtest Drills'
+            : 'Back to Dashboard',
         onBack: () => {
           setSelectedAttemptForReview(null);
           setActiveView(reviewSourceView);
@@ -199,6 +205,26 @@ export default function DashboardClient({ session }: { session: Session }) {
               data.handleResumeExam(attempt.id);
             }
           }}
+        />
+      )}
+
+      {activeView === 'subtest-drills' && (
+        <SubtestDrillsView
+          profile={profile}
+          activeModule={data.activeModule}
+          pastExams={data.pastExams}
+          onStartDrill={data.handleStartDrill}
+          onResumeAttempt={(attempt) => {
+            if (attempt && typeof attempt.id === 'string') {
+              data.handleResumeExam(attempt.id);
+            }
+          }}
+          onReviewAttempt={(attempt) => {
+            setReviewSourceView('subtest-drills');
+            setSelectedAttemptForReview(attempt);
+            setActiveView('review');
+          }}
+          isStarting={data.isStarting}
         />
       )}
 

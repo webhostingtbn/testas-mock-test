@@ -29,6 +29,12 @@ export async function POST(
     if (message === 'FORBIDDEN') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    if (message === 'ATTEMPT_NOT_FOUND') {
+      return NextResponse.json({ error: 'Attempt not found' }, { status: 404 });
+    }
+    if (message === 'ANSWER_KEY_MISSING' || message === 'NO_QUESTIONS_FOUND_FOR_ATTEMPT') {
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

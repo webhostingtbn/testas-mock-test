@@ -146,9 +146,12 @@ export function DashboardView({
       total: 0,
     };
 
-  const completedAttempts = filteredPastExams.filter(attempt => isFullCompletion(attempt));
-  const inProgressAttempts = filteredPastExams.filter(attempt => attempt.status !== 'completed');
-  const latestAttempt = filteredPastExams[0];
+  const mockAttempts = filteredPastExams.filter(
+    (attempt) => (attempt.attempt_kind ?? 'mock') === 'mock'
+  );
+  const completedAttempts = mockAttempts.filter((attempt) => isFullCompletion(attempt));
+  const inProgressAttempts = mockAttempts.filter((attempt) => attempt.status !== 'completed');
+  const latestAttempt = mockAttempts[0];
   const totalCorrect = radarStats.reduce((sum, item) => sum + item.correct, 0);
   const totalQuestions = radarStats.reduce((sum, item) => sum + item.total, 0);
   const overallMastery = totalQuestions > 0
@@ -178,9 +181,12 @@ export function DashboardView({
   const latestScore = latestAttempt?.max_score > 0
     ? Math.round(((latestAttempt.total_score ?? 0) / latestAttempt.max_score) * 100)
     : 0;
+  const mockAttemptsTotal = pastExams.filter(
+    (pe) => (pe.attempt_kind ?? 'mock') === 'mock'
+  ).length;
   const attemptsRemaining = examLimit === null
     ? null
-    : Math.max(0, examLimit - pastExams.length);
+    : Math.max(0, examLimit - mockAttemptsTotal);
 
   return (
     <div className="mx-auto w-full">

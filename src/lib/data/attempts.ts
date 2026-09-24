@@ -3,7 +3,7 @@ import 'server-only';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { requireApprovedUser } from '@/lib/auth/guards';
 import type { Database, Json } from '@/lib/supabase/database.types';
-import type { CompletionReason } from '@/lib/types';
+import type { CompletionReason, AttemptKind } from '@/lib/types';
 import { buildAttemptSectionScores } from '@/lib/exam/attempt-results';
 
 type SectionRow = Database['public']['Tables']['sections']['Row'];
@@ -26,7 +26,11 @@ function toJson(value: unknown): Json {
   return String(value);
 }
 
-export async function createAttempt(examId: string) {
+export async function createAttempt(
+  examId: string,
+  sectionIds?: string[] | null,
+  attemptKind: AttemptKind = 'mock',
+) {
   const { profile } = await requireApprovedUser();
   const supabase = getAdminSupabaseClient();
 
@@ -50,6 +54,8 @@ export async function createAttempt(examId: string) {
     p_exam_id: examId,
     p_user_id: profile.id,
     p_attempt_limit: attemptLimit,
+    p_section_ids: sectionIds && sectionIds.length > 0 ? sectionIds : null,
+    p_attempt_kind: attemptKind,
   });
 
   if (error) {
@@ -58,6 +64,18 @@ export async function createAttempt(examId: string) {
     }
     if (error.message.includes('EXAM_NOT_AVAILABLE')) {
       throw new Error('EXAM_NOT_AVAILABLE');
+    }
+    if (error.message.includes('Invalid attempt kind')) {
+      throw new Error('INVALID_ATTEMPT_KIND');
+    }
+    if (error.message.includes('DRILL_MISSING_SECTIONS')) {
+      throw new Error('DRILL_MISSING_SECTIONS');
+    }
+    if (error.message.includes('DRILL_SINGLE_SECTION_ONLY')) {
+      throw new Error('DRILL_SINGLE_SECTION_ONLY');
+    }
+    if (error.message.includes('INVALID_SECTION_FOR_EXAM')) {
+      throw new Error('INVALID_SECTION_FOR_EXAM');
     }
     throw new Error(`Failed to create attempt: ${error.message}`);
   }
@@ -89,7 +107,7 @@ export async function listAttempts() {
   const supabase = getAdminSupabaseClient();
   const { data, error } = await supabase
     .from('user_exams')
-    .select('id, user_id, exam_id, status, completion_reason, answered_count, started_at, completed_at, total_score, max_score, created_at, detailed_results')
+    .select('id, user_id, exam_id, attempt_kind, section_ids, status, completion_reason, answered_count, started_at, completed_at, total_score, max_score, created_at, detailed_results')
     .eq('user_id', profile.id)
     .order('created_at', { ascending: false });
 
@@ -149,10 +167,26 @@ export async function updateAttemptProgress(attemptId: string, userAnswers: Reco
     throw new Error('ATTEMPT_ALREADY_COMPLETED');
   }
 
+  // Drills are scoped to a subset of sections: strip answers for questions
+  // outside the drill scope so progress snapshots can't be polluted with
+  // out-of-scope keys (scoring already ignores them server-side).
+  let scopedAnswers = userAnswers;
+  if (attempt.attempt_kind === 'drill' && attempt.section_ids && attempt.section_ids.length > 0) {
+    const { data: scopedQuestions, error: scopeError } = await supabase
+      .from('questions')
+      .select('id')
+      .in('section_id', attempt.section_ids);
+    if (scopeError) throw new Error(`Failed to verify drill scope: ${scopeError.message}`);
+    const allowedIds = new Set((scopedQuestions ?? []).map((question) => question.id));
+    scopedAnswers = Object.fromEntries(
+      Object.entries(userAnswers).filter(([questionId]) => allowedIds.has(questionId)),
+    );
+  }
+
   const { data, error } = await supabase
     .from('user_exams')
     .update({
-      user_answers: toJson(userAnswers),
+      user_answers: toJson(scopedAnswers),
       updated_at: new Date().toISOString(),
     })
     .eq('id', attemptId)
@@ -179,6 +213,12 @@ export async function submitAttempt(
   });
 
   if (error) {
+    if (error.message.includes('ANSWER_KEY_MISSING')) {
+      throw new Error('ANSWER_KEY_MISSING');
+    }
+    if (error.message.includes('NO_QUESTIONS_FOUND_FOR_ATTEMPT')) {
+      throw new Error('NO_QUESTIONS_FOUND_FOR_ATTEMPT');
+    }
     throw new Error(`Scoring failed: ${error.message}`);
   }
 

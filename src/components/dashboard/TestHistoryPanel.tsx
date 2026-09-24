@@ -1,11 +1,13 @@
 "use client";
 
+import { useState } from 'react';
 import {
   ChevronRight, Clock, CheckCircle2, PlayCircle, AlertTriangle
 } from 'lucide-react';
 import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { isFullCompletion, isTerminalAttempt, isResumableAttempt } from '@/lib/types';
 import type { ExamAttemptReview } from '@/components/dashboard/ReviewView';
+import { cn } from '@/lib/utils';
 
 interface TestHistoryPanelProps {
   pastExams: ExamAttemptReview[];
@@ -15,12 +17,20 @@ interface TestHistoryPanelProps {
 }
 
 export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, onResumeAttempt }: TestHistoryPanelProps) {
+  const [kindFilter, setKindFilter] = useState<'all' | 'mock' | 'drill'>('all');
+
   const testAttempts = pastExams
     .filter((attempt) => attempt.exam_id === selectedExamId)
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
-  const completedAttempts = testAttempts.filter(attempt => isTerminalAttempt(attempt));
-  const inProgressAttempts = testAttempts.filter(attempt => isResumableAttempt(attempt));
+  const filteredAttempts = testAttempts.filter((attempt) => {
+    if (kindFilter === 'mock') return (attempt.attempt_kind ?? 'mock') === 'mock';
+    if (kindFilter === 'drill') return attempt.attempt_kind === 'drill';
+    return true;
+  });
+
+  const completedAttempts = filteredAttempts.filter(attempt => isTerminalAttempt(attempt));
+  const inProgressAttempts = filteredAttempts.filter(attempt => isResumableAttempt(attempt));
 
   const getPercentage = (attempt: ExamAttemptReview) => {
     if (!attempt.max_score || attempt.max_score === 0) return 0;
@@ -80,6 +90,46 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
         </div>
       </div>
 
+      {/* Category filter: All, Mock Tests, Subtest Drills */}
+      <div className="mt-4 flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs">
+        <button
+          type="button"
+          onClick={() => setKindFilter('all')}
+          className={cn(
+            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+            kindFilter === 'all'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          )}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setKindFilter('mock')}
+          className={cn(
+            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+            kindFilter === 'mock'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          )}
+        >
+          Mock Tests
+        </button>
+        <button
+          type="button"
+          onClick={() => setKindFilter('drill')}
+          className={cn(
+            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+            kindFilter === 'drill'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          )}
+        >
+          Subtest Drills
+        </button>
+      </div>
+
       <div className="mt-5 space-y-4">
         {/* In progress attempts */}
         {inProgressAttempts.length > 0 && (
@@ -94,6 +144,12 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                      attempt.attempt_kind === 'drill' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                    )}>
+                      {attempt.attempt_kind === 'drill' ? 'Drill' : 'Mock'}
+                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
                       <Clock className="size-3" />
                       In Progress
@@ -136,9 +192,19 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                   className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm hover:border-orange-200 hover:shadow-md transition"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-900 truncate">
-                      Attempt on {formatDate(attempt.created_at)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        "inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+                        attempt.attempt_kind === 'drill'
+                          ? "bg-purple-100 text-purple-700"
+                          : "bg-blue-100 text-blue-700"
+                      )}>
+                        {attempt.attempt_kind === 'drill' ? 'Subtest Drill' : 'Mock Exam'}
+                      </span>
+                      <p className="text-sm font-bold text-slate-900 truncate">
+                        Attempt on {formatDate(attempt.created_at)}
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {isEarly ? (
                         <p className="text-xs text-slate-500">
@@ -184,21 +250,31 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
       {completedAttempts.length > 0 && (
         <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Best Score</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              {kindFilter === 'drill' ? 'Best Drill Score' : 'Best Mock Score'}
+            </p>
             <p className="text-xl font-black text-slate-950 mt-1">
               {(() => {
-                const fullCompletions = completedAttempts.filter(a => isFullCompletion(a));
+                const fullCompletions = completedAttempts.filter((a) =>
+                  isFullCompletion(a) &&
+                  (kindFilter === 'drill' ? a.attempt_kind === 'drill' : (a.attempt_kind ?? 'mock') === 'mock')
+                );
                 return fullCompletions.length > 0
-                  ? `${Math.max(...fullCompletions.map(a => getPercentage(a)))}%`
+                  ? `${Math.max(...fullCompletions.map((a) => getPercentage(a)))}%`
                   : 'N/A';
               })()}
             </p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              {kindFilter === 'drill' ? 'Average Drill' : 'Average Mock'}
+            </p>
             <p className="text-xl font-black text-slate-950 mt-1">
               {(() => {
-                const fullCompletions = completedAttempts.filter(a => isFullCompletion(a));
+                const fullCompletions = completedAttempts.filter((a) =>
+                  isFullCompletion(a) &&
+                  (kindFilter === 'drill' ? a.attempt_kind === 'drill' : (a.attempt_kind ?? 'mock') === 'mock')
+                );
                 return fullCompletions.length > 0
                   ? `${Math.round(
                       fullCompletions.reduce((sum, a) => sum + getPercentage(a), 0) / fullCompletions.length

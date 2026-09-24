@@ -11,6 +11,7 @@ import {
   PenLine,
   Timer,
   Users,
+  Target,
   PanelLeftClose,
   PanelLeftOpen,
 } from 'lucide-react';
@@ -133,7 +134,7 @@ export function KniProgress({ value, className }: { value: number; className?: s
   );
 }
 
-export type DashboardView = 'dashboard' | 'practice' | 'mock' | 'users' | 'cms' | 'review';
+export type DashboardView = 'dashboard' | 'practice' | 'mock' | 'subtest-drills' | 'users' | 'cms' | 'review';
 
 type AppNavItem = {
   id: DashboardView;
@@ -143,8 +144,9 @@ type AppNavItem = {
 
 const VIEW_LABELS: Record<DashboardView, string> = {
   dashboard: 'Dashboard',
-  practice: 'Practice',
+  'subtest-drills': 'Subtest Drills',
   mock: 'Mock Test',
+  practice: 'Practice',
   users: 'Users',
   cms: 'Content Management',
   review: 'Attempt Review',
@@ -154,6 +156,7 @@ function getNavigation(isAdmin?: boolean): AppNavItem[] {
   const nav: AppNavItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'mock', icon: Timer, label: 'Mock Test' },
+    { id: 'subtest-drills', icon: Target, label: 'Subtest Drills' },
     { id: 'practice', icon: BookOpen, label: 'Practice' }
   ];
 

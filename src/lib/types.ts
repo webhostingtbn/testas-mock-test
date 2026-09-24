@@ -99,10 +99,14 @@ export interface Question {
   created_at: string;
 }
 
+export type AttemptKind = 'mock' | 'drill';
+
 export interface UserExam {
   id: string;
   user_id: string;
   exam_id: string;
+  attempt_kind?: AttemptKind;
+  section_ids?: string[] | null;
   status: ExamStatus;
   completion_reason: CompletionReason;
   answered_count: number;

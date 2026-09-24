@@ -15,12 +15,12 @@ import type {
   Section,
 } from '@/lib/types';
 
-interface ExamQuestionRecord {
+export interface ExamQuestionRecord {
   id: string;
   section_id: string;
 }
 
-interface ExamPayload {
+export interface ExamPayload {
   sections: Section[];
   questions: ExamQuestionRecord[];
   exam?: {
@@ -68,16 +68,27 @@ function parseExamPayload(value: unknown): ExamPayload {
   };
 }
 
-function buildStoredSections(
+export function buildStoredSections(
   payload: ExamPayload,
   isPaper: boolean,
   activeModule: ModuleTestType | null,
+  allowedSectionIds?: string[] | null,
 ): StoredSection[] {
   const { coreSections, moduleSections } = filterSections(payload.sections, isPaper, activeModule);
-  let selectedSections = [...coreSections, ...moduleSections];
-  if (selectedSections.length === 0 && payload.sections.length > 0) {
-    selectedSections = payload.sections;
+  let eligibleSections = [...coreSections, ...moduleSections];
+  if (eligibleSections.length === 0 && payload.sections.length > 0) {
+    eligibleSections = payload.sections;
   }
+
+  let selectedSections: Section[];
+  if (allowedSectionIds && allowedSectionIds.length > 0) {
+    selectedSections = eligibleSections.filter((section) => allowedSectionIds.includes(section.id));
+  } else {
+    selectedSections = eligibleSections;
+  }
+
+  // Preserve original database sort_order
+  selectedSections.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   const questionIdsBySection = new Map<string, string[]>();
 
@@ -139,7 +150,7 @@ function calculateBreakDuration(
   return BREAK_DURATIONS.SHORT;
 }
 
-function buildExamFlow(sections: StoredSection[], isPaper: boolean): ExamFlowStep[] {
+export function buildExamFlow(sections: StoredSection[], isPaper: boolean): ExamFlowStep[] {
   const flowSteps: ExamFlowStep[] = [];
 
   for (let i = 0; i < sections.length; i++) {
@@ -179,7 +190,9 @@ function assertExamFormat(
 export async function startExam(
   examId: string,
   activeModule: ModuleTestType | null,
-  format: 'Digital' | 'Paper'
+  format: 'Digital' | 'Paper',
+  sectionIds?: string[] | null,
+  attemptKind: 'mock' | 'drill' = 'mock',
 ): Promise<void> {
   const { startExam: storeStartExam } = useExamStore.getState();
 
@@ -187,7 +200,11 @@ export async function startExam(
     const attemptRes = await fetch('/api/attempts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ examId }),
+      body: JSON.stringify({
+        examId,
+        sectionIds: sectionIds && sectionIds.length > 0 ? sectionIds : undefined,
+        attemptKind,
+      }),
     });
 
     if (!attemptRes.ok) {
@@ -203,7 +220,7 @@ export async function startExam(
 
     const targetFormat = format || examData.exam?.format || 'Digital';
     const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
-    const builtSections = buildStoredSections(examData, isPaper, activeModule);
+    const builtSections = buildStoredSections(examData, isPaper, activeModule, sectionIds);
     if (builtSections.length === 0) throw new Error('Exam has no questions for the selected format/module');
 
     const flowSteps = buildExamFlow(builtSections, isPaper);
@@ -248,7 +265,10 @@ export async function resumeExam(
 
     const targetFormat = format || examData.exam?.format || 'Digital';
     const isPaper = typeof targetFormat === 'string' && targetFormat.toLowerCase() === 'paper';
-    const builtSections = buildStoredSections(examData, isPaper, activeModule);
+    const allowedSectionIds = Array.isArray(attempt.section_ids) && attempt.section_ids.length > 0
+      ? attempt.section_ids
+      : null;
+    const builtSections = buildStoredSections(examData, isPaper, activeModule, allowedSectionIds);
     if (builtSections.length === 0) throw new Error('Exam has no questions for the selected format/module');
 
     const flowSteps = buildExamFlow(builtSections, isPaper);
@@ -290,9 +310,11 @@ export function useExamOrchestrator() {
   async function handleStartExam(
     examId: string,
     activeModule: ModuleTestType | null,
-    format: 'Digital' | 'Paper'
+    format: 'Digital' | 'Paper',
+    sectionIds?: string[] | null,
+    attemptKind: 'mock' | 'drill' = 'mock',
   ): Promise<void> {
-    await startExam(examId, activeModule, format);
+    await startExam(examId, activeModule, format, sectionIds, attemptKind);
   }
 
   async function handleResumeExam(

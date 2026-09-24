@@ -10,6 +10,8 @@ interface UserExam {
   total_score: number | null;
   max_score: number | null;
   detailed_results: Record<string, unknown> | null;
+  attempt_kind?: 'mock' | 'drill';
+  section_ids?: string[] | null;
 }
 
 interface ProfileWithExams {
@@ -120,9 +122,16 @@ function ExpandedHistory({ user }: { user: ProfileWithExams }) {
               <div key={attempt.id} className="rounded-xl border border-orange-100 bg-white p-4 shadow-sm">
                 <div className="mb-4 flex flex-wrap justify-between gap-4 border-b border-orange-50 pb-4">
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      Attempt #{attemptIndex + 1} · {new Date(attempt.created_at).toLocaleString()}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        attempt.attempt_kind === 'drill' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {attempt.attempt_kind === 'drill' ? 'Subtest Drill' : 'Mock Exam'}
+                      </span>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Attempt #{attemptIndex + 1} · {new Date(attempt.created_at).toLocaleString()}
+                      </p>
+                    </div>
                     <p className="mt-1 text-xs font-medium uppercase text-slate-500">{attempt.status}</p>
                   </div>
                   <div className="text-right">
@@ -382,7 +391,15 @@ export function AdminUsersPanel() {
                   <div className="grid cursor-pointer gap-4 px-5 py-5 transition hover:bg-orange-50/30 lg:grid-cols-[1.1fr_0.9fr_0.5fr_1.9fr] lg:items-center" onClick={() => setExpandedUserId(expanded ? null : user.id)}>
                     <div><p className="font-semibold text-slate-900">{user.full_name || 'No Name Provided'}</p><p className="text-sm text-slate-500">{user.email}</p></div>
                     <div className="text-sm text-slate-600">{user.module_test || 'Not selected'} · {user.format || 'Digital'}</div>
-                    <div className="font-semibold text-slate-700">{user.user_exams.length}</div>
+                    <div className="text-xs text-slate-700">
+                      <span className="font-semibold">{user.user_exams.filter((e) => (e.attempt_kind ?? 'mock') === 'mock').length}</span>
+                      <span className="text-slate-400"> mocks</span>
+                      {user.user_exams.some((e) => e.attempt_kind === 'drill') && (
+                        <span className="block text-[10px] font-medium text-purple-600">
+                          +{user.user_exams.filter((e) => e.attempt_kind === 'drill').length} drills
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-wrap items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                       <select
                         aria-label="Select module"

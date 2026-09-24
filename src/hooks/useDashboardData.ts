@@ -9,17 +9,20 @@ import {
   filterSections,
 } from '@/lib/constants';
 import { pickDefaultExam } from '@/lib/exam/exam-select';
-import type { Profile, ModuleTestType, Exam } from '@/lib/types';
+import type { Profile, ModuleTestType, Exam, AttemptKind } from '@/lib/types';
 import { isFullCompletion } from '@/lib/types';
 import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
 import { usePracticeStore } from '@/lib/store/practice-store';
+import { calculatePeakRadarStats, type RadarStat } from '@/lib/exam/radar-stats';
 
 interface PastExam {
   id: string;
   user_id: string;
   exam_id: string;
+  attempt_kind?: AttemptKind;
+  section_ids?: string[] | null;
   status: string;
   completion_reason?: string | null;
   answered_count?: number | null;
@@ -46,14 +49,6 @@ interface PastExam {
   }>;
 }
 
-interface RadarStat {
-  key: string;
-  label: string;
-  correct: number;
-  total: number;
-  percentage: number;
-}
-
 export function useDashboardData(session: Session) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,13 +66,6 @@ export function useDashboardData(session: Session) {
 
   const [briefingChecklist, setBriefingChecklist] = useState<string[]>([]);
   const [selectedTestHistory, setSelectedTestHistory] = useState<PastExam[]>([]);
-  const [selectedTestRadarStats, setSelectedTestRadarStats] = useState<{
-    key: string;
-    label: string;
-    correct: number;
-    total: number;
-    percentage: number;
-  }[]>([]);
 
   const [selectedModule, setSelectedModule] = useState<ModuleTestType | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<'Digital' | 'Paper' | null>(null);
@@ -247,6 +235,20 @@ export function useDashboardData(session: Session) {
     }
   };
 
+  const handleStartDrill = async (examId: string, sectionId: string) => {
+    if (!profile) return;
+    setIsStarting(true);
+    try {
+      const format = profile.format === 'Paper' ? 'Paper' : 'Digital';
+      await orchestrator.startExam(examId, activeModule, format, [sectionId], 'drill');
+      router.push('/exam');
+    } catch (err) {
+      console.error('Error starting subtest drill:', err);
+      setIsStarting(false);
+      throw err;
+    }
+  };
+
   const handleResumeExam = async (userExamId: string) => {
     setIsStarting(true);
     try {
@@ -320,8 +322,11 @@ export function useDashboardData(session: Session) {
   const hasActiveExam = !!activeExamId;
 
   const getExamAttemptInfo = (exam: Exam) => {
-    const attempts = pastExams.filter((pe) => pe.exam_id === exam.id);
-    const attemptCount = attempts.length;
+    // Only count full mock exams towards attempt quotas and limits
+    const mockAttempts = pastExams.filter(
+      (pe) => pe.exam_id === exam.id && (pe.attempt_kind === 'mock' || !pe.attempt_kind)
+    );
+    const attemptCount = mockAttempts.length;
     const limit = isAdmin ? null : (exam.retry_number ?? profile?.allow_test_limit ?? 1);
     const limitReached = limit !== null && attemptCount >= limit;
     
@@ -329,7 +334,7 @@ export function useDashboardData(session: Session) {
     let maxScore = null;
     let bestPercentage = 0;
     // Only consider full completions for best score
-    attempts.filter((pe) => isFullCompletion(pe)).forEach((pe) => {
+    mockAttempts.filter((pe) => isFullCompletion(pe)).forEach((pe) => {
       if (pe.total_score !== null && pe.max_score) {
         const pct = Math.round((pe.total_score / pe.max_score) * 100);
         if (pct >= bestPercentage) {
@@ -350,78 +355,22 @@ export function useDashboardData(session: Session) {
     };
   };
 
-  const computeRadarStats = (formatOverride?: 'Digital' | 'Paper'): RadarStat[] => {
-    const totals = new Map<string, Omit<RadarStat, 'percentage'>>();
-
-    for (const attempt of pastExams) {
-      if (attempt.status !== 'completed') continue;
-      if (!isFullCompletion(attempt)) continue;
-      const attemptFormat = attempt.exam_format ?? attempt.exams?.format ?? 'Digital';
-      if (formatOverride && attemptFormat !== formatOverride) continue;
-
-      for (const section of attempt.section_scores ?? []) {
-        const current = totals.get(section.key) ?? {
-          key: section.key,
-          label: section.label,
-          correct: 0,
-          total: 0,
-        };
-        current.correct += section.correct;
-        current.total += section.total;
-        totals.set(section.key, current);
-      }
-    }
-
-    return [...totals.values()].map((section) => ({
-      ...section,
-      percentage: section.total > 0 ? Math.round((section.correct / section.total) * 100) : 0,
-    }));
-  };
+  const computeRadarStats = useCallback((formatOverride?: 'Digital' | 'Paper'): RadarStat[] => {
+    return calculatePeakRadarStats(pastExams, formatOverride, activeModule);
+  }, [pastExams, activeModule]);
 
   const getTestHistory = useCallback((examId: string) => {
     return pastExams.filter((pe) => pe.exam_id === examId);
-  }, [pastExams]);
-
-  const computeRadarStatsForExam = useCallback((examId: string, formatOverride?: 'Digital' | 'Paper'): RadarStat[] => {
-    const totals = new Map<string, Omit<RadarStat, 'percentage'>>();
-
-    for (const attempt of pastExams) {
-      if (attempt.exam_id !== examId || attempt.status !== 'completed') continue;
-      if (!isFullCompletion(attempt)) continue;
-      const attemptFormat = attempt.exam_format ?? attempt.exams?.format ?? 'Digital';
-      if (formatOverride && attemptFormat !== formatOverride) continue;
-
-      for (const section of attempt.section_scores ?? []) {
-        const current = totals.get(section.key) ?? {
-          key: section.key,
-          label: section.label,
-          correct: 0,
-          total: 0,
-        };
-        current.correct += section.correct;
-        current.total += section.total;
-        totals.set(section.key, current);
-      }
-    }
-
-    return [...totals.values()].map((section) => ({
-      ...section,
-      percentage: section.total > 0 ? Math.round((section.correct / section.total) * 100) : 0,
-    }));
   }, [pastExams]);
 
   useEffect(() => {
     if (selectedExam) {
       const history = getTestHistory(selectedExam.id);
       setSelectedTestHistory(history);
-
-      const stats = computeRadarStatsForExam(selectedExam.id);
-      setSelectedTestRadarStats(stats);
     } else {
       setSelectedTestHistory([]);
-      setSelectedTestRadarStats([]);
     }
-  }, [selectedExam, getTestHistory, computeRadarStatsForExam]);
+  }, [selectedExam, getTestHistory]);
 
   const selectedExamAttemptInfo = selectedExam ? getExamAttemptInfo(selectedExam) : null;
   const isAttemptLimitReached = selectedExamAttemptInfo ? selectedExamAttemptInfo.limitReached : false;
@@ -447,9 +396,7 @@ export function useDashboardData(session: Session) {
     computeRadarStats,
     handleResumeExam,
     selectedTestHistory,
-    selectedTestRadarStats,
     getTestHistory,
-    computeRadarStatsForExam,
     selectedModule,
     selectedFormat,
     selectedApprovedModule,
@@ -461,6 +408,7 @@ export function useDashboardData(session: Session) {
     setSelectedFormat,
     setSelectedApprovedModule,
     handleStartExam,
+    handleStartDrill,
     handleLogout,
     handleSaveConfig,
     handleSaveModuleOnly,

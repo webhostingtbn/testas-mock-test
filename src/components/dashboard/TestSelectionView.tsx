@@ -95,7 +95,9 @@ export function TestSelectionView({
   }, [exams, profile]);
 
   const getExamDisplayInfo = useCallback((exam: Exam): ExamDisplayInfo => {
-    const attempts = pastExams.filter((attempt) => attempt.exam_id === exam.id);
+    const attempts = pastExams.filter(
+      (attempt) => attempt.exam_id === exam.id && (attempt.attempt_kind === 'mock' || !attempt.attempt_kind)
+    );
     const hasCompleted = attempts.some((attempt) => isFullCompletion({ status: attempt.status ?? '', completion_reason: attempt.completion_reason }));
     const hasStarted = attempts.length > 0;
 
@@ -215,35 +217,21 @@ export function TestSelectionView({
     );
   }
 
-  const attempts = [...selectedTestHistory].sort((a, b) => getAttemptTimestamp(a) - getAttemptTimestamp(b));
+  const attempts = [...selectedTestHistory]
+    .filter((attempt) => attempt.attempt_kind === 'mock' || !attempt.attempt_kind)
+    .sort((a, b) => getAttemptTimestamp(a) - getAttemptTimestamp(b));
   const completedAttempts = attempts.filter((attempt) => attempt.status === 'completed');
   const latestCompleted = completedAttempts[completedAttempts.length - 1] ?? null;
 
   return (
-    <div className="mx-auto grid min-h-0 w-full max-w-full items-start gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:gap-6 lg:pb-0 xl:grid-cols-[360px_1fr]">
-        <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-[22px] border border-slate-100 bg-white p-4 shadow-sm transition duration-200 sm:p-6 lg:sticky lg:top-5 lg:max-h-[calc(100dvh-120px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
+    <div className="grid min-h-0 w-full max-w-full gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:pb-0 xl:grid-cols-[360px_1fr] items-start">
+        <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-xl border border-slate-200 bg-white p-4 transition duration-200 sm:p-6 lg:sticky lg:h-[calc(100dvh-116px)] lg:top-5 lg:max-h-[calc(100dvh-116px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-950">Available Tests</h2>
             <p className="mt-1 text-xs text-slate-500">Choose an active test to view details or start.</p>
           </div>
 
-          {/* <div className="flex rounded-xl border border-slate-250/20 bg-slate-100/85 p-1">
-            {(['all', 'completed', 'in_progress'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 rounded-lg py-2 text-center text-xs font-bold capitalize transition-all cursor-pointer ${
-                  activeTab === tab
-                    ? 'border border-slate-200/10 bg-white font-extrabold text-orange-600 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                {tab === 'in_progress' ? 'In Progress' : tab}
-              </button>
-            ))}
-          </div> */}
-
-          <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100dvh-280px)] lg:overflow-y-auto lg:pr-1">
+          <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100dvh-250px)] lg:overflow-y-auto lg:pr-1">
             {filteredExams.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center">
                 <p className="text-xs font-semibold text-slate-500">No tests match this filter</p>
@@ -311,7 +299,7 @@ export function TestSelectionView({
         </div>
 
         {selectedExam && (
-          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} min-h-0 w-full min-w-0 flex-col gap-5 bg-white px-5 py-5 transition duration-200 lg:gap-6 rounded-xl lg:border lg:border-slate-100 lg:p-6 lg:shadow-sm lg:max-h-[calc(100dvh-120px)] lg:overflow-y-auto`}>
+          <div className={`${mobileView === 'list' ? 'hidden lg:flex' : 'flex'} min-h-0 w-full min-w-0 flex-col gap-5 bg-white px-5 py-5 transition duration-200 lg:gap-6 rounded-xl lg:border lg:border-slate-200 lg:p-6 lg:h-[calc(100dvh-116px)] lg:max-h-[calc(100dvh-116px)] lg:overflow-y-auto`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="text-2xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
                 {selectedExam.title}

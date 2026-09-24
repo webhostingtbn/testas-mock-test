@@ -43,7 +43,7 @@ export async function adminFetchAllUsers() {
 
   const { data: attempts, error: attemptsError } = await supabase
     .from('user_exams')
-    .select('id, user_id, exam_id, status, started_at, completed_at, total_score, max_score, created_at, detailed_results')
+    .select('id, user_id, exam_id, attempt_kind, section_ids, status, started_at, completed_at, total_score, max_score, created_at, detailed_results')
     .order('created_at', { ascending: false });
 
   if (attemptsError) throw new Error(`Failed to fetch user attempts: ${attemptsError.message}`);

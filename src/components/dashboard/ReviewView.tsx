@@ -14,7 +14,7 @@ import {
   getModuleCategory,
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import type { MajorType, Profile } from '@/lib/types';
+import type { MajorType, Profile, AttemptKind } from '@/lib/types';
 
 interface AnswerData {
   question_id: string;
@@ -41,6 +41,8 @@ interface SectionData {
 export interface ExamAttemptReview {
   id?: string;
   exam_id?: string;
+  attempt_kind?: AttemptKind;
+  section_ids?: string[] | null;
   created_at?: string;
   completed_at?: string | null;
   started_at?: string | null;
