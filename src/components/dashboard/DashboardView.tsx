@@ -84,6 +84,7 @@ export function DashboardView({
 
   const cx = 200;
   const cy = 150;
+  const minRadius = 14;
   const maxRadius = 82;
 
   const N = radarStats.length;
@@ -93,7 +94,9 @@ export function DashboardView({
       const angle = (i * 2 * Math.PI) / N - Math.PI / 2;
       const gridX = cx + maxRadius * Math.cos(angle);
       const gridY = cy + maxRadius * Math.sin(angle);
-      const scoreRadius = (stat.percentage / 100) * maxRadius;
+      const baseX = cx + minRadius * Math.cos(angle);
+      const baseY = cy + minRadius * Math.sin(angle);
+      const scoreRadius = minRadius + (stat.percentage / 100) * (maxRadius - minRadius);
       const scoreX = cx + scoreRadius * Math.cos(angle);
       const scoreY = cy + scoreRadius * Math.sin(angle);
       return {
@@ -101,6 +104,8 @@ export function DashboardView({
         angle,
         gridX,
         gridY,
+        baseX,
+        baseY,
         scoreX,
         scoreY,
       };
@@ -111,10 +116,14 @@ export function DashboardView({
     return vertices.map(v => `${v.scoreX.toFixed(1)},${v.scoreY.toFixed(1)}`).join(' ');
   }, [vertices]);
 
+  const basePolygonStr = useMemo(() => {
+    return vertices.map(v => `${v.baseX.toFixed(1)},${v.baseY.toFixed(1)}`).join(' ');
+  }, [vertices]);
+
   const gridPolygons = useMemo(() => {
     if (N === 0) return [];
     return GRID_LEVELS.map(level => {
-      const radius = (level / 100) * maxRadius;
+      const radius = minRadius + (level / 100) * (maxRadius - minRadius);
       return vertices.map((_, i) => {
         const angle = (i * 2 * Math.PI) / N - Math.PI / 2;
         const x = cx + radius * Math.cos(angle);
@@ -543,6 +552,17 @@ export function DashboardView({
                   />
                 ))}
 
+                {/* 0% baseline hub polygon */}
+                {basePolygonStr && (
+                  <polygon
+                    points={basePolygonStr}
+                    fill="#f8fafc"
+                    stroke="#cbd5e1"
+                    strokeWidth="1"
+                    strokeDasharray="2 3"
+                  />
+                )}
+
                 {/* Axis grid lines */}
                 {vertices.map((v, i) => (
                   <line
@@ -557,9 +577,18 @@ export function DashboardView({
                   />
                 ))}
 
+                {/* 0% baseline label */}
+                <text
+                  x={cx + 4}
+                  y={cy - minRadius + 3}
+                  className="text-[8px] font-semibold fill-slate-400"
+                >
+                  0%
+                </text>
+
                 {/* Grid percentage labels */}
                 {GRID_LEVELS.map((level) => {
-                  const radius = (level / 100) * maxRadius;
+                  const radius = minRadius + (level / 100) * (maxRadius - minRadius);
                   return (
                     <text
                       key={level}
@@ -572,29 +601,49 @@ export function DashboardView({
                   );
                 })}
 
+                {/* Spoke progress tracks for active subtests */}
+                {vertices.map((v, i) => (
+                  v.percentage > 0 && (
+                    <line
+                      key={`track-${i}`}
+                      x1={v.baseX}
+                      y1={v.baseY}
+                      x2={v.scoreX}
+                      y2={v.scoreY}
+                      stroke="#ea580c"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                      opacity="0.9"
+                    />
+                  )
+                ))}
+
                 {/* User score polygon */}
                 {pointsStr && (
                   <polygon
                     points={pointsStr}
                     fill="url(#radarFill)"
                     stroke="#ea580c"
-                    strokeWidth="3"
+                    strokeWidth="2.5"
                     strokeLinejoin="round"
                     className="transition-all duration-300"
                   />
                 )}
 
-                {/* Score vertex dots */}
+                {/* Score vertex dots: solid orange for >0%, subtle hollow ring for 0% */}
                 {vertices.map((v, i) => (
                   <circle
                     key={i}
                     cx={v.scoreX}
                     cy={v.scoreY}
-                    r="4"
-                    fill="#ea580c"
-                    stroke="white"
-                    strokeWidth="2"
-                  />
+                    r={v.percentage > 0 ? 4 : 2.5}
+                    fill={v.percentage > 0 ? '#ea580c' : '#ffffff'}
+                    stroke={v.percentage > 0 ? '#ffffff' : '#94a3b8'}
+                    strokeWidth={v.percentage > 0 ? 2 : 1.5}
+                    className="transition-all duration-300"
+                  >
+                    <title>{`${v.label}: ${v.percentage}% (${v.correct}/${v.total})`}</title>
+                  </circle>
                 ))}
 
                 {/* Axis labels with wrapping */}
@@ -657,18 +706,26 @@ export function DashboardView({
             )}
 
             {/* Stats legend grid */}
-            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-4 shrink-0">
+            <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-slate-100 pt-4 shrink-0">
               {radarStats.map((stat) => (
                 <div key={stat.key} className="flex flex-col">
                   <span className="text-[10px] font-bold text-slate-400 truncate leading-tight uppercase tracking-wider" title={stat.label}>
                     {stat.label}
                   </span>
-                  <span className="text-sm font-black text-slate-950 mt-1">
-                    {stat.percentage}%
-                    <span className="text-[10px] font-medium text-slate-400 ml-1">
+                  <div className="mt-1 flex items-baseline justify-between">
+                    <span className="text-sm font-black text-slate-950">
+                      {stat.percentage}%
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400">
                       ({stat.correct}/{stat.total})
                     </span>
-                  </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-orange-500 transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, stat.percentage))}%` }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
