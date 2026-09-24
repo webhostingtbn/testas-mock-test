@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAttempt, listAttempts } from '@/lib/data/attempts';
 import type { AttemptKind } from '@/lib/types';
+import { isFeatureEnabled } from '@/lib/features';
 
 export async function GET() {
   try {
@@ -59,8 +60,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Mock exams cannot specify sectionIds' }, { status: 400 });
     }
 
-    if (parsedKind === 'drill' && (!parsedSectionIds || parsedSectionIds.length !== 1)) {
-      return NextResponse.json({ error: 'Subtest drills require exactly 1 sectionId' }, { status: 400 });
+    if (parsedKind === 'drill') {
+      if (!isFeatureEnabled('ENABLE_SUBTEST_DRILLS')) {
+        return NextResponse.json({ error: 'Subtest drills are currently disabled' }, { status: 403 });
+      }
+      if (!parsedSectionIds || parsedSectionIds.length !== 1) {
+        return NextResponse.json({ error: 'Subtest drills require exactly 1 sectionId' }, { status: 400 });
+      }
     }
 
     const attempt = await createAttempt(examId, parsedSectionIds, parsedKind);

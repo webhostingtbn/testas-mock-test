@@ -8,6 +8,7 @@ import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { isFullCompletion, isTerminalAttempt, isResumableAttempt } from '@/lib/types';
 import type { ExamAttemptReview } from '@/components/dashboard/ReviewView';
 import { cn } from '@/lib/utils';
+import { isFeatureEnabled } from '@/lib/features';
 
 interface TestHistoryPanelProps {
   pastExams: ExamAttemptReview[];
@@ -18,12 +19,14 @@ interface TestHistoryPanelProps {
 
 export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, onResumeAttempt }: TestHistoryPanelProps) {
   const [kindFilter, setKindFilter] = useState<'all' | 'mock' | 'drill'>('all');
+  const showDrills = isFeatureEnabled('ENABLE_SUBTEST_DRILLS');
 
   const testAttempts = pastExams
     .filter((attempt) => attempt.exam_id === selectedExamId)
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
 
   const filteredAttempts = testAttempts.filter((attempt) => {
+    if (!showDrills) return (attempt.attempt_kind ?? 'mock') === 'mock';
     if (kindFilter === 'mock') return (attempt.attempt_kind ?? 'mock') === 'mock';
     if (kindFilter === 'drill') return attempt.attempt_kind === 'drill';
     return true;
@@ -91,44 +94,46 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
       </div>
 
       {/* Category filter: All, Mock Tests, Subtest Drills */}
-      <div className="mt-4 flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs">
-        <button
-          type="button"
-          onClick={() => setKindFilter('all')}
-          className={cn(
-            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
-            kindFilter === 'all'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          )}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          onClick={() => setKindFilter('mock')}
-          className={cn(
-            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
-            kindFilter === 'mock'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          )}
-        >
-          Mock Tests
-        </button>
-        <button
-          type="button"
-          onClick={() => setKindFilter('drill')}
-          className={cn(
-            'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
-            kindFilter === 'drill'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          )}
-        >
-          Subtest Drills
-        </button>
-      </div>
+      {showDrills && (
+        <div className="mt-4 flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setKindFilter('all')}
+            className={cn(
+              'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+              kindFilter === 'all'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setKindFilter('mock')}
+            className={cn(
+              'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+              kindFilter === 'mock'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            Mock Tests
+          </button>
+          <button
+            type="button"
+            onClick={() => setKindFilter('drill')}
+            className={cn(
+              'flex-1 rounded-lg py-1.5 font-bold transition text-center cursor-pointer',
+              kindFilter === 'drill'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            Subtest Drills
+          </button>
+        </div>
+      )}
 
       <div className="mt-5 space-y-4">
         {/* In progress attempts */}

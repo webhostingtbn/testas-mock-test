@@ -13,6 +13,7 @@ import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
 import { usePracticeStore } from '@/lib/store/practice-store';
 import { calculatePeakRadarStats, type RadarStat } from '@/lib/exam/radar-stats';
+import { isFeatureEnabled } from '@/lib/features';
 
 interface PastExam {
   id: string;
@@ -242,7 +243,7 @@ export function useDashboardData(session: Session) {
   };
 
   const handleStartDrill = async (examId: string, sectionId: string) => {
-    if (!profile) return;
+    if (!profile || !isFeatureEnabled('ENABLE_SUBTEST_DRILLS')) return;
     setIsStarting(true);
     try {
       const format = profile.format === 'Paper' ? 'Paper' : 'Digital';

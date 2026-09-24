@@ -20,6 +20,7 @@ import { SubtestDrillsView } from '@/components/dashboard/SubtestDrillsView';
 
 import { useCallback } from 'react';
 import { pickDefaultExam } from '@/lib/exam/exam-select';
+import { isFeatureEnabled } from '@/lib/features';
 
 export default function DashboardClient({ session }: { session: Session }) {
   const data = useDashboardData(session);
@@ -28,19 +29,31 @@ export default function DashboardClient({ session }: { session: Session }) {
   const [backNavigation, setBackNavigation] = useState<{ label: string; onBack: () => void } | undefined>(undefined);
   const [reviewSourceView, setReviewSourceView] = useState<DashboardView>('dashboard');
 
+  // If subtest-drills is disabled and currently active, fallback to dashboard
+  useEffect(() => {
+    if (activeView === 'subtest-drills' && !isFeatureEnabled('ENABLE_SUBTEST_DRILLS')) {
+      setActiveView('dashboard');
+    }
+  }, [activeView]);
+
   // Handle back navigation for the review view centrally
   useEffect(() => {
     if (activeView === 'review' && selectedAttemptForReview) {
+      const isDrillSource = reviewSourceView === 'subtest-drills' && isFeatureEnabled('ENABLE_SUBTEST_DRILLS');
       setBackNavigation({
         label:
           reviewSourceView === 'mock'
             ? 'Back to Mock Test'
-            : reviewSourceView === 'subtest-drills'
+            : isDrillSource
             ? 'Back to Subtest Drills'
             : 'Back to Dashboard',
         onBack: () => {
           setSelectedAttemptForReview(null);
-          setActiveView(reviewSourceView);
+          setActiveView(
+            reviewSourceView === 'subtest-drills' && !isFeatureEnabled('ENABLE_SUBTEST_DRILLS')
+              ? 'dashboard'
+              : reviewSourceView
+          );
         }
       });
     }
@@ -208,7 +221,7 @@ export default function DashboardClient({ session }: { session: Session }) {
         />
       )}
 
-      {activeView === 'subtest-drills' && (
+      {activeView === 'subtest-drills' && isFeatureEnabled('ENABLE_SUBTEST_DRILLS') && (
         <SubtestDrillsView
           profile={profile}
           activeModule={data.activeModule}

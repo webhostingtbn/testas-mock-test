@@ -16,6 +16,7 @@ import {
   PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isFeatureEnabled } from '@/lib/features';
 
 export function KniBackground({ children, className }: { children?: ReactNode; className?: string } = {}) {
   return (
@@ -156,9 +157,13 @@ function getNavigation(isAdmin?: boolean): AppNavItem[] {
   const nav: AppNavItem[] = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { id: 'mock', icon: Timer, label: 'Mock Test' },
-    { id: 'subtest-drills', icon: Target, label: 'Subtest Drills' },
-    { id: 'practice', icon: BookOpen, label: 'Practice' }
   ];
+
+  if (isFeatureEnabled('ENABLE_SUBTEST_DRILLS')) {
+    nav.push({ id: 'subtest-drills', icon: Target, label: 'Subtest Drills' });
+  }
+
+  nav.push({ id: 'practice', icon: BookOpen, label: 'Practice' });
 
   if (isAdmin) {
     nav.push({ id: 'users', icon: Users, label: 'Users' });
