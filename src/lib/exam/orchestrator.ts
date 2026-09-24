@@ -8,6 +8,7 @@
 import { flattenExamAnswers, useExamStore, type StoredSection, type ExamFlowStep } from '@/lib/store/exam-store';
 import {
   BREAK_DURATIONS,
+  calculateBreakDuration,
   filterSections,
 } from '@/lib/constants';
 import type {
@@ -117,39 +118,6 @@ export function buildStoredSections(
     .filter((section) => section.questionCount > 0);
 }
 
-function isModuleQuestionType(questionType: string, isPaper: boolean): boolean {
-  if (isPaper) {
-    const paperModuleTypes = [
-      'sc_1', 'sc_2',
-      'eng_1', 'eng_2_2d', 'eng_2_3d', 'eng_3',
-      'econ_1', 'econ_2',
-    ];
-    return paperModuleTypes.includes(questionType);
-  } else {
-    const digitalModuleTypes = [
-      'module_mcq',
-      'interpreting_texts',
-      'representation_systems',
-      'linguistic_structures',
-    ];
-    return digitalModuleTypes.includes(questionType);
-  }
-}
-
-function calculateBreakDuration(
-  currentSection: StoredSection,
-  nextSection: StoredSection,
-  isPaper: boolean
-): number {
-  const currentIsModule = isModuleQuestionType(currentSection.questionType, isPaper);
-  const nextIsModule = isModuleQuestionType(nextSection.questionType, isPaper);
-
-  if (!currentIsModule && nextIsModule) {
-    return BREAK_DURATIONS.LONG;
-  }
-  return BREAK_DURATIONS.SHORT;
-}
-
 export function buildExamFlow(sections: StoredSection[], isPaper: boolean): ExamFlowStep[] {
   const flowSteps: ExamFlowStep[] = [];
 
@@ -158,8 +126,8 @@ export function buildExamFlow(sections: StoredSection[], isPaper: boolean): Exam
 
     if (i < sections.length - 1) {
       const breakDuration = calculateBreakDuration(
-        sections[i],
-        sections[i + 1],
+        sections[i].questionType,
+        sections[i + 1].questionType,
         isPaper
       );
       flowSteps.push({ type: 'break' as const, breakDuration });

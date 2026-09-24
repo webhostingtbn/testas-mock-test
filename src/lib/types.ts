@@ -51,6 +51,15 @@ export interface Profile {
   updated_at: string;
 }
 
+export interface ExamSectionSummary {
+  id: string;
+  title: string;
+  question_type: QuestionType | string;
+  duration_seconds: number;
+  question_count: number;
+  sort_order: number;
+}
+
 export interface Exam {
   id: string;
   title: string;
@@ -60,7 +69,7 @@ export interface Exam {
   is_active: boolean;
   retry_number?: number | null;
   created_at: string;
-  sections?: { duration_seconds: number; question_count: number }[];
+  sections?: ExamSectionSummary[];
 }
 
 export interface UserQuestionPractice {

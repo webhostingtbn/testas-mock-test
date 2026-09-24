@@ -18,6 +18,7 @@ import {
 import { KniButton, KniCard } from '@/components/KniPrimitives';
 import type { Exam, Profile } from '@/lib/types';
 import { isFullCompletion, isResumableAttempt } from '@/lib/types';
+import { calculateExamMetrics } from '@/lib/exam/metrics';
 import { ReviewView, type ExamAttemptReview } from './ReviewView';
 
 interface TestSelectionViewProps {
@@ -101,13 +102,10 @@ export function TestSelectionView({
     const hasCompleted = attempts.some((attempt) => isFullCompletion({ status: attempt.status ?? '', completion_reason: attempt.completion_reason }));
     const hasStarted = attempts.length > 0;
 
-    const sections = exam.sections || [];
-    const totalDurationSeconds = sections.reduce((sum, section) => sum + (section.duration_seconds || 0), 0);
-    const isPaper = exam.format === 'Paper';
-    const duration = totalDurationSeconds > 0
-      ? Math.round(totalDurationSeconds / 60) + (isPaper ? 15 : 10)
-      : (isPaper ? 170 : 130);
-    const questions = sections.reduce((sum, section) => sum + (section.question_count || 0), 0) || (isPaper ? 120 : 90);
+    const isPaper = exam.format === 'Paper' || profile?.format === 'Paper';
+    const metrics = calculateExamMetrics(exam.sections, isPaper, profile?.module_test ?? null);
+    const duration = metrics.durationMinutes;
+    const questions = metrics.questionCount;
 
     let bestPct = 0;
     attempts.forEach((attempt) => {
@@ -122,7 +120,7 @@ export function TestSelectionView({
       const latestAttempt = [...attempts].sort((a, b) => getAttemptTimestamp(b) - getAttemptTimestamp(a))[0];
       const detailed = latestAttempt?.detailed_results;
       const completedSections = isRecord(detailed) ? Object.keys(detailed).length : 0;
-      const totalSections = sections.length || 4;
+      const totalSections = metrics.sectionsCount || 4;
       progressPct = Math.round((completedSections / totalSections) * 100);
       if (progressPct === 0) progressPct = 10;
     }
@@ -135,7 +133,7 @@ export function TestSelectionView({
       bestPct,
       progressPct,
     };
-  }, [pastExams]);
+  }, [pastExams, profile]);
 
   const filteredExams = useMemo(() => {
     return [...activeExams].sort((left, right) => left.title.localeCompare(right.title));

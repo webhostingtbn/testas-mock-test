@@ -4,11 +4,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useExamStore } from '@/lib/store/exam-store';
-import {
-  BREAK_DURATION_TIME_OF_TEST,
-  filterSections,
-} from '@/lib/constants';
 import { pickDefaultExam } from '@/lib/exam/exam-select';
+import { calculateExamMetrics } from '@/lib/exam/metrics';
 import type { Profile, ModuleTestType, Exam, AttemptKind } from '@/lib/types';
 import { isFullCompletion } from '@/lib/types';
 import { signOut } from 'next-auth/react';
@@ -163,53 +160,62 @@ export function useDashboardData(session: Session) {
       return;
     }
 
-    async function fetchDetails() {
-      if (!currentExam) return;
+    const isPaper = typeof currentExam.format === 'string' && currentExam.format.toLowerCase() === 'paper';
+    const initialMetrics = currentExam.sections && currentExam.sections.length > 0
+      ? calculateExamMetrics(currentExam.sections, isPaper, activeModule)
+      : null;
+
+    if (initialMetrics) {
+      setSelectedExamDetails({
+        sectionsCount: initialMetrics.sectionsCount,
+        questionsCount: initialMetrics.questionCount,
+        totalDurationMinutes: initialMetrics.durationMinutes,
+        isLoading: false,
+      });
+    } else {
       setSelectedExamDetails({
         sectionsCount: 0,
         questionsCount: 0,
         totalDurationMinutes: 0,
-        isLoading: true
+        isLoading: true,
       });
+    }
 
+    async function fetchDetails() {
+      if (!currentExam) return;
       try {
         const res = await fetch(`/api/exams/${currentExam.id}`);
         if (!active) return;
         if (!res.ok) {
-          setSelectedExamDetails({
-            sectionsCount: 0,
-            questionsCount: 0,
-            totalDurationMinutes: 0,
-            isLoading: false
-          });
+          if (!initialMetrics) {
+            setSelectedExamDetails({
+              sectionsCount: 0,
+              questionsCount: 0,
+              totalDurationMinutes: 0,
+              isLoading: false,
+            });
+          }
           return;
         }
 
         const examData = await res.json();
         const dbSections = examData.sections || [];
-
-        const isPaper = typeof currentExam.format === 'string' && currentExam.format.toLowerCase() === 'paper';
-        const { coreSections: coreSectionsMatched, moduleSections: moduleSectionsMatched } = filterSections(dbSections, isPaper, activeModule);
-        const allMatchedSections = [...coreSectionsMatched, ...moduleSectionsMatched];
-        const sectionsCount = allMatchedSections.length;
-        const questionsCount = allMatchedSections.reduce((sum: number, s: any) => sum + (s.question_count || 1), 0);
-        const totalDurationSeconds = allMatchedSections.reduce((sum: number, s: any) => sum + (s.duration_seconds || 1800), 0);
-        const totalDurationMinutes = Math.round(totalDurationSeconds / 60) + Math.round((isPaper ? BREAK_DURATION_TIME_OF_TEST.paper : BREAK_DURATION_TIME_OF_TEST.digital) / 60);
+        const metrics = calculateExamMetrics(dbSections, isPaper, activeModule);
 
         setSelectedExamDetails({
-          sectionsCount,
-          questionsCount,
-          totalDurationMinutes,
-          isLoading: false
+          sectionsCount: metrics.sectionsCount,
+          questionsCount: metrics.questionCount,
+          totalDurationMinutes: metrics.durationMinutes,
+          isLoading: false,
         });
       } catch (err) {
         console.error('Error loading selected exam details:', err);
-        if (active) {
+        if (active && !initialMetrics) {
           setSelectedExamDetails({
             sectionsCount: 0,
             questionsCount: 0,
             totalDurationMinutes: 0,
-            isLoading: false
+            isLoading: false,
           });
         }
       }

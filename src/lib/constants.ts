@@ -186,11 +186,11 @@ export function resolveModuleTitle(mod: string | null): string {
 }
 
 /** Centralized helper to filter core and module sections based on format and active module */
-export function filterSections(
-  sections: Section[],
+export function filterSections<T extends ModuleMatchableSection>(
+  sections: T[],
   isPaper: boolean,
   activeModule: string | null
-): { coreSections: Section[]; moduleSections: Section[] } {
+): { coreSections: T[]; moduleSections: T[] } {
   // 1. Separate Core sections
   const coreTypes = CORE_QUESTION_TYPES[isPaper ? 'Paper' : 'Digital'];
   const coreSections = sections.filter((section) => coreTypes.includes(section.question_type));
@@ -210,6 +210,35 @@ export function filterSections(
   });
 
   return { coreSections, moduleSections };
+}
+
+/** Determines whether a question type is classified as a module question. */
+export function isModuleQuestionType(questionType: string, isPaper: boolean): boolean {
+  if (isPaper) {
+    const paperModuleTypes = [
+      'sc_1', 'sc_2',
+      'eng_1', 'eng_2', 'eng_2_2d', 'eng_2_3d', 'eng_3',
+      'econ_1', 'econ_2',
+    ];
+    return paperModuleTypes.includes(questionType);
+  } else {
+    return DIGITAL_MODULE_QUESTION_TYPES.includes(questionType);
+  }
+}
+
+/** Calculates the break duration between two consecutive sections. */
+export function calculateBreakDuration(
+  currentQuestionType: string,
+  nextQuestionType: string,
+  isPaper: boolean
+): number {
+  const currentIsModule = isModuleQuestionType(currentQuestionType, isPaper);
+  const nextIsModule = isModuleQuestionType(nextQuestionType, isPaper);
+
+  if (!currentIsModule && nextIsModule) {
+    return BREAK_DURATIONS.LONG;
+  }
+  return BREAK_DURATIONS.SHORT;
 }
 
 export interface SubtestDefinition {

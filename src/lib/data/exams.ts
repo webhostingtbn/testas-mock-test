@@ -9,7 +9,12 @@ export async function fetchExams() {
 
   let query = supabase
     .from('exams')
-    .select('id, title, description, major, created_at, retry_number, format, is_active')
+    .select(`
+      id, title, description, major, created_at, retry_number, format, is_active,
+      sections (
+        id, title, question_type, duration_seconds, question_count, sort_order
+      )
+    `)
     .order('created_at', { ascending: false });
 
   if (profile.role !== 'admin') {
@@ -22,7 +27,15 @@ export async function fetchExams() {
   const { data, error } = await query;
 
   if (error) throw new Error(`Failed to fetch exams: ${error.message}`);
-  return data || [];
+
+  const exams = (data || []).map((exam) => ({
+    ...exam,
+    sections: Array.isArray(exam.sections)
+      ? [...exam.sections].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+      : [],
+  }));
+
+  return exams;
 }
 
 export async function fetchExamById(examId: string) {
