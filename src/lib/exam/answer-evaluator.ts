@@ -1,3 +1,5 @@
+import { isNumericalSeriesCorrect } from '../scoring/numerical-series';
+
 export interface FigureSequenceAnswerObj {
   image1: number | null;
   image2: number | null;
@@ -71,16 +73,11 @@ export function evaluateAnswer(
 
   // 2. Numerical Series
   if (normalizedType === 'numerical_series') {
-    const userStr = String(userAnswer).trim();
-    const correctStr = String(correctAnswer).trim();
+    const userStr = String(userAnswer).trim().replace(/\s+/g, '');
+    const correctStr = String(correctAnswer).trim().replace(/\s+/g, '');
     if (userStr.length === 0 || correctStr.length === 0) return false;
 
-    const uNum = Number(userStr);
-    const cNum = Number(correctStr);
-    if (Number.isFinite(uNum) && Number.isFinite(cNum)) {
-      return Math.abs(uNum - cNum) < 1e-6;
-    }
-    return userStr === correctStr;
+    return isNumericalSeriesCorrect(userStr, correctStr);
   }
 
   // 3. Math Equation

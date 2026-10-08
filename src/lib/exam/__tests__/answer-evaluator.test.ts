@@ -29,6 +29,23 @@ describe('evaluateAnswer', () => {
       assert.strictEqual(evaluateAnswer('numerical_series', '  94  ', '94'), true);
       assert.strictEqual(evaluateAnswer('numerical_series', '93', 94), false);
     });
+
+    it('evaluates TestAS answer sheet digit marks regardless of click order or repeated digits', () => {
+      // User case from practice screenshot: answer is 1029, user marked digits 0, 1, 2, 9
+      assert.strictEqual(evaluateAnswer('numerical_series', '0129', 1029), true);
+      assert.strictEqual(evaluateAnswer('numerical_series', '1209', 1029), true);
+      // Repeated digits in correct answer (88 only marks digit 8)
+      assert.strictEqual(evaluateAnswer('numerical_series', '8', 88), true);
+      assert.strictEqual(evaluateAnswer('numerical_series', '8', '88'), true);
+      // Repeated zeros (100 only marks digits 0 and 1)
+      assert.strictEqual(evaluateAnswer('numerical_series', '01', 100), true);
+      // Negative numbers
+      assert.strictEqual(evaluateAnswer('numerical_series', '-9', '-9'), true);
+      assert.strictEqual(evaluateAnswer('numerical_series', '9-', '-9'), true);
+      // Wrong answers
+      assert.strictEqual(evaluateAnswer('numerical_series', '01293', 1029), false);
+      assert.strictEqual(evaluateAnswer('numerical_series', '129', 1029), false);
+    });
   });
 
   describe('math_equation', () => {
