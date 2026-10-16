@@ -10,6 +10,8 @@ import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { MODULE_TEST_LABELS } from '@/lib/constants';
 import type { Profile } from '@/lib/types';
 import { TestSelectionView } from './TestSelectionView';
+import { EnglishOnlyNotice } from './EnglishOnlyNotice';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface MockTestViewProps {
   profile: Profile | null;
@@ -61,20 +63,21 @@ export function MockTestView({
   onResumeAttempt,
 }: MockTestViewProps) {
   const [showSelection, setShowSelection] = useState(true);
+  const { lang, t } = useLanguage();
 
   // Synchronize back navigation in the header
   useEffect(() => {
     if (!onBackNavigation || showSelection) return;
 
     onBackNavigation({
-      label: 'Back to Tests',
+      label: t('mockTest.backToTests'),
       onBack: () => setShowSelection(true)
     });
 
     return () => {
       onBackNavigation(undefined);
     };
-  }, [showSelection, onBackNavigation]);
+  }, [showSelection, onBackNavigation, t]);
 
   // View 1: Test selection screen (shown when no exam selected or user clicks "Change Test")
   if (showSelection) {
@@ -106,18 +109,18 @@ export function MockTestView({
               <div className="mb-4 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600 sm:text-xs sm:tracking-[0.16em]">
                   <ClipboardCheck className="size-3.5" />
-                  Mock Test Briefing
+                  {t('mockTest.briefingTitle')}
                 </span>
                 <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] transition sm:text-xs sm:tracking-[0.16em] ${isEligible ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
                   {isEligible ? (
                     <>
                       <Check className="size-3.5" />
-                      You are eligible
+                      {t('mockTest.eligible')}
                     </>
                   ) : (
                     <>
                       <X className="size-3.5" />
-                      Access restricted
+                      {t('mockTest.accessRestricted')}
                     </>
                   )}
                 </span>
@@ -128,16 +131,16 @@ export function MockTestView({
                 </div>
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-orange-600 sm:text-xs sm:tracking-[0.18em]">
-                    {selectedExam.major ? MODULE_TEST_LABELS[selectedExam.major] : "Core Module"}
+                    {selectedExam.major ? MODULE_TEST_LABELS[selectedExam.major] : t('mockTest.coreModule')}
                   </p>
                   <h2 className="mt-0.5 break-words text-xl font-black leading-tight tracking-tight text-slate-950 sm:text-3xl">
                     {selectedExam.title}
                   </h2>
                   <p className="mt-1 text-sm leading-5 text-slate-500 sm:leading-6">
                     {selectedAttemptInfo.attemptCount > 0 && selectedAttemptInfo.bestScore !== null ? (
-                      `Your best score is ${selectedAttemptInfo.bestPercentage}%. Review the setup below before beginning a timed attempt.`
+                      t('mockTest.bestScoreNotice', { percent: selectedAttemptInfo.bestPercentage })
                     ) : (
-                      'Review the setup below before beginning a timed attempt.'
+                      t('mockTest.setupNotice')
                     )}
                   </p>
                 </div>
@@ -146,18 +149,20 @@ export function MockTestView({
             <div className="p-4 sm:p-6">
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-3">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Preparation checklist</p>
-                  <h3 className="text-xl font-black tracking-tight text-slate-950">Get ready to focus</h3>
-                  <p className="text-xs font-medium text-orange-600 mt-0.5 animate-pulse">Click each requirement below to confirm.</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('mockTest.prepChecklist')}</p>
+                  <h3 className="text-xl font-black tracking-tight text-slate-950">{t('mockTest.getReady')}</h3>
+                  <p className="text-xs font-medium text-orange-600 mt-0.5 animate-pulse">{t('mockTest.confirmInstructions')}</p>
                 </div>
                 <span className={`w-fit shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] sm:text-xs sm:tracking-[0.16em] ${briefingChecklist.length === 5 ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-200/35' : 'bg-amber-500/10 text-amber-700 border border-amber-200/35'}`}>
-                  {briefingChecklist.length} of 5 ready
+                  {t('mockTest.readyCount', { count: briefingChecklist.length })}
                 </span>
               </div>
               <div className="grid gap-2.5 sm:gap-3">
                 {CHECKLIST_ITEMS.map(item => {
                   const checked = briefingChecklist.includes(item.id);
                   const Icon = item.icon;
+                  const label = t(item.labelKey);
+                  const description = t(item.descKey);
                   return (
                     <button
                       key={item.id}
@@ -176,8 +181,8 @@ export function MockTestView({
                         <Icon className="size-5" />
                       </span>
                       <span className="min-w-0 flex-1 self-center">
-                        <span className={`block text-sm font-black leading-tight transition ${checked ? 'text-emerald-800' : 'text-slate-900'}`}>{item.label}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{item.description}</span>
+                        <span className={`block text-sm font-black leading-tight transition ${checked ? 'text-emerald-800' : 'text-slate-900'}`}>{label}</span>
+                        <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">{description}</span>
                       </span>
                       <div className="flex items-center justify-center shrink-0 self-center">
                         <div className={`flex size-5 items-center justify-center rounded-md border-2 transition-all duration-205 ${
@@ -197,23 +202,11 @@ export function MockTestView({
         </section>
 
         <aside className="flex min-w-0 flex-col gap-4 xl:gap-6">
-          {/* Change Test Button */}
-          {/* <div className="flex justify-center">
-            <KniButton
-              variant="secondary"
-              onClick={() => setShowSelection(true)}
-              className="h-10 px-4 text-xs font-semibold rounded-xl"
-            >
-              <ArrowLeft className="size-3.5 mr-1.5" />
-              Select a Different Test
-            </KniButton>
-          </div> */}
-
           <KniCard className="p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">Attempt overview</p>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">Exam details</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">{t('mockTest.attemptOverview')}</p>
+                <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">{t('mockTest.examDetails')}</h2>
               </div>
               <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
                 <FileText className="size-5" />
@@ -222,55 +215,55 @@ export function MockTestView({
 
             <div className="mt-4 divide-y divide-slate-100 sm:mt-5">
               <div className="flex items-center justify-between gap-4 py-2.5 first:pt-0">
-                <span className="text-xs font-medium text-slate-500">Sections</span>
+                <span className="text-xs font-medium text-slate-500">{t('mockTest.sectionsLabel')}</span>
                 <span className="text-right text-xs font-black text-slate-950">
                   {selectedExamDetails?.isLoading ? (
-                    <span className="text-slate-400">Loading...</span>
+                    <span className="text-slate-400">{t('common.loading')}</span>
                   ) : (
-                    `${selectedExamDetails?.sectionsCount || 0} sections`
+                    t('mockTest.sectionsCount', { count: selectedExamDetails?.sectionsCount || 0 })
                   )}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 py-2.5">
-                <span className="text-xs font-medium text-slate-500">Questions</span>
+                <span className="text-xs font-medium text-slate-500">{t('mockTest.questionsLabel')}</span>
                 <span className="text-right text-xs font-black text-slate-950">
                   {selectedExamDetails?.isLoading ? (
-                    <span className="text-slate-400">Loading...</span>
+                    <span className="text-slate-400">{t('common.loading')}</span>
                   ) : (
-                    `${selectedExamDetails?.questionsCount || 0} questions`
+                    t('gate.questionsCount', { count: selectedExamDetails?.questionsCount || 0 })
                   )}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 py-2.5">
-                <span className="text-xs font-medium text-slate-500">Time</span>
+                <span className="text-xs font-medium text-slate-500">{t('mockTest.timeLabel')}</span>
                 <span className="text-right text-xs font-black text-slate-950">
                   {selectedExamDetails?.isLoading ? (
-                    <span className="text-slate-400">Loading...</span>
+                    <span className="text-slate-400">{t('common.loading')}</span>
                   ) : (
                     (() => {
                       const totalMinutes = selectedExamDetails?.totalDurationMinutes || 0;
                       if (!totalMinutes) return 'N/A';
                       const hrs = Math.floor(totalMinutes / 60);
                       const mins = totalMinutes % 60;
-                      if (hrs === 0) return `~${mins}m`;
-                      if (mins === 0) return `~${hrs} hours`;
-                      return `~${hrs}h ${mins}m`;
+                      if (hrs === 0) return t('common.minutesShort', { count: mins });
+                      if (mins === 0) return t('common.hours', { count: hrs });
+                      return t('common.hoursAndMinutes', { hours: hrs, mins });
                     })()
                   )}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 py-2.5">
-                <span className="text-xs font-medium text-slate-500">Scoring</span>
-                <span className="text-right text-xs font-black text-slate-950">1 point per correct answer</span>
+                <span className="text-xs font-medium text-slate-500">{t('mockTest.scoringLabel')}</span>
+                <span className="text-right text-xs font-black text-slate-950">{t('common.pointPerAnswer')}</span>
               </div>
               <div className="flex items-center justify-between gap-4 py-2.5 last:pb-0">
-                <span className="text-xs font-medium text-slate-500">Format</span>
-                <span className="text-right text-xs font-black text-slate-950">{profile?.format || 'Digital'}</span>
+                <span className="text-xs font-medium text-slate-500">{t('common.format')}</span>
+                <span className="text-right text-xs font-black text-slate-950">
+                  {profile?.format ? (profile.format === 'Paper' ? t('common.paper') : t('common.digital')) : t('common.digital')}
+                </span>
               </div>
             </div>
           </KniCard>
-
-
 
           <KniCard className="p-4 sm:p-6">
             <div className={`rounded-2xl border p-4 ${isEligible ? 'border-emerald-200 bg-emerald-50/70' : 'border-rose-200 bg-rose-50/70'}`}>
@@ -280,18 +273,29 @@ export function MockTestView({
                 </div>
                 <div>
                   <p className={`text-sm font-black ${isEligible ? 'text-emerald-800' : 'text-rose-800'}`}>
-                    {isEligible ? 'Eligibility confirmed' : 'Access restricted'}
+                    {isEligible ? t('mockTest.eligibilityConfirmed') : t('mockTest.accessRestricted')}
                   </p>
                   <p className="mt-0.5 text-xs leading-normal text-slate-600">
                     {isEligible ? (
-                      `Your approved ${selectedExam.major ? MODULE_TEST_LABELS[selectedExam.major] : "Core"} allocation includes this ${(profile?.format || 'Digital').toLowerCase()} mock test.`
+                      t('mockTest.approvedAllocationNotice', {
+                        major: selectedExam.major ? MODULE_TEST_LABELS[selectedExam.major] : t('mockTest.coreModule'),
+                        format: (profile?.format ? (profile.format === 'Paper' ? t('common.paper') : t('common.digital')) : t('common.digital')).toLowerCase()
+                      })
                     ) : (
-                      !hasActiveExam ? 'No active exam is scheduled.' : `Your attempts limit (${selectedAttemptInfo.limit}) is exhausted.`
+                      !hasActiveExam
+                        ? t('mockTest.noActiveScheduled')
+                        : t('mockTest.attemptsLimitExhausted', { limit: selectedAttemptInfo.limit ?? 0 })
                     )}
                   </p>
                 </div>
               </div>
             </div>
+
+            {lang === 'de' && !selectedExam.languages?.includes('de') && (
+              <div className="mt-4">
+                <EnglishOnlyNotice />
+              </div>
+            )}
 
             <KniButton
               type="button"
@@ -302,24 +306,24 @@ export function MockTestView({
               {isStarting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4.5 h-4.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Starting...
+                  {t('mockTest.starting')}
                 </div>
               ) : !hasActiveExam ? (
-                'No Active Exam'
+                t('mockTest.noActiveExam')
               ) : isAttemptLimitReached ? (
-                'Retakes Exhausted'
+                t('mockTest.retakesExhausted')
               ) : (
                 <>
                   <Timer className="size-5" />
-                  Start Mock Test
+                  {t('mockTest.startMockTest')}
                   <ChevronRight className="size-5" />
                 </>
               )}
             </KniButton>
-            <p className="mt-3 text-center text-xs text-rose-600 font-medium">Once started, the timer cannot be paused.</p>
+            <p className="mt-3 text-center text-xs text-rose-600 font-medium">{t('mockTest.timerNoPause')}</p>
             {briefingChecklist.length !== 5 && hasActiveExam && !isAttemptLimitReached && (
               <p className="mt-2 text-center text-xs text-slate-500 font-medium">
-                Complete {5 - briefingChecklist.length} more preparation item{5 - briefingChecklist.length === 1 ? '' : 's'} to continue.
+                {t('mockTest.completeItemsNotice', { count: 5 - briefingChecklist.length })}
               </p>
             )}
           </KniCard>
@@ -334,32 +338,32 @@ export function MockTestView({
 const CHECKLIST_ITEMS = [
   {
     id: 'internet',
-    label: 'Stable internet connection',
-    description: 'Your connection is ready for continuous answer syncing.',
+    labelKey: 'mockTest.checkInternet' as const,
+    descKey: 'mockTest.checkInternetDesc' as const,
     icon: Wifi,
   },
   {
     id: 'environment',
-    label: 'Quiet testing environment',
-    description: 'Notifications are muted and interruptions are minimized.',
+    labelKey: 'mockTest.checkEnvironment' as const,
+    descKey: 'mockTest.checkEnvironmentDesc' as const,
     icon: Volume2,
   },
   {
     id: 'fullscreen',
-    label: 'Full-screen mode ready',
-    description: 'You can focus on the exam without switching windows.',
+    labelKey: 'mockTest.checkFullscreen' as const,
+    descKey: 'mockTest.checkFullscreenDesc' as const,
     icon: Maximize2,
   },
   {
     id: 'materials',
-    label: 'Material restrictions understood',
-    description: 'Only permitted calculators and reference materials are nearby.',
+    labelKey: 'mockTest.checkMaterials' as const,
+    descKey: 'mockTest.checkMaterialsDesc' as const,
     icon: Calculator,
   },
   {
     id: 'timer',
-    label: 'No-pause rule accepted',
-    description: 'You understand the timer cannot be paused after starting.',
+    labelKey: 'mockTest.checkTimer' as const,
+    descKey: 'mockTest.checkTimerDesc' as const,
     icon: Timer,
   },
 ];

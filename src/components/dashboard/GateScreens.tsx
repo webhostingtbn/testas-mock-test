@@ -9,6 +9,7 @@ import { KniCard, KniButton } from '@/components/KniPrimitives';
 import { DashboardLoadingShell } from '@/components/dashboard/DashboardSkeleton';
 import { MODULE_TEST_OPTIONS } from '@/lib/constants';
 import type { Profile, ModuleTestType } from '@/lib/types';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 // --------------- Loading Screen ---------------
 // Sidebar + header render immediately; only the main content area
@@ -35,6 +36,8 @@ export function ModuleSelectionScreen({
   onLogout,
   isLoading,
 }: ModuleSelectionScreenProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-orange-50 relative overflow-hidden">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_12%_12%,rgba(234,88,12,.14),transparent_30%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,.16),transparent_28%),linear-gradient(135deg,#fff7ed,#ffffff_46%,#fffbeb)]" />
@@ -46,11 +49,11 @@ export function ModuleSelectionScreen({
             <GraduationCap className="size-9 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
-            Choose Your
-            <span className="text-orange-600"> Module Test</span>
+            {t('gate.chooseModuleTitle')}
+            <span className="text-orange-600"> {t('gate.chooseModuleWord')}</span>
           </h1>
           <p className="text-slate-550 mt-2 max-w-sm mx-auto text-sm">
-            Select the subject module you want to practice. This determines your 4th exam section.
+            {t('gate.chooseModuleSubtitle')}
           </p>
         </div>
 
@@ -58,10 +61,10 @@ export function ModuleSelectionScreen({
           <div className="text-center pb-4">
             <h2 className="text-lg font-bold text-slate-900 flex items-center justify-center gap-2">
               <Sparkles className="w-5 h-5 text-orange-500" />
-              Module Test Selection
+              {t('gate.moduleSelection')}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Pick one module — this cannot be changed during the exam
+              {t('gate.moduleSelectionDesc')}
             </p>
           </div>
           <div className="flex flex-col gap-3">
@@ -95,11 +98,11 @@ export function ModuleSelectionScreen({
                     <div className="flex items-center gap-3 mt-2">
                       <span className="inline-flex items-center gap-1 text-xs text-slate-400 font-semibold">
                         <Clock className="w-3 h-3 text-orange-400" />
-                        150 min
+                        {t('gate.durationMinutes', { count: 150 })}
                       </span>
                       <span className="inline-flex items-center gap-1 text-xs text-slate-400 font-semibold">
                         <FileText className="w-3 h-3 text-orange-400" />
-                        22 questions
+                        {t('gate.questionsCount', { count: 22 })}
                       </span>
                     </div>
                   </div>
@@ -122,7 +125,7 @@ export function ModuleSelectionScreen({
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <div className="flex items-center gap-2">
-                    Continue to Exam
+                    {t('gate.continueToExam')}
                     <ChevronRight className="w-4 h-4" />
                   </div>
                 )}
@@ -133,14 +136,14 @@ export function ModuleSelectionScreen({
                 variant="outline"
                 className="flex-1 h-12 justify-center"
               >
-                Return to Sign In
+                {t('gate.returnToSignIn')}
               </KniButton>
             </div>
           </div>
         </KniCard>
 
         <p className="text-center text-xs text-slate-400 mt-4">
-          The core tests (Figure Sequences, Math Equations, Latin Squares) are the same for all modules.
+          {t('gate.coreTestsNote')}
         </p>
       </div>
     </div>
@@ -170,6 +173,8 @@ export function PendingSetupScreen({
   isSubmitting,
   configError,
 }: PendingSetupScreenProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50 p-4 py-12">
       <div className="w-full max-w-4xl text-center">
@@ -182,19 +187,19 @@ export function PendingSetupScreen({
           />
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             TestAS
-            <span className="text-orange-600"> Mock Test</span>
+            <span className="text-orange-600"> {t('auth.mockTestWord')}</span>
           </h1>
           <p className="text-gray-500 mt-2">
-            Practice the real exam experience
+            {t('auth.mockTestSubtitle')}
           </p>
         </div>
 
         <KniCard className="p-8 text-left flex flex-col">
           <h2 className="text-2xl font-bold text-slate-900 text-center mb-2">
-            Configure Your Exam
+            {t('gate.configureExamTitle')}
           </h2>
           <p className="text-slate-550 text-sm text-center mb-6 leading-relaxed">
-            Please choose your target module and preferred format before submitting your registration for administrator approval.
+            {t('gate.configureExamDesc')}
           </p>
 
           {configError && (
@@ -207,7 +212,7 @@ export function PendingSetupScreen({
             {/* Left Column: Module Selection */}
             <div className="space-y-4">
               <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                Select Your Test Module
+                {t('gate.selectTestModule')}
               </label>
               <div className="flex flex-col gap-3">
                 {[
@@ -248,12 +253,12 @@ export function PendingSetupScreen({
               {/* Format Selection */}
               <div className="space-y-4">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
-                  Select Exam Format
+                  {t('gate.selectExamFormat')}
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { id: 'Digital', label: 'Digital Exam', desc: 'Take in browser', icon: Monitor },
-                    { id: 'Paper', label: 'Paper Exam', desc: 'Download booklets', icon: File },
+                    { id: 'Digital', label: t('gate.digitalExam'), desc: t('gate.digitalExamDesc'), icon: Monitor },
+                    { id: 'Paper', label: t('gate.paperExam'), desc: t('gate.paperExamDesc'), icon: File },
                   ].map((fmt) => {
                     const IconComp = fmt.icon;
                     const isSelected = selectedFormat === fmt.id;
@@ -292,10 +297,10 @@ export function PendingSetupScreen({
                   {isSubmitting ? (
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Submitting...
+                      {t('gate.submitting')}
                     </div>
                   ) : (
-                    'Submit Registration'
+                    t('gate.submitRegistration')
                   )}
                 </KniButton>
 
@@ -304,7 +309,7 @@ export function PendingSetupScreen({
                   onClick={onLogout}
                   className="w-full h-12 text-sm justify-center"
                 >
-                  Return to Sign In
+                  {t('gate.returnToSignIn')}
                 </KniButton>
               </div>
             </div>
@@ -322,6 +327,8 @@ interface StatusScreenProps {
 }
 
 export function PendingApprovalScreen({ onLogout }: StatusScreenProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50 p-4">
       <div className="w-full max-w-md text-center">
@@ -334,10 +341,10 @@ export function PendingApprovalScreen({ onLogout }: StatusScreenProps) {
           />
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             TestAS
-            <span className="text-orange-600"> Mock Test</span>
+            <span className="text-orange-600"> {t('auth.mockTestWord')}</span>
           </h1>
           <p className="text-gray-500 mt-2">
-            Practice the real exam experience
+            {t('auth.mockTestSubtitle')}
           </p>
         </div>
 
@@ -349,15 +356,15 @@ export function PendingApprovalScreen({ onLogout }: StatusScreenProps) {
 
           {/* status badge */}
           <span className="rounded-full border border-amber-300/30 bg-amber-500/10 px-3 py-1 text-sm text-amber-700 font-semibold">
-            Pending Approval
+            {t('gate.pendingApprovalBadge')}
           </span>
 
           <h2 className="mt-5 text-2xl font-bold text-slate-900">
-            Account Pending Approval
+            {t('gate.pendingApprovalTitle')}
           </h2>
 
           <p className="mt-4 text-slate-500 text-sm leading-relaxed">
-            An administrator is reviewing your registration. Once approved, you will gain access to your allocated modules.
+            {t('gate.pendingApprovalDesc')}
           </p>
 
           <KniButton
@@ -365,7 +372,7 @@ export function PendingApprovalScreen({ onLogout }: StatusScreenProps) {
             onClick={onLogout}
             className="mt-7 w-full h-12 text-sm"
           >
-            Return to Sign In
+            {t('gate.returnToSignIn')}
           </KniButton>
         </KniCard>
       </div>
@@ -376,6 +383,8 @@ export function PendingApprovalScreen({ onLogout }: StatusScreenProps) {
 // --------------- Rejected Screen ---------------
 
 export function RejectedScreen({ onLogout }: StatusScreenProps) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-50 via-white to-amber-50 p-4">
       <div className="w-full max-w-md text-center">
@@ -388,10 +397,10 @@ export function RejectedScreen({ onLogout }: StatusScreenProps) {
           />
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
             TestAS
-            <span className="text-orange-600"> Mock Test</span>
+            <span className="text-orange-600"> {t('auth.mockTestWord')}</span>
           </h1>
           <p className="text-gray-500 mt-2">
-            Practice the real exam experience
+            {t('auth.mockTestSubtitle')}
           </p>
         </div>
 
@@ -403,15 +412,15 @@ export function RejectedScreen({ onLogout }: StatusScreenProps) {
 
           {/* status badge */}
           <span className="rounded-full border border-red-300/30 bg-red-500/10 px-3 py-1 text-sm text-red-700 font-semibold">
-            Registration Rejected
+            {t('gate.rejectedBadge')}
           </span>
 
           <h2 className="mt-5 text-2xl font-bold text-slate-900">
-            Registration Rejected
+            {t('gate.rejectedTitle')}
           </h2>
 
           <p className="mt-4 text-slate-500 text-sm leading-relaxed">
-            Your registration has been rejected by an administrator. Please contact support if you believe this is a mistake.
+            {t('gate.rejectedDesc')}
           </p>
 
           <KniButton
@@ -419,7 +428,7 @@ export function RejectedScreen({ onLogout }: StatusScreenProps) {
             onClick={onLogout}
             className="mt-7 w-full h-12 text-sm"
           >
-            Return to Sign In
+            {t('gate.returnToSignIn')}
           </KniButton>
         </KniCard>
       </div>

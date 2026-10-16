@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ResilientImage } from './ResilientImage';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface CanvasImageProps {
   src: string;
@@ -13,11 +14,13 @@ interface CanvasImageProps {
 
 export function CanvasImage({
   src,
-  alt = 'Graphic',
+  alt,
   minZoom = 0.1,
   maxZoom = 2,
   initialZoom = 1
 }: CanvasImageProps) {
+  const { t } = useLanguage();
+  const resolvedAlt = alt ?? t('common.graphic');
   const [zoom, setZoom] = useState(initialZoom);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -199,7 +202,7 @@ export function CanvasImage({
         <ResilientImage
           imgRef={imageRef}
           src={src}
-          alt={alt}
+          alt={resolvedAlt}
           className="max-w-none object-contain pointer-events-none transition-transform duration-75 ease-out"
           style={{
             transform: `scale(${zoom})`,
@@ -243,14 +246,14 @@ export function CanvasImage({
           onClick={resetView}
           className="text-xs font-medium text-orange-600 hover:text-orange-700 px-2 py-1 rounded hover:bg-orange-50"
         >
-          Reset
+          {t('common.reset')}
         </button>
       </div>
 
       {/* Zoom indicator if using mouse wheel */}
       {zoom !== initialZoom && (
         <div className="absolute top-4 right-4 bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-sm">
-          Scroll to zoom
+          {t('common.scrollToZoom')}
         </div>
       )}
     </div>

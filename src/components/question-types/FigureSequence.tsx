@@ -4,6 +4,7 @@ import { ImageOff } from 'lucide-react';
 import { ResilientImage } from './ResilientImage';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isAbsoluteOrDataUrl } from '@/lib/services/image-service';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 export interface FigureSequenceVerification {
   isVerified: boolean;
@@ -27,6 +28,7 @@ interface FigureSequenceProps {
 }
 
 export function FigureSequenceSkeleton() {
+  const { t } = useLanguage();
   const matrices = [1, 2, 3] as const;
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -43,7 +45,7 @@ export function FigureSequenceSkeleton() {
 
           {/* Image 1 Header Box (Col 2) */}
           <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black/30 flex flex-col items-center justify-center bg-slate-50 relative mb-4 mt-2">
-            <span className="text-xs md:text-sm font-medium text-slate-400 absolute top-1">Image 1</span>
+            <span className="text-xs md:text-sm font-medium text-slate-400 absolute top-1">{t('exam.imageColumn', { col: 1 })}</span>
             <span className="text-3xl md:text-5xl font-light text-slate-300 mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
               <svg className="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
@@ -54,7 +56,7 @@ export function FigureSequenceSkeleton() {
 
           {/* Image 2 Header Box (Col 3) */}
           <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black/30 flex flex-col items-center justify-center bg-slate-50 relative mb-4 mt-2">
-            <span className="text-xs md:text-sm font-medium text-slate-400 absolute top-1">Image 2</span>
+            <span className="text-xs md:text-sm font-medium text-slate-400 absolute top-1">{t('exam.imageColumn', { col: 2 })}</span>
             <span className="text-3xl md:text-5xl font-light text-slate-300 mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
               <svg className="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
@@ -67,7 +69,7 @@ export function FigureSequenceSkeleton() {
           {matrices.map((row) => (
             <React.Fragment key={`skeleton-row-${row}`}>
               <div className="text-[#18181B] font-medium text-sm md:text-base pr-4 lg:pr-8 justify-self-end text-right">
-                Matrix {row}
+                {t('exam.matrixRow', { row })}
               </div>
               <div className="w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px] border-[3px] border-black/20 bg-slate-50 overflow-hidden relative">
                 <Skeleton className="w-full h-full rounded-none" />
@@ -103,6 +105,7 @@ export default function FigureSequence({
   onAnswer,
   verification,
 }: FigureSequenceProps) {
+  const { t } = useLanguage();
   const [loadedImages, setLoadedImages] = useState<Record<string, boolean>>({});
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
@@ -177,7 +180,7 @@ export default function FigureSequence({
   if (!imageUrl || optionsUrls.length < 6) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-[#71717A] text-center px-6">
-        Question images are unavailable for this item. Please continue to the next question.
+        {t('exam.imagesUnavailable')}
       </div>
     );
   }
@@ -209,7 +212,7 @@ export default function FigureSequence({
         <div
           key={`img${col}-matrix${row}`}
           className="w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px] border-[3px] border-black/20 bg-slate-50 flex items-center justify-center text-2xl text-slate-300"
-          aria-label={`Image ${col} Matrix ${row} (unavailable)`}
+          aria-label={t('exam.choiceUnavailable', { col, row })}
         >
           ?
         </div>
@@ -222,6 +225,9 @@ export default function FigureSequence({
     const isCorrectChoice = isVerified && targetCorrectRow === row;
     const isWrongChoice = isVerified && isSelected && targetCorrectRow !== row;
 
+    const baseAlt = t('exam.choiceAlt', { col, row });
+    const ariaLabel = `${baseAlt}${isSelected ? ` (${t('exam.selected')})` : ''}${isCorrectChoice ? ` (${t('exam.correct')})` : ''}${isWrongChoice ? ` (${t('exam.incorrect')})` : ''}`;
+
     return (
       <button
         key={`img${col}-matrix${row}`}
@@ -229,7 +235,7 @@ export default function FigureSequence({
         disabled={isVerified}
         onClick={isVerified ? undefined : () => handleOptionClick(col, row)}
         aria-pressed={isSelected}
-        aria-label={`Image ${col} Matrix ${row}${isSelected ? ' (selected)' : ''}${isCorrectChoice ? ' (correct)' : ''}${isWrongChoice ? ' (incorrect)' : ''}`}
+        aria-label={ariaLabel}
         className={`
           relative w-24 h-24 md:w-32 md:h-32 lg:w-[120px] lg:h-[120px]
           border-[3px] transition-all overflow-hidden bg-slate-50
@@ -252,12 +258,12 @@ export default function FigureSequence({
         )}
         {isChoiceFailed ? (
           <span className="absolute inset-0 flex items-center justify-center p-1">
-            <ImageErrorMark label={`Image ${col} Matrix ${row} unavailable`} />
+            <ImageErrorMark label={t('exam.choiceUnavailable', { col, row })} />
           </span>
         ) : (
           <ResilientImage
             src={optUrl}
-            alt={`Image ${col} Matrix ${row}`}
+            alt={baseAlt}
             onLoad={() => markImageLoaded(optUrl)}
             onError={() => markImageFailed(optUrl)}
             imgRef={(node) => handleImageRef(node, optUrl)}
@@ -294,7 +300,7 @@ export default function FigureSequence({
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex-none py-3">
-        <p className="text-[13px] font-medium text-[#71717A]">Complete the sequence</p>
+        <p className="text-[13px] font-medium text-[#71717A]">{t('exam.completeSequence')}</p>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-8 pb-6 sm:pb-8">
@@ -309,11 +315,11 @@ export default function FigureSequence({
               <Skeleton className="absolute inset-0 w-full h-full rounded-none" />
             )}
             {isPromptFailed ? (
-              <ImageErrorMark label="Sequence prompt unavailable" />
+              <ImageErrorMark label={t('exam.sequencePromptUnavailable')} />
             ) : (
               <ResilientImage
                 src={imageUrl}
-                alt="Sequence prompt"
+                alt={t('exam.sequencePrompt')}
                 onLoad={() => markImageLoaded(imageUrl)}
                 onError={() => markImageFailed(imageUrl)}
                 imgRef={(node) => handleImageRef(node, imageUrl)}
@@ -326,7 +332,7 @@ export default function FigureSequence({
 
           {/* Image 1 Header Box (Col 2) */}
           <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white relative mb-4 mt-2">
-            <span className="text-xs md:text-sm font-medium absolute top-1">Image 1</span>
+            <span className="text-xs md:text-sm font-medium absolute top-1">{t('exam.imageColumn', { col: 1 })}</span>
             <span className="text-3xl md:text-5xl font-light mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
               <svg className="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
@@ -335,7 +341,7 @@ export default function FigureSequence({
 
           {/* Image 2 Header Box (Col 3) */}
           <div className="w-20 h-20 md:w-28 md:h-28 lg:w-[100px] lg:h-[100px] border-[3px] border-black flex flex-col items-center justify-center bg-white relative mb-4 mt-2">
-            <span className="text-xs md:text-sm font-medium absolute top-1">Image 2</span>
+            <span className="text-xs md:text-sm font-medium absolute top-1">{t('exam.imageColumn', { col: 2 })}</span>
             <span className="text-3xl md:text-5xl font-light mt-2">?</span>
             <div className="absolute -bottom-6 flex justify-center w-full">
               <svg className="w-5 h-5 text-black" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 10.293a1 1 0 010 1.414l-6 6a1 1 0 01-1.414 0l-6-6a1 1 0 111.414-1.414L9 14.586V3a1 1 0 012 0v11.586l4.293-4.293a1 1 0 011.414 0z" clipRule="evenodd"></path></svg>
@@ -348,7 +354,7 @@ export default function FigureSequence({
 
               {/* Matrix Label (Col 1) */}
               <div className="text-[#18181B] font-medium text-sm md:text-base pr-4 lg:pr-8 justify-self-end text-right">
-                Matrix {row}
+                {t('exam.matrixRow', { row })}
               </div>
 
               {/* Image 1 Choices (Col 2) */}

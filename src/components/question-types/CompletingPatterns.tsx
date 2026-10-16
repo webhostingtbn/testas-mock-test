@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import { CanvasImage } from './CanvasImage';
 import { ResilientImage } from './ResilientImage';
 
@@ -34,6 +35,7 @@ export default function CompletingPatterns({
   onAnswer,
   verification,
 }: CompletingPatternsProps) {
+  const { t } = useLanguage();
   const content = question.content ?? {};
   const gridUrl = content.grid_image_url || '';
   const optionsUrl = content.options_image_url || '';
@@ -65,7 +67,7 @@ export default function CompletingPatterns({
   if (!gridUrl || !optionsUrl) {
     return (
       <div className="flex items-center justify-center h-48 text-gray-400 text-sm bg-white rounded-2xl border border-orange-100/60 shadow-sm">
-        Loading question images...
+        {t('exam.loadingImages')}
       </div>
     );
   }
@@ -75,7 +77,7 @@ export default function CompletingPatterns({
       {/* Question Header Label */}
       <div className="flex items-center gap-2 flex-none">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-          Complete the pattern
+          {t('exam.completePattern')}
         </span>
       </div>
 
@@ -83,18 +85,10 @@ export default function CompletingPatterns({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch w-full min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
         
         {/* Left Panel: 3x3 Question Grid */}
-        {/* <div className={`bg-white rounded-2xl border border-gray-200 p-3 md:p-4 shadow-sm flex flex-col justify-start items-center space-y-2 h-full min-h-0 ${
-          isEightOptions ? 'lg:col-span-6' : 'lg:col-span-7'
-        }`}>
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider self-start flex-none">
-            Question Pattern
-          </h3>
-          
-        </div> */}
         <div className={`w-full flex-1 h-full flex items-center justify-center min-h-0 overflow-hidden ${
           isEightOptions ? 'lg:col-span-6' : 'lg:col-span-7'
         }`}>
-          <CanvasImage src={gridUrl} alt="Completing patterns 3x3 grid" />
+          <CanvasImage src={gridUrl} alt={t('exam.patternGridAlt')} />
         </div>
 
         {/* Right Panel: Options unified Image with Clickable Overlay */}
@@ -103,10 +97,10 @@ export default function CompletingPatterns({
         }`}>
           <div className="flex items-baseline justify-between flex-none gap-2">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-              Select Answer Option
+              {t('exam.selectAnswerOption')}
             </h3>
             <span className="text-[10px] text-gray-500 font-medium hidden sm:inline">
-              Click directly on the letter box
+              {t('exam.clickLetterBox')}
             </span>
           </div>
 
@@ -118,7 +112,7 @@ export default function CompletingPatterns({
               {/* The unified image containing all options */}
               <ResilientImage
                 src={optionsUrl}
-                alt={isEightOptions ? "Answer options A through H" : "Answer options A through F"}
+                alt={isEightOptions ? t('exam.optionsAtoH') : t('exam.optionsAtoF')}
                 onLoad={(event) => {
                   const image = event.currentTarget;
                   if (image.naturalWidth && image.naturalHeight) {
@@ -157,7 +151,7 @@ export default function CompletingPatterns({
                         focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-inset
                         ${isVerified ? 'cursor-default' : 'cursor-pointer'}
                       `}
-                      aria-label={`Option ${opt}${isSelected ? ' (selected)' : ''}${isCorrectChoice ? ' (correct)' : ''}${isWrongChoice ? ' (incorrect)' : ''}`}
+                      aria-label={`${t('exam.optionLabel', { opt })}${isSelected ? ` (${t('exam.selected')})` : ''}${isCorrectChoice ? ` (${t('exam.correct')})` : ''}${isWrongChoice ? ` (${t('exam.incorrect')})` : ''}`}
                       aria-pressed={isSelected}
                     >
                       {/* Highlight only the illustration area, not the printed answer label. */}

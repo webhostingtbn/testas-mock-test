@@ -5,6 +5,9 @@ import { requireApprovedUser } from '@/lib/auth/guards';
 import type { Database, Json } from '@/lib/supabase/database.types';
 import type { CompletionReason, AttemptKind } from '@/lib/types';
 import { buildAttemptSectionScores } from '@/lib/exam/attempt-results';
+import { germanAvailable } from '@/lib/data/exams';
+import { filterSections } from '@/lib/constants';
+import type { Lang } from '@/lib/i18n/config';
 
 type SectionRow = Database['public']['Tables']['sections']['Row'];
 type QuestionReference = Pick<Database['public']['Tables']['questions']['Row'], 'id' | 'section_id'>;
@@ -24,6 +27,10 @@ function toJson(value: unknown): Json {
     return objectValue;
   }
   return String(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export async function createAttempt(
@@ -49,6 +56,39 @@ export async function createAttempt(
   const attemptLimit = profile.role === 'admin'
     ? null
     : (exam.retry_number ?? profile.allow_test_limit ?? 1);
+
+  const requested = profile.preferred_language ?? 'en';
+  let language: Lang = 'en';
+
+  if (requested === 'de') {
+    let scope: string[] = [];
+    if (sectionIds && sectionIds.length > 0) {
+      scope = sectionIds;
+    } else {
+      const { data: examSections } = await supabase
+        .from('sections')
+        .select('id, question_type, title, sort_order')
+        .eq('exam_id', examId);
+
+      const rawSections = examSections ?? [];
+      const isPaper = exam.format?.toLowerCase() === 'paper';
+      let applicable = rawSections;
+      if (profile.module_test) {
+        const { coreSections, moduleSections } = filterSections(
+          rawSections,
+          isPaper,
+          profile.module_test,
+        );
+        const scoped = [...coreSections, ...moduleSections];
+        if (scoped.length > 0) {
+          applicable = scoped;
+        }
+      }
+      scope = applicable.map((s) => s.id);
+    }
+    const isGerman = await germanAvailable(scope);
+    if (isGerman) language = 'de';
+  }
 
   const { data, error } = await supabase.rpc('create_attempt_transaction', {
     p_exam_id: examId,
@@ -79,7 +119,22 @@ export async function createAttempt(
     }
     throw new Error(`Failed to create attempt: ${error.message}`);
   }
-  return data;
+
+  const attemptId = isRecord(data) && typeof data.id === 'string' ? data.id : null;
+  let resolvedLang: Lang = 'en';
+  if (attemptId && language !== 'en') {
+    const { error: updateErr } = await supabase
+      .from('user_exams')
+      .update({ language })
+      .eq('id', attemptId);
+    if (updateErr) {
+      console.error(`Failed to set attempt language: ${updateErr.message}`);
+    } else {
+      resolvedLang = language;
+    }
+  }
+
+  return isRecord(data) ? { ...data, language: resolvedLang } : data;
 }
 
 export async function getAttempt(attemptId: string) {
@@ -107,7 +162,7 @@ export async function listAttempts() {
   const supabase = getAdminSupabaseClient();
   const { data, error } = await supabase
     .from('user_exams')
-    .select('id, user_id, exam_id, attempt_kind, section_ids, status, completion_reason, answered_count, started_at, completed_at, total_score, max_score, created_at, detailed_results')
+    .select('id, user_id, exam_id, language, attempt_kind, section_ids, status, completion_reason, answered_count, started_at, completed_at, total_score, max_score, created_at, detailed_results')
     .eq('user_id', profile.id)
     .order('created_at', { ascending: false });
 
@@ -149,7 +204,7 @@ export async function listAttempts() {
   return attempts.map((attempt) => ({
     ...attempt,
     exam_format: examFormats.get(attempt.exam_id) ?? null,
-    section_scores: buildAttemptSectionScores(attempt.detailed_results, questionSectionIds, sectionsById),
+    section_scores: buildAttemptSectionScores(attempt.detailed_results, questionSectionIds, sectionsById, attempt.language),
   }));
 }
 

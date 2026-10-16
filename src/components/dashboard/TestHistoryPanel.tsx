@@ -9,6 +9,8 @@ import { isFullCompletion, isTerminalAttempt, isResumableAttempt } from '@/lib/t
 import type { ExamAttemptReview } from '@/components/dashboard/ReviewView';
 import { cn } from '@/lib/utils';
 import { isFeatureEnabled } from '@/lib/features';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { formatDate as i18nFormatDate } from '@/lib/i18n/format';
 
 interface TestHistoryPanelProps {
   pastExams: ExamAttemptReview[];
@@ -18,6 +20,7 @@ interface TestHistoryPanelProps {
 }
 
 export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, onResumeAttempt }: TestHistoryPanelProps) {
+  const { lang, t } = useLanguage();
   const [kindFilter, setKindFilter] = useState<'all' | 'mock' | 'drill'>('all');
   const showDrills = isFeatureEnabled('ENABLE_SUBTEST_DRILLS');
 
@@ -40,11 +43,9 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
     return Math.round(((attempt.total_score ?? 0) / attempt.max_score) * 100);
   };
 
-  const formatDate = (value?: string) => {
-    if (!value) return 'Date unavailable';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime)) return 'Date unavailable';
-    return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const formatDisplayDate = (value?: string) => {
+    if (!value) return t('common.dateUnavailable');
+    return i18nFormatDate(value, lang, { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   if (completedAttempts.length === 0 && inProgressAttempts.length === 0) {
@@ -53,10 +54,10 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-              Attempt History
+              {t('history.attemptHistory')}
             </p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-              Your Performance
+              {t('history.yourPerformance')}
             </h2>
           </div>
           <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -68,9 +69,9 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
           <div className="grid size-12 place-items-center rounded-full bg-slate-50 text-slate-400 mx-auto mb-3">
             <CheckCircle2 className="size-5" />
           </div>
-          <p className="text-sm font-medium text-slate-900">No attempts yet</p>
+          <p className="text-sm font-medium text-slate-900">{t('history.noAttemptsYet')}</p>
           <p className="mt-1 text-xs text-slate-500">
-            Your test history will appear here after you complete an attempt.
+            {t('history.noAttemptsDesc')}
           </p>
         </div>
       </KniCard>
@@ -82,10 +83,10 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-            Attempt History
+            {t('history.attemptHistory')}
           </p>
           <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-            Your Performance
+            {t('history.yourPerformance')}
           </h2>
         </div>
         <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -106,7 +107,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                 : 'text-slate-600 hover:text-slate-900'
             )}
           >
-            All
+            {t('common.all')}
           </button>
           <button
             type="button"
@@ -118,7 +119,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                 : 'text-slate-600 hover:text-slate-900'
             )}
           >
-            Mock Tests
+            {t('history.filterMocks')}
           </button>
           <button
             type="button"
@@ -130,7 +131,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                 : 'text-slate-600 hover:text-slate-900'
             )}
           >
-            Subtest Drills
+            {t('history.filterDrills')}
           </button>
         </div>
       )}
@@ -140,7 +141,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
         {inProgressAttempts.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              In Progress
+              {t('common.inProgress')}
             </h3>
             {inProgressAttempts.map((attempt) => (
               <div
@@ -153,14 +154,14 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                       "inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
                       attempt.attempt_kind === 'drill' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                     )}>
-                      {attempt.attempt_kind === 'drill' ? 'Drill' : 'Mock'}
+                      {attempt.attempt_kind === 'drill' ? t('common.drill') : t('common.mock')}
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
                       <Clock className="size-3" />
-                      In Progress
+                      {t('common.inProgress')}
                     </span>
                     <p className="text-xs text-slate-500">
-                      Started on {formatDate(attempt.created_at)}
+                      {t('history.startedOn', { date: formatDisplayDate(attempt.created_at) })}
                     </p>
                   </div>
                 </div>
@@ -170,7 +171,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                   className="h-9 px-4 text-xs font-bold"
                 >
                   <PlayCircle className="size-3.5 mr-1.5" />
-                  Resume
+                  {t('common.resume')}
                 </KniButton>
               </div>
             ))}
@@ -181,7 +182,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
         {completedAttempts.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Completed ({completedAttempts.length})
+              {t('history.completedWithCount', { count: completedAttempts.length })}
             </h3>
             {completedAttempts.map((attempt) => {
               const isEarly = attempt.completion_reason === 'ended_early';
@@ -204,26 +205,31 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                           ? "bg-purple-100 text-purple-700"
                           : "bg-blue-100 text-blue-700"
                       )}>
-                        {attempt.attempt_kind === 'drill' ? 'Subtest Drill' : 'Mock Exam'}
+                        {attempt.attempt_kind === 'drill' ? t('history.subtestDrill') : t('history.mockExam')}
                       </span>
                       <p className="text-sm font-bold text-slate-900 truncate">
-                        Attempt on {formatDate(attempt.created_at)}
+                        {t('history.attemptOn', { date: formatDisplayDate(attempt.created_at) })}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       {isEarly ? (
                         <p className="text-xs text-slate-500">
-                          Score: <span className="font-semibold text-slate-900">{totalScore}/{answeredCount}</span> correct • Answered <span className="font-semibold text-slate-900">{answeredCount}/{maxScore}</span> ({completion}%)
+                          {t('history.scoreEarly', {
+                            total: totalScore,
+                            answered: answeredCount,
+                            max: maxScore,
+                            completion
+                          })}
                         </p>
                       ) : (
                         <p className="text-xs text-slate-500">
-                          Score: <span className="font-semibold text-slate-900">{totalScore}/{maxScore}</span> correct
+                          {t('history.scoreCorrect', { total: totalScore, max: maxScore })}
                         </p>
                       )}
                       {isEarly && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider">
                           <AlertTriangle className="size-2.5" />
-                          Ended Early
+                          {t('common.endedEarly')}
                         </span>
                       )}
                     </div>
@@ -232,7 +238,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                     <div className="text-right">
                       <span className="text-lg font-black text-slate-950">{accuracy}%</span>
                       <span className="block text-[9px] font-bold uppercase text-slate-400">
-                        {isEarly ? 'Accuracy' : 'Score'}
+                        {isEarly ? t('common.accuracy') : t('common.score')}
                       </span>
                     </div>
                     <KniButton
@@ -241,7 +247,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
                       className="h-9 px-4 text-xs font-bold"
                     >
                       <ChevronRight className="size-3.5 ml-1" />
-                      Review
+                      {t('common.review')}
                     </KniButton>
                   </div>
                 </div>
@@ -256,7 +262,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
         <div className="mt-5 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {kindFilter === 'drill' ? 'Best Drill Score' : 'Best Mock Score'}
+              {kindFilter === 'drill' ? t('history.bestDrillScore') : t('history.bestMockScore')}
             </p>
             <p className="text-xl font-black text-slate-950 mt-1">
               {(() => {
@@ -272,7 +278,7 @@ export function TestHistoryPanel({ pastExams, selectedExamId, onSelectAttempt, o
           </div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {kindFilter === 'drill' ? 'Average Drill' : 'Average Mock'}
+              {kindFilter === 'drill' ? t('history.averageDrill') : t('history.averageMock')}
             </p>
             <p className="text-xl font-black text-slate-950 mt-1">
               {(() => {

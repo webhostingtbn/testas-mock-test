@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+
 interface QuestionPaginationProps {
   totalQuestions: number;
   currentIndex: number;
@@ -15,6 +17,7 @@ export default function QuestionPagination({
   onQuestionClick,
   isCurrentQuestionRated = false,
 }: QuestionPaginationProps) {
+  const { t } = useLanguage();
   const answeredSet = new Set(answeredIndices);
 
   return (
@@ -43,8 +46,8 @@ export default function QuestionPagination({
             `}
             title={
               isDisabled 
-                ? "Rate the current question first to navigate" 
-                : `Question ${i + 1}${isAnswered ? ' (answered)' : ''}`
+                ? t('exam.rateCurrentToNavigate') 
+                : `${t('common.questions')} ${i + 1}${isAnswered ? ` (${t('practice.answered').toLowerCase()})` : ''}`
             }
           >
             {i + 1}

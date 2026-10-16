@@ -2,6 +2,7 @@
 
 import { Smile, Meh, Frown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface RatingWidgetProps {
   value: 'easy' | 'medium' | 'hard' | null;
@@ -16,11 +17,12 @@ export default function RatingWidget({
   disabled = false,
   className,
 }: RatingWidgetProps) {
+  const { t } = useLanguage();
+
   const options = [
     {
       id: 'easy' as const,
-      label: 'Easy',
-      labelVi: 'Dễ',
+      labelKey: 'common.easy' as const,
       icon: Smile,
       colorClass: {
         active: 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600 shadow-md shadow-emerald-500/20',
@@ -29,8 +31,7 @@ export default function RatingWidget({
     },
     {
       id: 'medium' as const,
-      label: 'Medium',
-      labelVi: 'Vừa',
+      labelKey: 'common.medium' as const,
       icon: Meh,
       colorClass: {
         active: 'bg-amber-500 hover:bg-amber-400 text-white border-amber-500 shadow-md shadow-amber-500/20',
@@ -39,8 +40,7 @@ export default function RatingWidget({
     },
     {
       id: 'hard' as const,
-      label: 'Hard',
-      labelVi: 'Khó',
+      labelKey: 'common.hard' as const,
       icon: Frown,
       colorClass: {
         active: 'bg-rose-600 hover:bg-rose-500 text-white border-rose-600 shadow-md shadow-rose-500/20',
@@ -52,8 +52,8 @@ export default function RatingWidget({
   return (
     <div className={cn("rounded-2xl border border-orange-100/60 bg-white p-4 px-4.5 shadow-sm", className)}>
       <div className="mb-3 text-center sm:text-left">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Feedback</h4>
-        <h3 className="text-sm font-bold text-slate-800 mt-0.5">Rate this question to proceed</h3>
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t('exam.ratingFeedback')}</h4>
+        <h3 className="text-sm font-bold text-slate-800 mt-0.5">{t('exam.rateToProceed')}</h3>
       </div>
       <div className="grid grid-cols-3 gap-2.5">
         {options.map((opt) => {
@@ -73,8 +73,7 @@ export default function RatingWidget({
             >
               <Icon className="w-4 h-4 shrink-0 transition-transform duration-200" />
               <div className="text-center sm:text-left">
-                <span className="block text-[11px] sm:text-xs leading-none">{opt.label}</span>
-                <span className={cn("block text-[9px] font-normal leading-none mt-0.5", isActive ? "text-white/80" : "text-slate-400")}>{opt.labelVi}</span>
+                <span className="block text-[11px] sm:text-xs leading-none">{t(opt.labelKey)}</span>
               </div>
             </button>
           );

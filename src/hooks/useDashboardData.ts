@@ -1,5 +1,4 @@
 "use client";
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,6 +11,7 @@ import { signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { useExamOrchestrator } from '@/lib/exam/orchestrator';
 import { usePracticeStore } from '@/lib/store/practice-store';
+import { useUserStore } from '@/lib/store/user-store';
 import { calculatePeakRadarStats, type RadarStat } from '@/lib/exam/radar-stats';
 import { isFeatureEnabled } from '@/lib/features';
 
@@ -97,6 +97,7 @@ export function useDashboardData(session: Session) {
         const realProfile = meData.profile as Profile;
 
         setProfile(realProfile);
+        useUserStore.getState().setProfile(realProfile);
         if (realProfile.module_test && !searchParams.get('module')) {
           setActiveModule(realProfile.module_test as ModuleTestType);
         }

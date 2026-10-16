@@ -19,6 +19,7 @@ import WatermarkOverlay from '@/components/exam/WatermarkOverlay';
 import { questionRendererFactory, QuestionData } from '@/lib/exam/renderer';
 import { ImageService } from '@/lib/services/image-service';
 import { usePracticeStore } from '@/lib/store/practice-store';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface PracticeQuestion {
   id: string;
@@ -71,6 +72,7 @@ export default function PracticeSession({
   onExit,
   onQuestionRated,
 }: PracticeSessionProps) {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState<unknown>(null);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
@@ -242,8 +244,8 @@ export default function PracticeSession({
   if (!currentItem) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
-        <p className="text-muted-foreground">No practice items available.</p>
-        <KniButton onClick={onExit} className="mt-4">Back to Practice</KniButton>
+        <p className="text-muted-foreground">{t('practice.noItemsAvailable')}</p>
+        <KniButton onClick={onExit} className="mt-4">{t('practice.backToPractice')}</KniButton>
       </div>
     );
   }
@@ -452,7 +454,7 @@ export default function PracticeSession({
           <div className="min-w-0">
             <h2 className="font-semibold text-[18px] leading-tight text-[#18181B] truncate">{subtestTitle}</h2>
             <p className="text-[13px] text-[#71717A] capitalize truncate">
-              Folder: {folderId} • {answeredCount}/{questions.length} answered
+              {t('practice.folderInfo', { folder: folderId, answered: answeredCount, total: questions.length })}
             </p>
           </div>
 
@@ -464,8 +466,8 @@ export default function PracticeSession({
               <button
                 type="button"
                 onClick={() => setTimerHidden((v) => !v)}
-                aria-label={timerHidden ? 'Show timer' : 'Hide timer'}
-                title={timerHidden ? 'Show timer' : 'Hide timer'}
+                aria-label={timerHidden ? t('practice.showTimer') : t('practice.hideTimer')}
+                title={timerHidden ? t('practice.showTimer') : t('practice.hideTimer')}
                 className="w-7 h-7 rounded-lg flex items-center justify-center text-[#71717A] hover:text-[#18181B] hover:bg-white transition-colors"
               >
                 {timerHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -490,10 +492,11 @@ export default function PracticeSession({
         {/* Bottom dock (64px): help • navigator pill • rating + Back/Check/Next */}
         <footer className="flex-none min-h-16 pt-3 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="hidden md:inline text-[13px] font-medium text-[#71717A]">Rate:</span>
+            <span className="hidden md:inline text-[13px] font-medium text-[#71717A]">{t('practice.rate')}</span>
             <div className="flex items-center gap-1.5">
-              {RATING_OPTIONS.map(({ id, label, Icon }) => {
+              {RATING_OPTIONS.map(({ id, Icon }) => {
                 const isActive = ratingMap[currentItem.id] === id;
+                const label = id === 'easy' ? t('common.easy') : id === 'medium' ? t('common.medium') : t('common.hard');
                 return (
                   <button
                     key={id}
@@ -523,31 +526,31 @@ export default function PracticeSession({
               aria-haspopup="listbox"
               className="flex items-center gap-1.5 bg-[#F4F4F5] rounded-full px-4 py-2 text-[13px] font-medium text-[#18181B] hover:bg-[#ECECEE] transition-colors"
             >
-              Question {currentIndex + 1} of {questions.length}
+              {t('practice.questionOf', { current: currentIndex + 1, total: questions.length })}
               <ChevronDown className={`w-3.5 h-3.5 text-[#71717A] transition-transform ${navigatorOpen ? 'rotate-180' : ''}`} />
             </button>
             {navigatorOpen && (
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-[min(460px,calc(100vw-3rem))] bg-white border border-[#E5E7EB] rounded-xl p-3 z-40 shadow-lg">
                 <div className="flex items-center justify-between px-1 pb-2 border-b border-gray-100 mb-2">
                   <span className="text-[13px] font-medium text-[#71717A]">
-                    {answeredCount} of {questions.length} answered
+                    {t('practice.answeredOf', { answered: answeredCount, total: questions.length })}
                   </span>
                   <span className="flex items-center gap-2.5 text-[11px] text-[#71717A]">
                     <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> Correct
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" /> {t('practice.correct')}
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-rose-500" /> Wrong
+                      <span className="w-2 h-2 rounded-full bg-rose-500" /> {t('practice.wrong')}
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-[#18181B]" /> Answered
+                      <span className="w-2 h-2 rounded-full bg-[#18181B]" /> {t('practice.answered')}
                     </span>
                     <span className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full border border-[#D1D5DB]" /> Todo
+                      <span className="w-2 h-2 rounded-full border border-[#D1D5DB]" /> {t('practice.todo')}
                     </span>
                   </span>
                 </div>
-                <div role="listbox" aria-label="Questions" className="grid grid-cols-7 gap-1.5 max-h-[240px] overflow-y-auto custom-scrollbar">
+                <div role="listbox" aria-label={t('common.questions')} className="grid grid-cols-7 gap-1.5 max-h-[240px] overflow-y-auto custom-scrollbar">
                   {questions.map((q, idx) => {
                     const isActive = currentIndex === idx;
                     const isAnswered = isItemAnswered(q);
@@ -615,7 +618,7 @@ export default function PracticeSession({
               className="h-10 px-4 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] disabled:opacity-40 transition-colors flex items-center gap-1"
             >
               <ChevronLeft className="w-4 h-4" />
-              Back
+              {t('common.back')}
             </button>
 
             {/* Check Answer Button */}
@@ -629,12 +632,12 @@ export default function PracticeSession({
                 {isCheckingAnswer ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                    Checking...
+                    {t('practice.checking')}
                   </>
                 ) : (
                   <>
                     <CheckCircle2 className="w-4 h-4" />
-                    Check Answer
+                    {t('practice.checkAnswer')}
                   </>
                 )}
               </button>
@@ -649,12 +652,12 @@ export default function PracticeSession({
                 {currentIsCorrect ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Checked: Correct
+                    {t('practice.checkedCorrect')}
                   </>
                 ) : (
                   <>
                     <XCircle className="w-3.5 h-3.5" />
-                    Checked: Incorrect
+                    {t('practice.checkedIncorrect')}
                   </>
                 )}
               </div>
@@ -671,7 +674,7 @@ export default function PracticeSession({
               }}
               className="h-10 px-5 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"
             >
-              {isLastQuestion ? 'Finish' : 'Next'}
+              {isLastQuestion ? t('practice.finish') : t('common.next')}
               {!isLastQuestion && <ChevronRight className="w-4 h-4" />}
             </button>
           </div>

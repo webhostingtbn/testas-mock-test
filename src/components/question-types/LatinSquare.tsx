@@ -2,6 +2,7 @@
 
 import { CanvasImage } from './CanvasImage';
 import { isAbsoluteOrDataUrl } from '@/lib/services/image-service';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface LatinSquareContent {
   grid_image?: string;
@@ -33,6 +34,7 @@ export default function LatinSquare({
   onAnswer,
   verification,
 }: LatinSquareProps) {
+  const { t } = useLanguage();
   const content = question.content ?? {};
   const imageUrl = content.grid_image_url || (content.grid_image && isAbsoluteOrDataUrl(content.grid_image) ? content.grid_image : '');
   const options =
@@ -44,7 +46,7 @@ export default function LatinSquare({
   if (!imageUrl) {
     return (
       <div className="flex items-center justify-center h-48 text-sm text-[#71717A]">
-        Loading question...
+        {t('exam.loadingQuestion')}
       </div>
     );
   }
@@ -53,23 +55,23 @@ export default function LatinSquare({
     <div className="flex flex-col h-full min-h-0">
       {/* Pane label */}
       <div className="flex-none py-3">
-        <p className="text-[13px] font-medium text-[#71717A]">Find the missing letter</p>
+        <p className="text-[13px] font-medium text-[#71717A]">{t('exam.findMissingLetter')}</p>
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:divide-x lg:divide-[#E5E7EB]">
         {/* Left pane: grid puzzle — zoomable canvas, no nested card */}
         <div className="flex-1 min-h-0 flex flex-col px-6 sm:px-8 pb-6 lg:py-6">
           <div className="w-full max-w-2xl mx-auto h-[320px] sm:h-[400px] lg:h-[440px] shrink-0 overflow-hidden rounded-xl">
-            <CanvasImage src={imageUrl} alt="Latin square puzzle" />
+            <CanvasImage src={imageUrl} alt={t('exam.latinSquarePuzzle')} />
           </div>
         </div>
 
         {/* Right pane: answer options */}
         <div className="w-full lg:w-[300px] shrink-0 flex flex-col px-6 sm:px-8 pb-6 sm:pb-8 lg:py-6">
-          <p className="text-[13px] font-medium text-[#71717A] mb-4">Select answer</p>
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">{t('exam.selectAnswer')}</p>
           <div
             role="radiogroup"
-            aria-label="Answer options"
+            aria-label={t('exam.answerOptions')}
             className="grid grid-cols-5 lg:grid-cols-2 gap-[10px]"
           >
             {options.map((letter) => {

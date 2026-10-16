@@ -24,10 +24,21 @@ export interface SectionScoreReference {
   id: string;
   title: string;
   sort_order: number;
+  translations?: Json | null;
 }
 
-function isRecord(value: Json): value is { [key: string]: Json | undefined } {
+function isRecord(value: unknown): value is { [key: string]: Json | undefined } {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveSectionLabel(section: SectionScoreReference, language?: string | null): string {
+  if (language === 'de' && isRecord(section.translations)) {
+    const de = section.translations.de;
+    if (isRecord(de) && typeof de.title === 'string' && de.title.trim().length > 0) {
+      return de.title.trim();
+    }
+  }
+  return section.title;
 }
 
 function extractAnswerOutcomes(detailedResults: Json | null): AnswerOutcome[] {
@@ -50,6 +61,7 @@ export function buildAttemptSectionScores(
   detailedResults: Json | null,
   questionSectionIds: ReadonlyMap<string, string>,
   sectionsById: ReadonlyMap<string, SectionScoreReference>,
+  language?: string | null,
 ): AttemptSectionScore[] {
   const scores = new Map<string, AttemptSectionScore>();
 
@@ -60,7 +72,7 @@ export function buildAttemptSectionScores(
 
     const current = scores.get(section.id) ?? {
       key: section.id,
-      label: section.title,
+      label: resolveSectionLabel(section, language),
       correct: 0,
       total: 0,
       answers: [],

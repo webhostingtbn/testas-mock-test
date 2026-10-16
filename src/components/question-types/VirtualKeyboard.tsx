@@ -1,12 +1,14 @@
 'use client';
 
 import { Delete } from 'lucide-react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface VirtualKeyboardProps {
   onKeyPress: (key: string) => void;
 }
 
 export default function VirtualKeyboard({ onKeyPress }: VirtualKeyboardProps) {
+  const { t } = useLanguage();
   const keys = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0'];
 
   return (
@@ -31,7 +33,7 @@ export default function VirtualKeyboard({ onKeyPress }: VirtualKeyboardProps) {
       <button
         type="button"
         onClick={() => onKeyPress('delete')}
-        aria-label="Delete last digit"
+        aria-label={t('exam.deleteKeyAria')}
         className="
           col-span-2 h-12 rounded-[10px] border border-[#E5E7EB] bg-white
           hover:border-[#D1D5DB] hover:bg-[#FAFAFA] active:bg-[#F4F4F5]
@@ -41,7 +43,7 @@ export default function VirtualKeyboard({ onKeyPress }: VirtualKeyboardProps) {
         "
       >
         <Delete className="w-4 h-4" />
-        Delete
+        {t('exam.deleteKey')}
       </button>
     </div>
   );

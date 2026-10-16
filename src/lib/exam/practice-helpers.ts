@@ -99,3 +99,45 @@ export function groupPracticeItemsByPassage(
   }
   return result;
 }
+
+export interface PracticeQuestionWithPassage {
+  id: string;
+  passage_id?: string | null;
+  content?: unknown;
+  [key: string]: unknown;
+}
+
+export interface PracticePassageSource {
+  id: string;
+  title: string;
+  body_markdown: string;
+  image_url?: string | null;
+}
+
+/**
+ * Merges localized passage fields (title, body_markdown, image_url) into
+ * matching child questions' content object.
+ */
+export function enrichPracticeQuestions<
+  Q extends PracticeQuestionWithPassage,
+  P extends PracticePassageSource,
+>(questions: Q[], passages: P[]): Q[] {
+  const passageMap = new Map(passages.map((p) => [p.id, p]));
+  return questions.map((q) => {
+    const passage = q.passage_id ? passageMap.get(q.passage_id) : undefined;
+    if (passage) {
+      const contentObj = typeof q.content === 'object' && q.content !== null ? q.content : {};
+      return {
+        ...q,
+        content: {
+          ...contentObj,
+          passage_title: passage.title,
+          passage_markdown: passage.body_markdown,
+          passage_image_url: passage.image_url,
+        },
+      };
+    }
+    return q;
+  });
+}
+

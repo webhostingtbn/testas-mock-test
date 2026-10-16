@@ -23,6 +23,7 @@ import type { Profile, ModuleTestType } from '@/lib/types';
 import PracticeFolderView from './PracticeFolderView';
 import PracticeSession from './PracticeSession';
 import { usePracticeStore } from '@/lib/store/practice-store';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import {
   PAPER_CORE_SUBTESTS,
   DIGITAL_CORE_SUBTESTS,
@@ -64,6 +65,7 @@ interface DifficultySegment {
 }
 
 export function PracticeView({ profile, activeModule, onBackNavigation }: PracticeViewProps) {
+  const { t } = useLanguage();
   const {
     sections,
     questions,
@@ -451,19 +453,19 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
   const difficultySegments: DifficultySegment[] = [
     {
       key: 'hard',
-      label: 'Hard',
+      label: t('common.hard'),
       className: 'bg-rose-500',
       hoverClassName: 'group-hover:bg-rose-600',
     },
     {
       key: 'medium',
-      label: 'Medium',
+      label: t('common.medium'),
       className: 'bg-amber-400',
       hoverClassName: 'group-hover:bg-amber-500',
     },
     {
       key: 'easy',
-      label: 'Easy',
+      label: t('common.easy'),
       className: 'bg-emerald-500',
       hoverClassName: 'group-hover:bg-emerald-600',
     },
@@ -579,13 +581,13 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Recommended next
+                {t('practice.recommendedPractice')}
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <h3 className="truncate text-base font-black text-slate-950">
                   {practiceSubtest
                     ? practiceSubtest.title
-                    : 'Start your first practice session'}
+                    : t('dashboard.startFirstSession')}
                 </h3>
                 <span className="text-xs font-semibold text-slate-400">
                   {overallStats.totalRated > 0
@@ -599,7 +601,7 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
                 onClick={() => practiceSubtest && setSelectedSubtest(practiceSubtest.id)}
                 className="h-11 px-5 text-sm"
               >
-                Practice
+                {t('practice.practiceButton')}
                 <ChevronRight className="size-4" />
               </KniButton>
             </div>
@@ -610,23 +612,12 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
-                  Your study plan
+                  {t('practice.yourStudyPlan')}
                 </p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                  Recommended practice
+                  {t('practice.recommendedPractice')}
                 </h2>
               </div>
-
-              {/* <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-slate-400 focus-within:border-orange-300 focus-within:text-orange-600">
-                <Search className="size-4" />
-                <span className="sr-only">Search practice areas</span>
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Find a practice area"
-                  className="w-full bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400 sm:w-44"
-                />
-              </label> */}
             </div>
 
             <KniCard className="p-0">
@@ -663,15 +654,15 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
                             {counts.total > 0 ? (
                               <>
                                 <span className="flex items-center gap-1 text-xs font-medium">
-                                  <span className="text-rose-500">{counts.hard} HARD</span>
+                                  <span className="text-rose-500">{counts.hard} {t('practice.hardFolder')}</span>
                                   <span className="text-slate-300">|</span>
-                                  <span className="text-amber-500">{counts.medium} MEDIUM</span>
+                                  <span className="text-amber-500">{counts.medium} {t('practice.mediumFolder')}</span>
                                   <span className="text-slate-300">|</span>
-                                  <span className="text-emerald-500">{counts.easy} EASY</span>
+                                  <span className="text-emerald-500">{counts.easy} {t('practice.easyFolder')}</span>
                                 </span>
                               </>
                             ) : (
-                              <span className="text-xs font-medium text-slate-400">No rated questions</span>
+                              <span className="text-xs font-medium text-slate-400">{t('practice.noRatedQuestions')}</span>
                             )}
                           </div>
                         </div>
@@ -682,8 +673,8 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
                 );
               }) : (
                 <div className="px-5 py-10 text-center">
-                  <p className="text-sm font-bold text-slate-700">No matching practice area</p>
-                  <p className="mt-1 text-xs text-slate-400">Try a shorter search term.</p>
+                  <p className="text-sm font-bold text-slate-700">{t('practice.noMatchingArea')}</p>
+                  <p className="mt-1 text-xs text-slate-400">{t('practice.tryShorterSearch')}</p>
                 </div>
               )}
             </KniCard>
@@ -727,10 +718,10 @@ export function PracticeView({ profile, activeModule, onBackNavigation }: Practi
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-                  Study Focus
+                  {t('practice.studyFocus')}
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  Question breakdown
+                  {t('practice.questionBreakdown')}
                 </h2>
               </div>
               <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">

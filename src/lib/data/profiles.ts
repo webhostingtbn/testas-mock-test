@@ -62,3 +62,16 @@ export async function updateMyProfile(updates: unknown): Promise<UserProfile> {
     allow_test_limit: data.allow_test_limit ?? 1,
   };
 }
+
+export async function updatePreferredLanguage(userId: string, lang: import('@/lib/i18n/config').Lang): Promise<void> {
+  const supabase = getAdminSupabaseClient();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ preferred_language: lang })
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(`Failed to update preferred language: ${error.message}`);
+  }
+}
+

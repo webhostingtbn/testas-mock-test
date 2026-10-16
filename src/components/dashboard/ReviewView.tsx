@@ -15,6 +15,8 @@ import {
 } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { MajorType, Profile, AttemptKind } from '@/lib/types';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { formatDate } from '@/lib/i18n/format';
 
 interface AnswerData {
   question_id: string;
@@ -118,6 +120,7 @@ function getAttemptKey(attempt: ExamAttemptReview): string | null {
 }
 
 export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
+  const { lang, t } = useLanguage();
   const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(getAttemptKey(attempt));
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
@@ -296,15 +299,16 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     }));
   };
 
-  const dateCompletedStr = selectedAttempt.completed_at || selectedAttempt.created_at
-    ? new Date(selectedAttempt.completed_at || selectedAttempt.created_at || '').toLocaleString('vi-VN', {
+  const rawDate = selectedAttempt.completed_at || selectedAttempt.created_at;
+  const dateCompletedStr = rawDate
+    ? formatDate(rawDate, lang, {
         hour: '2-digit',
         minute: '2-digit',
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-      }).replace(',', '')
-    : 'Date unavailable';
+      })
+    : t('common.dateUnavailable');
 
   const isEarly = selectedAttempt.completion_reason === 'ended_early';
   const totalScore = selectedAttempt.total_score ?? 0;
@@ -318,7 +322,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
     <div className="mx-auto flex h-auto w-full flex-col overflow-visible lg:h-full lg:overflow-auto">
       <div className="mb-4 sm:mb-6">
         <p className="text-sm leading-6 text-slate-500">
-          Format: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || 'Digital'}</span> • {isEarly ? 'Ended early' : 'Completed'} on {dateCompletedStr}
+          {t('common.format')}: <span className="font-medium text-slate-700">{profile?.format || selectedAttempt.exams?.format || t('common.digital')}</span> • {t('review.completedOn', { status: isEarly ? t('common.endedEarly') : t('common.completed'), date: dateCompletedStr })}
         </p>
       </div>
 
@@ -327,7 +331,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center md:gap-6">
           <div>
             <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 sm:tracking-[0.18em]">
-              Score Summary
+              {t('common.scoreSummary')}
             </p>
             <div className="flex items-baseline gap-3">
               <span className="text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">
@@ -335,7 +339,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                 {isEarly && <span className="text-2xl font-bold">%</span>}
               </span>
               <span className="text-lg text-slate-400 font-medium">
-                {isEarly ? `(${totalScore}/${answeredCount} correct)` : `/ ${maxScore}`}
+                {isEarly ? `(${t('dashboard.correctOutOfTotal', { correct: totalScore, total: answeredCount })})` : `/ ${maxScore}`}
               </span>
               <span
                 className={cn(
@@ -347,21 +351,31 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                       : 'border-rose-200 bg-rose-50 text-rose-700'
                 )}
               >
-                {accuracyPercentage}% Accuracy
+                {t('results.accuracy', { percent: accuracyPercentage })}
               </span>
               {isEarly && (
                 <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 text-amber-700 px-3 py-1 text-xs font-bold">
-                  Ended Early ({completionPercentage}% Completed)
+                  {t('results.endedEarlyBadge', { percent: completionPercentage })}
                 </span>
               )}
             </div>
             {isEarly ? (
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                You answered <span className="font-bold text-slate-900">{answeredCount}</span> of <span className="font-bold text-slate-900">{maxScore}</span> total questions ({completionPercentage}% test completion) and scored <span className="font-bold text-slate-900">{totalScore}</span> correct ({accuracyPercentage}% accuracy).
+                {t('results.answeredSummary', {
+                  answered: answeredCount,
+                  total: maxScore,
+                  completion: completionPercentage,
+                  correct: totalScore,
+                  accuracy: accuracyPercentage,
+                })}
               </p>
             ) : (
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                You correctly answered <span className="font-bold text-slate-900">{totalScore}</span> questions out of <span className="font-bold text-slate-900">{maxScore}</span> total questions ({accuracyPercentage}%).
+                {t('results.fullSummary', {
+                  correct: totalScore,
+                  total: maxScore,
+                  accuracy: accuracyPercentage,
+                })}
               </p>
             )}
           </div>
@@ -372,17 +386,17 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                 className="mb-2"
               />
               <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">
-                {isEarly ? 'Accuracy' : 'Performance'}
+                {isEarly ? t('common.accuracy') : t('results.performance')}
               </span>
             </div>
             <div className="hidden h-10 w-px bg-slate-100 md:block" />
             <div className="hidden min-w-[120px] flex-col gap-1 md:flex">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Calendar className="size-3.5" />
-                <span className="font-medium">{isEarly ? 'Ended Early' : 'Completed'}</span>
+                <span className="font-medium">{isEarly ? t('common.endedEarly') : t('common.completed')}</span>
               </div>
               <span className="text-xs text-slate-400">
-                {isEarly ? `Partial attempt (${answeredCount}/${maxScore} Qs)` : 'Official mock conditions'}
+                {isEarly ? t('review.partialAttempt', { answered: answeredCount, max: maxScore }) : t('results.officialConditionsBadge')}
               </span>
             </div>
           </div>
@@ -394,10 +408,10 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
         <div className="mb-4 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600 mb-1">
-              Score Progression
+              {t('dashboard.scoreProgression')}
             </p>
             <h3 className="text-lg font-black tracking-tight text-slate-950">
-              Over time
+              {t('dashboard.overTime')}
             </h3>
           </div>
           <div className="grid size-9 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -443,7 +457,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                     />
                   </div>
                   <span className={`text-[10px] mt-2 font-bold ${isCurrent ? 'text-orange-700 font-extrabold' : 'text-slate-400'}`}>
-                    {isCurrent ? 'Current' : `#${idx + 1}`}
+                    {isCurrent ? t('review.current') : `#${idx + 1}`}
                   </span>
                 </button>
               );
@@ -453,7 +467,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
           <div className="h-40 flex items-center justify-center text-sm text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
             <div className="flex items-center gap-2">
               <BarChart2 className="size-4" />
-              <span>No progress history available</span>
+              <span>{t('dashboard.noProgressHistory')}</span>
             </div>
           </div>
         )}
@@ -466,7 +480,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
             <FileText className="size-4" />
           </div>
           <h3 className="text-base font-black tracking-tight text-slate-950">
-            Subtest Reviews
+            {t('review.subtestReviews')}
           </h3>
         </div>
 
@@ -495,7 +509,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                         {section.title}
                       </h4>
                       <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                        {DIGITAL_MODULE_TYPES.has(section.type) ? 'Module Subtest' : 'Core Subtest'}
+                        {DIGITAL_MODULE_TYPES.has(section.type) ? t('common.moduleSubtest') : t('common.coreSubtest')}
                       </span>
                     </div>
                   </div>
@@ -505,7 +519,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                       <div className="flex-1">
                         <KniProgress value={pct} />
                         <div className="flex items-center justify-between gap-1 text-[10px] font-bold mt-1">
-                          <span className="text-slate-500">Score</span>
+                          <span className="text-slate-500">{t('common.score')}</span>
                           <span className="text-slate-900">{correct} / {total}</span>
                         </div>
                       </div>
@@ -515,7 +529,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                           {pct}%
                         </span>
                         <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                          {pct >= 80 ? 'Excellent' : pct >= 50 ? 'Good' : 'Needs Work'}
+                          {pct >= 80 ? t('review.excellent') : pct >= 50 ? t('review.good') : t('review.needsWork')}
                         </span>
                       </div>
                     </div>
@@ -533,7 +547,7 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                     {sectionAnswers.length === 0 ? (
                       <div className="text-center py-6 text-sm text-slate-500 flex items-center justify-center gap-2 bg-slate-100/50 rounded-lg">
                         <AlertCircle className="size-4" />
-                        <span>Detailed question indicators are not available for this subtest.</span>
+                        <span>{t('review.detailedUnavailable')}</span>
                       </div>
                     ) : (
                       <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
@@ -550,9 +564,16 @@ export function ReviewView({ profile, attempt, pastExams }: ReviewViewProps) {
                                     ? 'bg-emerald-50/80 border-emerald-200 text-emerald-700'
                                     : 'bg-rose-50/80 border-rose-200 text-rose-700'
                               }`}
-                              title={`Question ${idx + 1}: ${!isAnswered ? 'Unvisited' : isCorrect ? 'Correct' : 'Incorrect'}`}
+                              title={t('review.questionLabel', {
+                                number: idx + 1,
+                                status: !isAnswered
+                                  ? t('review.unvisited')
+                                  : isCorrect
+                                    ? t('review.correct')
+                                    : t('review.incorrect'),
+                              })}
                             >
-                              <span className="text-[9px] text-slate-400 font-semibold block leading-none mb-0.5">Q{idx + 1}</span>
+                              <span className="text-[9px] text-slate-400 font-semibold block leading-none mb-0.5">{t('review.qPrefix', { number: idx + 1 })}</span>
                               <span className="leading-none text-xs">{!isAnswered ? '—' : isCorrect ? '✓' : '✗'}</span>
                             </div>
                           );

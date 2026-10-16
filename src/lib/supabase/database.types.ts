@@ -33,6 +33,7 @@ export interface Database {
         allow_test_limit: number | null;
         status: string | null;
         format: string | null;
+        preferred_language: 'en' | 'de' | null;
       }>;
       exams: TableDefinition<{
         id: string;
@@ -54,6 +55,7 @@ export interface Database {
         question_count: number;
         sort_order: number;
         environment_content: Json | null;
+        translations: Json;
         created_at: string;
       }>;
       passages: TableDefinition<{
@@ -62,6 +64,7 @@ export interface Database {
         title: string;
         body_markdown: string;
         image_url: string | null;
+        translations: Json;
         sort_order: number;
       }>;
       questions: TableDefinition<{
@@ -71,6 +74,7 @@ export interface Database {
         question_type: string;
         content: Json;
         correct_answer?: Json;
+        translations: Json;
         passage_id: string | null;
         created_at: string;
       }>;
@@ -78,6 +82,7 @@ export interface Database {
         id: string;
         user_id: string;
         exam_id: string;
+        language: 'en' | 'de';
         attempt_kind: 'mock' | 'drill';
         section_ids: string[] | null;
         status: string;
@@ -100,7 +105,16 @@ export interface Database {
         updated_at: string;
       }>;
     };
-    Views: Record<string, never>;
+    Views: {
+      section_de_gaps: {
+        Row: {
+          section_id: string;
+          exam_id: string;
+          missing_de: number;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       create_attempt_transaction: {
         Args: {

@@ -14,6 +14,7 @@ CREATE TABLE public.profiles (
   allow_test_limit integer NOT NULL DEFAULT 1,
   status USER-DEFINED NOT NULL DEFAULT 'Pending'::profile_status,
   format USER-DEFINED NOT NULL DEFAULT 'Unassign'::profile_format,
+  preferred_language text CHECK (preferred_language = ANY (ARRAY['en'::text, 'de'::text])),
   CONSTRAINT profiles_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.exams (
@@ -37,9 +38,11 @@ CREATE TABLE public.sections (
   question_count integer NOT NULL DEFAULT 20,
   sort_order integer NOT NULL DEFAULT 0,
   environment_content jsonb,
+  translations jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT sections_pkey PRIMARY KEY (id),
-  CONSTRAINT sections_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id)
+  CONSTRAINT sections_exam_id_fkey FOREIGN KEY (exam_id) REFERENCES public.exams(id),
+  CONSTRAINT sections_translations_shape CHECK (jsonb_typeof(translations) = 'object' AND (translations - 'de') = '{}'::jsonb)
 );
 CREATE TABLE public.questions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -48,16 +51,19 @@ CREATE TABLE public.questions (
   question_type USER-DEFINED NOT NULL,
   content jsonb NOT NULL,
   correct_answer jsonb NOT NULL,
+  translations jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   passage_id uuid,
   CONSTRAINT questions_pkey PRIMARY KEY (id),
   CONSTRAINT questions_section_id_fkey FOREIGN KEY (section_id) REFERENCES public.sections(id),
-  CONSTRAINT questions_passage_id_fkey FOREIGN KEY (passage_id) REFERENCES public.passages(id)
+  CONSTRAINT questions_passage_id_fkey FOREIGN KEY (passage_id) REFERENCES public.passages(id),
+  CONSTRAINT questions_translations_shape CHECK (jsonb_typeof(translations) = 'object' AND (translations - 'de') = '{}'::jsonb)
 );
 CREATE TABLE public.user_exams (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   exam_id uuid NOT NULL,
+  language text NOT NULL DEFAULT 'en'::text CHECK (language = ANY (ARRAY['en'::text, 'de'::text])),
   status USER-DEFINED NOT NULL DEFAULT 'not_started'::exam_status,
   started_at timestamp with time zone,
   completed_at timestamp with time zone,
@@ -100,9 +106,11 @@ CREATE TABLE public.passages (
   title text NOT NULL,
   body_markdown text NOT NULL,
   image_url text,
+  translations jsonb NOT NULL DEFAULT '{}'::jsonb,
   sort_order integer DEFAULT 0,
   CONSTRAINT passages_pkey PRIMARY KEY (id),
-  CONSTRAINT passages_section_id_fkey FOREIGN KEY (section_id) REFERENCES public.sections(id)
+  CONSTRAINT passages_section_id_fkey FOREIGN KEY (section_id) REFERENCES public.sections(id),
+  CONSTRAINT passages_translations_shape CHECK (jsonb_typeof(translations) = 'object' AND (translations - 'de') = '{}'::jsonb)
 );
 CREATE TABLE public.user_question_practices (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -114,3 +122,26 @@ CREATE TABLE public.user_question_practices (
   CONSTRAINT user_question_practices_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.profiles(id),
   CONSTRAINT user_question_practices_question_id_fkey FOREIGN KEY (question_id) REFERENCES public.questions(id)
 );
+CREATE INDEX IF NOT EXISTS idx_questions_section_id ON public.questions(section_id);
+CREATE INDEX IF NOT EXISTS idx_passages_section_id  ON public.passages(section_id);
+
+CREATE OR REPLACE VIEW public.section_de_gaps
+WITH (security_invoker = true) AS
+SELECT s.id AS section_id, s.exam_id,
+  ( (CASE WHEN btrim(coalesce(s.translations #>> '{de,title}', '')) = ''
+           OR (btrim(coalesce(s.description,'')) <> '' AND btrim(coalesce(s.translations #>> '{de,description}', '')) = '')
+           OR (btrim(coalesce(s.environment_content->>'text','')) <> '' AND btrim(coalesce(s.translations #>> '{de,environment_content,text}', '')) = '')
+         THEN 1 ELSE 0 END)
+  + (SELECT count(*) FROM public.questions q
+      WHERE q.section_id = s.id
+        AND btrim(coalesce(q.content->>'question_text','')) <> ''
+        AND btrim(coalesce(q.translations #>> '{de,question_text}', '')) = '')
+  + (SELECT count(*) FROM public.passages p
+      WHERE p.section_id = s.id
+        AND ( btrim(coalesce(p.translations #>> '{de,title}', '')) = ''
+           OR (btrim(coalesce(p.body_markdown,'')) <> '' AND btrim(coalesce(p.translations #>> '{de,body_markdown}', '')) = '') ))
+  )::int AS missing_de
+FROM public.sections s;
+
+REVOKE ALL ON public.section_de_gaps FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.section_de_gaps TO service_role;

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchExamById } from '@/lib/data/exams';
+import { isLang } from '@/lib/i18n/config';
 
 export async function GET(
   request: Request,
@@ -7,7 +8,11 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const data = await fetchExamById(id);
+    const { searchParams } = new URL(request.url);
+    const langParam = searchParams.get('lang');
+    const lang = isLang(langParam) ? langParam : undefined;
+
+    const data = await fetchExamById(id, lang ? { lang } : undefined);
     return NextResponse.json(data);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';

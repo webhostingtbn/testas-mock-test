@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { ResilientImage } from './ResilientImage';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface ZoomableImageProps {
   src: string;
@@ -9,9 +10,11 @@ interface ZoomableImageProps {
   scaleDirection?: 'width' | 'height';
 }
 
-export function ZoomableImage({ src, alt = 'Graphic', scaleDirection = 'width' }: ZoomableImageProps) {
+export function ZoomableImage({ src, alt, scaleDirection = 'width' }: ZoomableImageProps) {
   const [imageScale, setImageScale] = useState(100);
+  const { t } = useLanguage();
   const isHeight = scaleDirection === 'height';
+  const resolvedAlt = alt ?? t('common.graphic');
 
   return (
     <div 
@@ -28,7 +31,7 @@ export function ZoomableImage({ src, alt = 'Graphic', scaleDirection = 'width' }
       >
         <ResilientImage
           src={src}
-          alt={alt}
+          alt={resolvedAlt}
           style={
             isHeight
               ? { height: `${imageScale}%`, width: 'auto', maxWidth: 'none', maxHeight: 'none', margin: 'auto' }
@@ -38,7 +41,7 @@ export function ZoomableImage({ src, alt = 'Graphic', scaleDirection = 'width' }
         />
       </div>
       <div className="w-full absolute bottom-2 max-w-sm flex items-center gap-3 px-4 py-1 bg-white rounded-full border border-gray-200 shadow-sm mt-2 z-10">
-        <span className="text-xs text-gray-500 font-medium">Zoom</span>
+        <span className="text-xs text-gray-500 font-medium">{t('common.zoom')}</span>
         <input
           type="range"
           min="10"

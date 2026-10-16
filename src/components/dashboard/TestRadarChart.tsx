@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { Target } from 'lucide-react';
 import { KniCard } from '@/components/KniPrimitives';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface RadarStat {
   key: string;
@@ -19,6 +20,7 @@ interface TestRadarChartProps {
 }
 
 export function TestRadarChart({ radarStats, isActiveModule }: TestRadarChartProps) {
+  const { t } = useLanguage();
   const cx = 150;
   const cy = 120;
   const maxRadius = 70;
@@ -263,7 +265,7 @@ export function TestRadarChart({ radarStats, isActiveModule }: TestRadarChartPro
       {/* Overall mastery indicator */}
       <div className="mt-5 pt-4 border-t border-slate-100">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-slate-500">Overall mastery</span>
+          <span className="text-xs font-medium text-slate-500">{t('dashboard.overallMastery')}</span>
           <span className="text-sm font-black text-slate-950">{overallMastery}%</span>
         </div>
         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">

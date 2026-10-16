@@ -17,6 +17,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isFeatureEnabled } from '@/lib/features';
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+import type { MessageKey } from '@/lib/i18n/messages';
 
 export function KniBackground({ children, className }: { children?: ReactNode; className?: string } = {}) {
   return (
@@ -143,15 +146,22 @@ type AppNavItem = {
   label: string;
 };
 
-const VIEW_LABELS: Record<DashboardView, string> = {
-  dashboard: 'Dashboard',
-  'subtest-drills': 'Subtest Drills',
-  mock: 'Mock Test',
-  practice: 'Practice',
-  users: 'Users',
-  cms: 'Content Management',
-  review: 'Attempt Review',
+const VIEW_LABEL_KEYS: Partial<Record<DashboardView, MessageKey>> = {
+  dashboard: 'dashboard.navDashboard',
+  'subtest-drills': 'dashboard.navSubtestDrills',
+  mock: 'dashboard.navMockTest',
+  practice: 'dashboard.navPractice',
+  cms: 'dashboard.contentManagement',
+  review: 'dashboard.attemptReview',
 };
+
+export function getViewLabel(
+  view: DashboardView,
+  t: (k: MessageKey) => string,
+): string {
+  const key = VIEW_LABEL_KEYS[view];
+  return key ? t(key) : view === 'users' ? 'Users' : '';
+}
 
 function getNavigation(isAdmin?: boolean): AppNavItem[] {
   const nav: AppNavItem[] = [
@@ -198,12 +208,7 @@ export function KniHeader({
 }) {
   const [imageError, setImageError] = useState(false);
   const router = useRouter();
-  const goHome = () => {
-    if (onViewChange) onViewChange('dashboard');
-    else router.push('/dashboard');
-  };
-
-  console.log("parentViewLabel", parentViewLabel);
+  const { t } = useLanguage();
 
   return (
     <header className="relative z-20 flex py-4 shrink-0 items-center justify-between border-b border-slate-100 bg-white px-3 md:px-5">
@@ -221,30 +226,22 @@ export function KniHeader({
           ) : null}
         <div className="min-w-0 text-left">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-600">
-            TestAS Preparation
+            {t('dashboard.title')}
           </p>
           <h1 className="truncate text-lg font-black tracking-tight text-slate-950">
-            {VIEW_LABELS[activeView]}
+            {getViewLabel(activeView, t)}
         </h1>
         </div>
       </div>
 
       <div className="flex items-center gap-2 md:gap-3">
-        {/* <button
-          type="button"
-          aria-label="Notifications"
-          title="Notifications"
-          className="relative hidden size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 sm:grid"
-        >
-          <Bell className="size-5" />
-          <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-orange-600 ring-2 ring-white" />
-        </button> */}
+        <LanguageSwitcher />
 
         {email && (
           <div className="hidden text-right lg:block">
             <p className="max-w-56 truncate text-xs font-bold text-slate-800">{email}</p>
             <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">
-              Student account
+              {t('dashboard.studentAccount')}
             </p>
           </div>
         )}
@@ -267,8 +264,8 @@ export function KniHeader({
             type="button"
             onClick={onLogout}
             className="grid size-10 place-items-center rounded-xl text-slate-500 transition hover:bg-red-50 hover:text-red-600"
-            title="Log out"
-            aria-label="Log out"
+            title={t('common.logout')}
+            aria-label={t('common.logout')}
           >
             <LogOut className="size-4.5" />
           </button>
@@ -294,6 +291,7 @@ export function KniSidebar({
   onToggleExpand?: () => void;
 }) {
   const router = useRouter();
+  const { t } = useLanguage();
   const nav = getNavigation(isAdmin);
 
   const handleNav = (item: AppNavItem) => {
@@ -343,11 +341,12 @@ export function KniSidebar({
       <nav className="flex flex-col gap-1 flex-1">
         {nav.map(item => {
           const isActive = activeView === item.id;
+          const label = getViewLabel(item.id, t);
           return (
             <button
               key={item.id}
               type="button"
-              title={isExpanded ? undefined : item.label}
+              title={isExpanded ? undefined : label}
               onClick={() => handleNav(item)}
               className={cn(
                 'flex items-center w-full h-10 rounded-xl transition-all duration-200 text-left',
@@ -364,7 +363,7 @@ export function KniSidebar({
                   isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
                 )}
               >
-                {item.label}
+                {label}
               </span>
             </button>
           );
@@ -376,7 +375,7 @@ export function KniSidebar({
         {onLogout && (
           <button
             type="button"
-            title="Log out"
+            title={t('common.logout')}
             onClick={onLogout}
             className={cn(
               'flex items-center w-full h-10 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all duration-200 text-left',
@@ -390,7 +389,7 @@ export function KniSidebar({
                 isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
               )}
             >
-              Log out
+              {t('common.logout')}
             </span>
           </button>
         )}
@@ -399,7 +398,7 @@ export function KniSidebar({
         {onToggleExpand && (
           <button
             type="button"
-            title={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+            title={isExpanded ? t('common.collapse') : t('common.expand')}
             onClick={onToggleExpand}
             className={cn(
               'hidden md:flex items-center w-full h-10 rounded-xl text-slate-400 hover:bg-orange-50 hover:text-slate-700 transition-all duration-200 text-left',
@@ -416,7 +415,7 @@ export function KniSidebar({
                 isExpanded ? 'md:max-w-40 md:opacity-100' : 'max-w-0 opacity-0',
               )}
             >
-              Collapse
+              {t('common.collapse')}
             </span>
           </button>
         )}
@@ -434,6 +433,7 @@ function KniMobileNav({
   activeView: DashboardView;
   onViewChange?: (view: DashboardView) => void;
 }) {
+  const { t } = useLanguage();
   const nav = getNavigation(isAdmin);
 
   return (
@@ -443,12 +443,13 @@ function KniMobileNav({
     >
       {nav.map(item => {
         const isActive = activeView === item.id;
+        const label = getViewLabel(item.id, t);
         return (
           <button
             key={item.id}
             type="button"
-            aria-label={item.label}
-            title={item.label}
+            aria-label={label}
+            title={label}
             onClick={() => onViewChange?.(item.id)}
             className={cn(
               'grid size-11 place-items-center rounded-xl transition-all duration-200',

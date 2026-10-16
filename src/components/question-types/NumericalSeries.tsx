@@ -1,5 +1,7 @@
 'use client';
 
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+
 export interface NumericalSeriesVerification {
   isVerified: boolean;
   isCorrect: boolean;
@@ -26,11 +28,16 @@ export default function NumericalSeries({
   onAnswer,
   verification,
 }: NumericalSeriesProps) {
+  const { t } = useLanguage();
   const sequence = question?.content?.sequence || [];
   // Find index of '?' or fallback to target_index, otherwise fallback to last element
   const fallbackIndex = sequence.indexOf('?') !== -1 ? sequence.indexOf('?') : sequence.length - 1;
   const targetIndex = question?.content?.target_index ?? fallbackIndex;
-  const prompt = question?.content?.prompt || 'Find the missing number in the numerical series.';
+  const defaultEnglishPrompt = 'Find the missing number in the numerical series.';
+  const rawPrompt = question?.content?.prompt?.trim();
+  const prompt = !rawPrompt || rawPrompt === defaultEnglishPrompt
+    ? t('exam.numericalPrompt')
+    : rawPrompt;
 
   const isVerified = Boolean(verification?.isVerified);
   const isCorrect = Boolean(verification?.isCorrect);
@@ -85,7 +92,7 @@ export default function NumericalSeries({
                       <span className={`text-[9px] font-bold uppercase tracking-wider ${
                         isVerified ? (isCorrect ? 'text-emerald-600' : 'text-rose-600') : 'text-orange-600'
                       }`}>
-                        {isVerified ? (isCorrect ? '✓ Correct' : '✕ Your Marks') : 'Your Marks'}
+                        {isVerified ? (isCorrect ? t('exam.correctBadge') : t('exam.yourMarksBadge')) : t('exam.yourMarks')}
                       </span>
                     </div>
 
@@ -95,7 +102,7 @@ export default function NumericalSeries({
                           {correctVal}
                         </div>
                         <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">
-                          Correct Solution
+                          {t('exam.correctSolution')}
                         </span>
                       </div>
                     )}
@@ -122,7 +129,7 @@ export default function NumericalSeries({
               <span>📝 TestAS Answer Sheet (Continuing Numerical Series)</span>
             </h4> */}
             <p className="text-xs text-slate-500 leading-relaxed">
-              Mark the digits that appear in your solution. If the number is negative, mark the <strong>"-"</strong> box. The order of the digits does not matter.
+              {t('exam.numericalInstructions')}
             </p>
           </div>
 
@@ -170,14 +177,14 @@ export default function NumericalSeries({
           </div>
           
           <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
-            <span>Example: For answer <strong>40</strong>, mark <strong>4</strong> and <strong>0</strong>.</span>
+            <span>{t('exam.numericalExample')}</span>
             {!isVerified && currentChars.length > 0 && (
               <button
                 type="button"
                 onClick={() => onAnswer('')}
                 className="text-orange-600 hover:text-orange-500 font-semibold cursor-pointer"
               >
-                Clear Marks
+                {t('exam.clearMarks')}
               </button>
             )}
           </div>

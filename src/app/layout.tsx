@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
+import { resolveRequestLang } from "@/lib/i18n/server";
+import { LanguageProvider } from "@/components/i18n/LanguageProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,16 +22,20 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const lang = await resolveRequestLang(null);
+
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
+    <html lang={lang} className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans">
         <AuthProvider>
-          {children}
+          <LanguageProvider initialLang={lang}>
+            {children}
+          </LanguageProvider>
         </AuthProvider>
         <Toaster position="top-right" richColors />
         <SpeedInsights />

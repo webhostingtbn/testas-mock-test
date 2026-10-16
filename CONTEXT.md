@@ -27,3 +27,14 @@ _Avoid_: Part, phase, module block
 **Attempt**:
 A tracked record of a user taking either a Mock Exam or a Subtest Drill, capturing user answers, timestamps, score, and completion status.
 _Avoid_: Session, run, test log
+
+**Content Language**:
+The language a student sees question content in; for an Attempt it is fixed at creation (`user_exams.language`).
+_Avoid_: locale, translation mode
+
+**Preferred Language**:
+The student's platform-wide setting (`profiles.preferred_language`) controlling UI and Practice Bank content.
+
+**Translation**:
+A German override of an English base row, stored in `translations.de`; English is always the complete base.
+_Avoid_: localisation copy, version

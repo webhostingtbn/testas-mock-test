@@ -22,6 +22,9 @@ import { MODULE_TEST_LABELS } from '@/lib/constants';
 import type { ModuleTestType, Profile } from '@/lib/types';
 import { isFullCompletion } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { LanguageSwitcher } from '@/components/i18n/LanguageSwitcher';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { formatDate as i18nFormatDate } from '@/lib/i18n/format';
 
 interface DashboardViewProps {
   profile: Profile | null;
@@ -58,13 +61,6 @@ function smoothPath(points: Array<{ x: number; y: number }>) {
   }, '');
 }
 
-function formatAttemptDate(value?: string) {
-  if (!value) return 'Date unavailable';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Date unavailable';
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-}
-
 const GRID_LEVELS = [25, 50, 75, 100];
 
 export function DashboardView({
@@ -79,8 +75,14 @@ export function DashboardView({
   activeFormatTab,
   onFormatTabChange,
 }: DashboardViewProps) {
+  const { lang, t } = useLanguage();
   const [avatarImageError, setAvatarImageError] = useState(false);
   const [chartViewMode, setChartViewMode] = useState<'graph' | 'list'>('graph');
+
+  const formatAttemptDate = (value?: string) => {
+    if (!value) return t('common.dateUnavailable');
+    return i18nFormatDate(value, lang, { day: '2-digit', month: 'short' });
+  };
 
   const cx = 200;
   const cy = 150;
@@ -167,7 +169,7 @@ export function DashboardView({
     ? Math.round((totalCorrect / totalQuestions) * 100)
     : 0;
   const moduleLabel =
-    MODULE_TEST_LABELS[activeModule || profile?.module_test || ''] || 'Module not selected';
+    MODULE_TEST_LABELS[activeModule || profile?.module_test || ''] || t('dashboard.moduleNotSelected');
 
   const chartAttempts = completedAttempts.slice(0, 7).reverse();
   const chartWidth = 520;
@@ -203,27 +205,21 @@ export function DashboardView({
         <section className="flex min-w-0 flex-col gap-6">
           <div className="grid overflow-hidden rounded-[26px] bg-kni-soft sm:min-h-[250px] sm:grid-cols-[minmax(0,1fr)_250px]">
             <div className="relative z-10 p-6 sm:p-8 lg:p-10">
-              {/* <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-bold text-orange-700 shadow-sm">
-                <Book className="size-3.5" />
-                Your preparation space
-              </span> */}
               <h2 className="text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
-                Hello {firstName(profile?.full_name)}!
+                {t('dashboard.helloUser', { name: firstName(profile?.full_name) })}
               </h2>
               <p className="mt-3 max-w-lg text-sm leading-6 text-slate-500">
-                Keep today simple: strengthen one weak area, then use a mock test to measure the difference.
+                {t('dashboard.welcomeHeroSubtitle')}
               </p>
 
-              <div className="mt-6 flex flex-wrap gap-2">
+              <div className="mt-6 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
                   {moduleLabel}
                 </span>
                 <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
-                  {profile?.format || 'Format not selected'}
+                  {profile?.format ? (profile.format === 'Paper' ? t('common.paper') : t('common.digital')) : t('dashboard.formatNotSelected')}
                 </span>
-                {/* <span className="rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-xs font-bold text-slate-600">
-                  {profile?.status || 'Pending'}
-                </span> */}
+                <LanguageSwitcher />
               </div>
             </div>
 
@@ -283,41 +279,13 @@ export function DashboardView({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-                  Performance
+                  {t('dashboard.performance')}
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  Mock score trend
+                  {t('dashboard.mockScoreTrend')}
                 </h2>
               </div>
               <div className="flex flex-wrap items-center gap-2 pb-4">
-                {/* View toggle (Graph / List) */}
-                {/* <div className="flex rounded-xl bg-slate-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setChartViewMode('graph')}
-                    className={cn(
-                      'rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] transition',
-                      chartViewMode === 'graph'
-                        ? 'bg-white text-slate-950 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-700',
-                    )}
-                  >
-                    Graph
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setChartViewMode('list')}
-                    className={cn(
-                      'rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] transition',
-                      chartViewMode === 'list'
-                        ? 'bg-white text-slate-950 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-700',
-                    )}
-                  >
-                    List
-                  </button>
-                </div> */}
-
                 {/* Digital / Paper format tabs */}
                 <div className="flex rounded-xl bg-slate-100 p-1">
                   {(['Digital', 'Paper'] as const).map(format => (
@@ -332,7 +300,7 @@ export function DashboardView({
                           : 'text-slate-400 hover:text-slate-700',
                       )}
                     >
-                      {format}
+                      {format === 'Digital' ? t('common.digital') : t('common.paper')}
                     </button>
                   ))}
                 </div>
@@ -404,9 +372,11 @@ export function DashboardView({
                 <div className="mt-5 grid min-h-52 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
                   <div>
                     <BarChart3 className="mx-auto size-7 text-slate-300" />
-                    <p className="mt-3 text-sm font-bold text-slate-700">No completed {activeFormatTab.toLowerCase()} mocks yet</p>
+                    <p className="mt-3 text-sm font-bold text-slate-700">
+                      {t('dashboard.noCompletedMocks', { format: (activeFormatTab === 'Paper' ? t('common.paper') : t('common.digital')).toLowerCase() })}
+                    </p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Your score trend will appear after the first completed test.
+                      {t('dashboard.mockScoreTrendNotice')}
                     </p>
                   </div>
                 </div>
@@ -425,17 +395,17 @@ export function DashboardView({
                       >
                         <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-slate-900 truncate">
-                            {attempt.exams?.title || 'Mock Test'}
+                            {attempt.exams?.title || t('mockTest.title')}
                           </h4>
                           <p className="mt-1 text-xs text-slate-400">
-                            Taken on {formatAttemptDate(attempt.created_at)}
+                            {t('dashboard.takenOn', { date: formatAttemptDate(attempt.created_at) })}
                           </p>
                         </div>
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <span className="text-sm font-black text-slate-950">{percentage}%</span>
                             <p className="text-[10px] text-slate-400">
-                              {attempt.total_score}/{attempt.max_score} correct
+                              {t('dashboard.correctOutOfTotal', { correct: attempt.total_score, total: attempt.max_score })}
                             </p>
                           </div>
                           <KniButton
@@ -443,7 +413,7 @@ export function DashboardView({
                             onClick={() => onReviewAttempt(attempt)}
                             className="h-9 px-4 text-xs font-bold"
                           >
-                            Review
+                            {t('common.review')}
                           </KniButton>
                         </div>
                       </div>
@@ -454,9 +424,11 @@ export function DashboardView({
                 <div className="mt-5 grid min-h-52 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
                   <div>
                     <BarChart3 className="mx-auto size-7 text-slate-300" />
-                    <p className="mt-3 text-sm font-bold text-slate-700">No completed {activeFormatTab.toLowerCase()} mocks yet</p>
+                    <p className="mt-3 text-sm font-bold text-slate-700">
+                      {t('dashboard.noCompletedMocks', { format: (activeFormatTab === 'Paper' ? t('common.paper') : t('common.digital')).toLowerCase() })}
+                    </p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
-                      Your mock history will appear after the first completed test.
+                      {t('dashboard.mockHistoryNotice')}
                     </p>
                   </div>
                 </div>
@@ -510,10 +482,10 @@ export function DashboardView({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-600">
-                  Proficiency Radar
+                  {t('dashboard.proficiencyRadar')}
                 </p>
                 <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950">
-                  Module mastery
+                  {t('dashboard.moduleMastery')}
                 </h2>
               </div>
               <div className="grid size-11 place-items-center rounded-full bg-orange-50 text-orange-600">
@@ -525,9 +497,9 @@ export function DashboardView({
               <div className="mt-5 grid min-h-52 place-items-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
                 <div>
                   <Target className="mx-auto size-7 text-slate-300" />
-                  <p className="mt-3 text-sm font-bold text-slate-700">No mastery data yet</p>
+                  <p className="mt-3 text-sm font-bold text-slate-700">{t('dashboard.noMasteryData')}</p>
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Complete a {activeFormatTab.toLowerCase()} mock test to see your section scores.
+                    {t('dashboard.completeMockForRadar', { format: (activeFormatTab === 'Paper' ? t('common.paper') : t('common.digital')).toLowerCase() })}
                   </p>
                 </div>
               </div>

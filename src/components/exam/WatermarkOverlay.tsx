@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
+import { formatDate } from '@/lib/i18n/format';
 
 interface WatermarkOverlayProps {
   email: string;
@@ -8,10 +10,11 @@ interface WatermarkOverlayProps {
 }
 
 export default function WatermarkOverlay({ email, fullName }: WatermarkOverlayProps) {
+  const { lang } = useLanguage();
   const backgroundImage = useMemo(() => {
     if (!email) return '';
 
-    const dateStr = new Date().toLocaleDateString();
+    const dateStr = formatDate(new Date(), lang);
     const displayName = fullName ? `${fullName} - ` : '';
     const text = `${displayName}${email} (${dateStr})`;
 

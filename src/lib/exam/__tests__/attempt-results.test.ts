@@ -34,4 +34,33 @@ describe('buildAttemptSectionScores', () => {
       },
     ]);
   });
+
+  it('localizes section label when German language and translations exist', () => {
+    const scores = buildAttemptSectionScores(
+      {
+        answers: [
+          { question_id: 'q1', is_correct: true, is_answered: true },
+        ],
+      },
+      new Map([['q1', 'section-1']]),
+      new Map([
+        [
+          'section-1',
+          {
+            id: 'section-1',
+            title: 'Muster ergänzen',
+            sort_order: 1,
+            translations: {
+              de: {
+                title: 'Muster ergänzen (DE)',
+              },
+            },
+          },
+        ],
+      ]),
+      'de',
+    );
+
+    assert.strictEqual(scores[0]?.label, 'Muster ergänzen (DE)');
+  });
 });

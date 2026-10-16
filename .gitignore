@@ -51,7 +51,12 @@ next-env.d.ts
 .claude/
 .impeccable/
 skills-lock.json
-/scripts/
+/scripts/*
+!/scripts/import-translations.ts
+!/scripts/import-paper-core-translations.ts
+!/scripts/import-paper-module-translations.ts
 normalize-question-content-report.json
 plan.md
 search_ct_pages.py
+test.html
+.gitignore

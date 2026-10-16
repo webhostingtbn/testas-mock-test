@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import type { Lang } from '@/lib/i18n/config';
 
 export interface PracticeSection {
   id: string;
@@ -14,6 +15,7 @@ export interface PracticeSection {
   environment_content?: unknown;
   created_at: string;
   exams?: { title?: string } | Array<{ title?: string }>;
+  languages?: Lang[];
 }
 
 export interface PracticeQuestionItem {
@@ -58,6 +60,7 @@ interface PracticeState {
   fetchPracticeData: (options?: { force?: boolean }) => Promise<void>;
   refreshRatings: () => Promise<void>;
   updateRating: (questionIds: string[], difficulty: 'easy' | 'medium' | 'hard') => Promise<void>;
+  reset: () => void;
 }
 
 // Module-scope fetch coordination: dedupes concurrent callers (dashboard
@@ -83,7 +86,7 @@ function toRatings(userPractices: UserQuestionPracticeRow[]): {
   return { userRatings, userPracticeDates: Array.from(dateSet) };
 }
 
-export const usePracticeStore = create<PracticeState>((set, get) => ({
+const initialState = {
   sections: [],
   questions: [],
   passages: [],
@@ -93,6 +96,10 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   isLoading: false,
   lastFetchedAt: null,
   error: null,
+};
+
+export const usePracticeStore = create<PracticeState>((set, get) => ({
+  ...initialState,
 
   fetchPracticeData: async (options) => {
     const { isLoaded, lastFetchedAt } = get();
@@ -210,5 +217,9 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     } catch (err) {
       console.error('Failed to sync practice rating to database:', err);
     }
+  },
+
+  reset: () => {
+    set(initialState);
   },
 }));

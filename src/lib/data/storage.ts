@@ -66,8 +66,8 @@ export async function canAccessStoragePath(path: string, profile: UserProfile): 
   if (sectionIds.length === 0) return false;
 
   const [{ data: passages, error: passageError }, { data: questions, error: questionError }] = await Promise.all([
-    supabase.from('passages').select('image_url').in('section_id', sectionIds),
-    supabase.from('questions').select('content').in('section_id', sectionIds),
+    supabase.from('passages').select('image_url, body_markdown, translations').in('section_id', sectionIds),
+    supabase.from('questions').select('content, translations').in('section_id', sectionIds),
   ]);
 
   if (passageError) throw new Error(`Failed to check passage assets: ${passageError.message}`);
@@ -75,9 +75,14 @@ export async function canAccessStoragePath(path: string, profile: UserProfile): 
 
   const referencedPaths = new Set<string>();
   (passages ?? []).forEach((passage) => {
-    if (passage.image_url) referencedPaths.add(passage.image_url);
+    collectStrings(passage.image_url, referencedPaths);
+    collectStrings(passage.body_markdown, referencedPaths);
+    collectStrings(passage.translations, referencedPaths);
   });
-  (questions ?? []).forEach((question) => collectStrings(question.content, referencedPaths));
+  (questions ?? []).forEach((question) => {
+    collectStrings(question.content, referencedPaths);
+    collectStrings(question.translations, referencedPaths);
+  });
 
   return referencedPaths.has(path);
 }

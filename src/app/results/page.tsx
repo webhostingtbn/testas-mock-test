@@ -11,12 +11,14 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { calculateAccuracyPercentage, calculateCompletionPercentage } from "@/lib/exam/metrics";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export default function ResultsPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
   const [isCalculated, setIsCalculated] = useState(false);
@@ -112,7 +114,7 @@ export default function ResultsPage() {
       <div className="min-h-screen bg-[#F4F4F5] flex items-center justify-center p-6">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18181B]"></div>
-          <p className="text-sm text-[#71717A] animate-pulse font-medium">Loading…</p>
+          <p className="text-sm text-[#71717A] animate-pulse font-medium">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -126,7 +128,7 @@ export default function ResultsPage() {
           <div className="grid size-12 place-items-center rounded-full bg-rose-50 text-rose-600">
             <AlertTriangle className="size-6" />
           </div>
-          <h2 className="text-[18px] font-semibold text-[#18181B]">Scoring failed</h2>
+          <h2 className="text-[18px] font-semibold text-[#18181B]">{t('results.scoringFailed')}</h2>
           <p className="text-sm text-[#71717A]">{submitError}</p>
           <button
             type="button"
@@ -135,10 +137,10 @@ export default function ResultsPage() {
             className="mt-1 h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 disabled:opacity-40 transition-colors flex items-center gap-2"
           >
             <RefreshCw className={`w-4 h-4 ${isRetrying ? 'animate-spin' : ''}`} />
-            {isRetrying ? 'Retrying…' : 'Retry scoring'}
+            {isRetrying ? t('results.retrying') : t('results.retryScoring')}
           </button>
           <p className="text-[13px] text-[#71717A]">
-            Your answers are saved. Retry to complete scoring.
+            {t('results.answersSavedRetry')}
           </p>
         </div>
       </div>
@@ -152,7 +154,7 @@ export default function ResultsPage() {
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18181B]"></div>
           <p className="text-sm text-[#71717A] animate-pulse font-medium">
-            Scoring your exam…
+            {t('results.scoringYourExam')}
           </p>
         </div>
       </div>
@@ -173,11 +175,11 @@ export default function ResultsPage() {
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600"><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>
-              <h2 className="text-xl font-semibold text-[#18181B]">Exam Results</h2>
+              <h2 className="text-xl font-semibold text-[#18181B]">{t('results.title')}</h2>
             </div>
             <p className="text-sm text-[#71717A] mt-1.5">
-              You answered {answeredCount} of {totalQuestions} questions
-              {isEndedEarly ? ' · test ended early' : ''}
+              {t('results.questionsAnswered', { answered: answeredCount, total: totalQuestions })}
+              {isEndedEarly ? ` · ${t('results.testEndedEarly')}` : ''}
             </p>
           </div>
           <button
@@ -186,7 +188,7 @@ export default function ResultsPage() {
             className="shrink-0 h-10 px-4 text-sm font-medium rounded-[10px] border border-[#E5E7EB] bg-white text-[#18181B] hover:bg-[#FAFAFA] transition-colors flex items-center gap-1.5"
           >
             <Home className="w-4 h-4" />
-            Dashboard
+            {t('dashboard.navDashboard')}
           </button>
         </div>
 
@@ -195,12 +197,12 @@ export default function ResultsPage() {
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-px" />
             <div className="text-sm">
-              <p className="font-semibold text-amber-800">Ended early</p>
+              <p className="font-semibold text-amber-800">{t('common.endedEarly')}</p>
               <p className="text-amber-700 mt-0.5">
-                You ended this test before completing all subtests.
+                {t('results.endedEarlyDesc')}
                 {answeredCount === 0
-                  ? ' No questions were answered.'
-                  : ` ${answeredCount} of ${totalQuestions} questions were answered.`}
+                  ? ` ${t('results.noQuestionsAnswered')}`
+                  : ` ${t('results.someQuestionsAnswered', { answered: answeredCount, total: totalQuestions })}`}
               </p>
             </div>
           </div>
@@ -209,31 +211,31 @@ export default function ResultsPage() {
         {/* Metric strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Score</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">{t('common.score')}</p>
             <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
               {totalCorrect} <span className="text-sm font-normal text-[#71717A]">/ {isEndedEarly ? answeredCount : totalQuestions}</span>
             </p>
           </div>
           <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Accuracy</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">{t('common.accuracy')}</p>
             <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
               {isEndedEarly ? accuracyPercentage : calculateAccuracyPercentage(totalCorrect, totalQuestions)}%
             </p>
           </div>
           <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Answered</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">{t('practice.answered')}</p>
             <p className="text-2xl font-bold text-[#18181B] mt-1 tabular-nums">
               {answeredCount} <span className="text-sm font-normal text-[#71717A]">/ {totalQuestions}</span>
             </p>
           </div>
           <div className="p-4 rounded-xl bg-[#F4F4F5] border border-gray-100">
-            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">Outcome</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#71717A]">{t('results.outcome')}</p>
             {isEndedEarly ? (
-              <p className="text-lg font-semibold text-amber-600 mt-1.5">Ended early</p>
+              <p className="text-lg font-semibold text-amber-600 mt-1.5">{t('common.endedEarly')}</p>
             ) : (
-              <p className="text-lg font-semibold text-emerald-600 mt-1.5">Completed</p>
+              <p className="text-lg font-semibold text-emerald-600 mt-1.5">{t('common.completed')}</p>
             )}
-            <p className="text-[13px] text-[#71717A] mt-0.5">{completionPercentage}% of questions seen</p>
+            <p className="text-[13px] text-[#71717A] mt-0.5">{t('results.questionsSeen', { percent: completionPercentage })}</p>
           </div>
         </div>
 
@@ -241,15 +243,15 @@ export default function ResultsPage() {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
           <span className="flex items-center gap-1.5 text-[#18181B]">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="font-semibold tabular-nums">{totalCorrect}</span> correct
+            <span className="font-semibold tabular-nums">{t('results.correctCount', { count: totalCorrect })}</span>
           </span>
           <span className="flex items-center gap-1.5 text-[#18181B]">
             <span className="w-2 h-2 rounded-full bg-rose-500" />
-            <span className="font-semibold tabular-nums">{wrongCount}</span> wrong
+            <span className="font-semibold tabular-nums">{t('results.wrongCount', { count: wrongCount })}</span>
           </span>
           <span className="flex items-center gap-1.5 text-[#18181B]">
             <span className="w-2 h-2 rounded-full bg-zinc-300" />
-            <span className="font-semibold tabular-nums">{skippedCount}</span> skipped
+            <span className="font-semibold tabular-nums">{t('results.skippedCount', { count: skippedCount })}</span>
           </span>
         </div>
 
@@ -260,15 +262,15 @@ export default function ResultsPage() {
             onClick={goDashboard}
             className="h-10 px-4 text-sm font-medium rounded-[10px] text-[#71717A] hover:text-[#18181B] hover:bg-[#F4F4F5] transition-colors"
           >
-            Back to Dashboard
+            {t('results.backToDashboard')}
           </button>
           <button
             type="button"
             onClick={goDashboard}
-            title="Find this attempt in your test history to review each answer"
+            title={t('results.reviewAnswersTooltip')}
             className="h-10 px-6 text-sm font-medium rounded-[10px] bg-[#18181B] text-white hover:bg-zinc-800 transition-colors flex items-center justify-center gap-1.5"
           >
-            Review Answers
+            {t('results.reviewAnswers')}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

@@ -5,7 +5,9 @@ import {
   filterPracticeQuestionsByRating,
   getPassageChildQuestionIds,
   groupPracticeItemsByPassage,
+  enrichPracticeQuestions,
 } from '../practice-helpers';
+import { localizeExamData } from '../../i18n/localize';
 import {
   calculateAccuracyPercentage,
   calculateCompletionPercentage,
@@ -191,5 +193,80 @@ describe('calculateCompletionPercentage', () => {
 
   it('returns 100 when all questions answered', () => {
     assert.strictEqual(calculateCompletionPercentage(10, 10), 100);
+  });
+});
+
+// ---- enrichPracticeQuestions ----
+
+describe('enrichPracticeQuestions', () => {
+  it('enriches child questions with passage fields', () => {
+    const questions = [
+      { id: 'q1', passage_id: 'p1', content: { question_text: 'Q1' } },
+      { id: 'q2', passage_id: null, content: { question_text: 'Q2' } },
+    ];
+    const passages = [
+      { id: 'p1', title: 'Passage 1', body_markdown: 'Markdown 1', image_url: 'p1.png' },
+    ];
+
+    const result = enrichPracticeQuestions(questions, passages);
+    assert.strictEqual(result.length, 2);
+    assert.deepStrictEqual(result[0]?.content, {
+      question_text: 'Q1',
+      passage_title: 'Passage 1',
+      passage_markdown: 'Markdown 1',
+      passage_image_url: 'p1.png',
+    });
+    assert.deepStrictEqual(result[1]?.content, {
+      question_text: 'Q2',
+    });
+  });
+
+  it('correctly enriches questions when localized passages are provided', () => {
+    // Simulates what fetchPracticeData does: localize passages first, then enrich
+    const rawPassages = [
+      {
+        id: 'p1',
+        title: 'English Title',
+        body_markdown: 'English Body',
+        image_url: 'en.png',
+        translations: {
+          de: {
+            title: 'Deutscher Titel',
+            body_markdown: 'Deutscher Inhalt',
+            image_url: 'de.png',
+          },
+        },
+      },
+    ];
+    const rawQuestions = [
+      {
+        id: 'q1',
+        passage_id: 'p1',
+        content: { question_text: 'English Question' },
+        translations: {
+          de: { question_text: 'Deutsche Frage' },
+        },
+      },
+    ];
+
+    const localized = localizeExamData(
+      { passages: rawPassages, questions: rawQuestions },
+      'de',
+    );
+
+    const enriched = enrichPracticeQuestions(localized.questions, localized.passages);
+    assert.strictEqual(enriched[0]?.id, 'q1');
+    assert.deepStrictEqual(enriched[0]?.content, {
+      question_text: 'Deutsche Frage',
+      passage_title: 'Deutscher Titel',
+      passage_markdown: 'Deutscher Inhalt',
+      passage_image_url: 'de.png',
+    });
+  });
+
+  it('leaves question unchanged if passage is not found', () => {
+    const questions = [{ id: 'q1', passage_id: 'missing-p', content: { question_text: 'Hello' } }];
+    const result = enrichPracticeQuestions(questions, []);
+    assert.deepStrictEqual(result[0], questions[0]);
   });
 });

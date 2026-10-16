@@ -58,7 +58,14 @@ export function calculateExamMetrics<T extends MetricSectionInput>(
     eligibleSections = [...sections];
   }
 
-  eligibleSections.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const coreSet = new Set(coreSections);
+  eligibleSections.sort((a, b) => {
+    const aIsCore = coreSet.has(a);
+    const bIsCore = coreSet.has(b);
+    if (aIsCore && !bIsCore) return -1;
+    if (!aIsCore && bIsCore) return 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
 
   const sectionsCount = eligibleSections.length;
   const questionCount = eligibleSections.reduce(

@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CompletionReason } from '@/lib/types';
+import { isLang, type Lang } from '@/lib/i18n/config';
 
 // ---- Types for the store ----
 
@@ -34,6 +35,7 @@ interface ExamState {
   // ---- Exam metadata ----
   currentExamId: string | null;
   userExamId: string | null;
+  language: Lang;
   sections: StoredSection[];
   flowSteps: ExamFlowStep[];
   currentFlowStepIndex: number;
@@ -64,6 +66,7 @@ interface ExamState {
     userExamId: string;
     sections: StoredSection[];
     flowSteps: ExamFlowStep[];
+    language?: Lang;
   }) => void;
 
   startSection: (sectionIndex: number) => void;
@@ -96,9 +99,34 @@ interface ExamState {
   resetExam: () => void;
 }
 
-const initialState = {
+type ExamStoreData = Omit<
+  ExamState,
+  | 'startExam'
+  | 'startSection'
+  | 'startSectionTimer'
+  | 'startBreak'
+  | 'setAnswer'
+  | 'getAnswer'
+  | 'setRating'
+  | 'getRating'
+  | 'nextQuestion'
+  | 'prevQuestion'
+  | 'goToQuestion'
+  | 'advanceFlowStep'
+  | 'getCurrentFlowStep'
+  | 'getRemainingTime'
+  | 'getBreakRemainingTime'
+  | 'setFontSize'
+  | 'getAnsweredCount'
+  | 'isQuestionAnswered'
+  | 'endExamEarly'
+  | 'resetExam'
+>;
+
+const initialState: ExamStoreData = {
   currentExamId: null,
   userExamId: null,
+  language: 'en',
   sections: [],
   flowSteps: [],
   currentFlowStepIndex: 0,
@@ -111,7 +139,7 @@ const initialState = {
   breakStartTime: null,
   breakDuration: 0,
   fontSize: 16,
-  completionReason: 'finished' as CompletionReason,
+  completionReason: 'finished',
 };
 
 export const useExamStore = create<ExamState>()(
@@ -120,19 +148,21 @@ export const useExamStore = create<ExamState>()(
       ...initialState,
 
       // ---- Start exam ----
-      startExam: ({ examId, userExamId, sections, flowSteps }) => {
+      startExam: ({ examId, userExamId, sections, flowSteps, language }) => {
         const state = get();
         if (state.userExamId === userExamId) {
           set({
             currentExamId: examId,
             sections,
             flowSteps,
+            language: language ?? state.language ?? 'en',
           });
           return;
         }
         set({
           currentExamId: examId,
           userExamId,
+          language: language ?? 'en',
           sections,
           flowSteps,
           currentFlowStepIndex: 0,
@@ -310,10 +340,12 @@ export const useExamStore = create<ExamState>()(
     }),
     {
       name: 'testas-exam-store',
+      version: 1,
       // Only persist essential data for disconnect resilience
       partialize: (state) => ({
         currentExamId: state.currentExamId,
         userExamId: state.userExamId,
+        language: state.language,
         sections: state.sections,
         flowSteps: state.flowSteps,
         currentFlowStepIndex: state.currentFlowStepIndex,
@@ -328,6 +360,16 @@ export const useExamStore = create<ExamState>()(
         fontSize: state.fontSize,
         completionReason: state.completionReason,
       }),
+      migrate: (persistedState: unknown) => {
+        if (typeof persistedState === 'object' && persistedState !== null) {
+          const state = persistedState as Record<string, unknown>;
+          if (!state.language || !isLang(state.language)) {
+            state.language = 'en';
+          }
+          return state;
+        }
+        return persistedState;
+      },
     }
   )
 );

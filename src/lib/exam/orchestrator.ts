@@ -7,7 +7,6 @@
 
 import { flattenExamAnswers, useExamStore, type StoredSection, type ExamFlowStep } from '@/lib/store/exam-store';
 import {
-  BREAK_DURATIONS,
   calculateBreakDuration,
   filterSections,
 } from '@/lib/constants';
@@ -15,6 +14,7 @@ import type {
   ModuleTestType,
   Section,
 } from '@/lib/types';
+import { isLang } from '@/lib/i18n/config';
 
 export interface ExamQuestionRecord {
   id: string;
@@ -88,8 +88,16 @@ export function buildStoredSections(
     selectedSections = eligibleSections;
   }
 
-  // Preserve original database sort_order
-  selectedSections.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  // Ensure core sections always precede module sections in the exam flow,
+  // then sort by sort_order within each category.
+  const coreSet = new Set(coreSections.map((s) => s.id));
+  selectedSections.sort((a, b) => {
+    const aIsCore = coreSet.has(a.id);
+    const bIsCore = coreSet.has(b.id);
+    if (aIsCore && !bIsCore) return -1;
+    if (!aIsCore && bIsCore) return 1;
+    return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  });
 
   const questionIdsBySection = new Map<string, string[]>();
 
@@ -180,8 +188,9 @@ export async function startExam(
       throw new Error(errJson.error || 'Failed to create attempt session');
     }
     const { attempt } = await attemptRes.json();
+    const attemptLang = (attempt && isLang(attempt.language)) ? attempt.language : 'en';
 
-    const examRes = await fetch(`/api/exams/${examId}`);
+    const examRes = await fetch(`/api/exams/${examId}?lang=${attemptLang}`);
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
     assertExamFormat(examData.exam?.format, format, 'start');
@@ -198,6 +207,7 @@ export async function startExam(
       userExamId: attempt.id,
       sections: builtSections,
       flowSteps,
+      language: attemptLang,
     });
   } catch (err) {
     console.error('[ExamOrchestrator] Error starting exam:', err);
@@ -225,8 +235,9 @@ export async function resumeExam(
       );
     }
     const { attempt } = await attemptRes.json();
+    const attemptLang = (attempt && isLang(attempt.language)) ? attempt.language : 'en';
 
-    const examRes = await fetch(`/api/exams/${attempt.exam_id}`);
+    const examRes = await fetch(`/api/exams/${attempt.exam_id}?lang=${attemptLang}`);
     if (!examRes.ok) throw new Error('Failed to fetch exam data');
     const examData = parseExamPayload(await examRes.json());
     assertExamFormat(examData.exam?.format, format, 'resume');
@@ -246,6 +257,7 @@ export async function resumeExam(
       userExamId,
       sections: builtSections,
       flowSteps,
+      language: attemptLang,
     });
   } catch (err) {
     console.error('[ExamOrchestrator] Error resuming exam:', err);

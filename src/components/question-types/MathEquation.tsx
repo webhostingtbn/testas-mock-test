@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 // import VirtualCalculator from './VirtualCalculator';
 import VirtualKeyboard from './VirtualKeyboard';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 export interface MathEquationVerification {
   isVerified: boolean;
@@ -29,6 +30,7 @@ export default function MathEquation({
   onAnswer,
   verification,
 }: MathEquationProps) {
+  const { t } = useLanguage();
   const equations = question?.content?.equations || [];
   const variables = question?.content?.variables || [];
   const [activeVariable, setActiveVariable] = useState<string | null>(() => variables[0] || null);
@@ -110,13 +112,13 @@ export default function MathEquation({
     <div className="flex flex-col h-full min-h-0" onKeyDown={handleKeyDown} tabIndex={0}>
       {/* Pane label */}
       <div className="flex-none pt-6 py-3">
-        <p className="text-[13px] font-medium text-[#71717A]">Solve the equations</p>
+        <p className="text-[13px] font-medium text-[#71717A]">{t('exam.solveEquations')}</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 lg:divide-x lg:divide-[#E5E7EB]">
+      <div className="flex-col lg:flex-row flex-1 min-h-0 lg:divide-x lg:divide-[#E5E7EB] flex">
         {/* Left pane: Equations — flat display rows, no nested card */}
         <div className="flex-1 min-w-0 pb-6 lg:py-6 pr-6">
-          <p className="text-[13px] font-medium text-[#71717A] mb-4">Equations</p>
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">{t('exam.givenEquations')}</p>
           <div className="flex flex-col gap-[10px]">
             {equations.map((eq, idx) => (
               <div
@@ -133,7 +135,7 @@ export default function MathEquation({
 
         {/* Middle pane: Variable inputs */}
         <div className="flex-1 min-w-0 px-6 sm:px-8 pb-6 lg:py-6">
-          <p className="text-[13px] font-medium text-[#71717A] mb-4">Your answers</p>
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">{t('exam.yourAnswers')}</p>
           <div className="flex flex-col gap-[10px]">
             {variables.map((variable) => {
               const isActive = !isVerified && activeVariable === variable;
@@ -216,7 +218,7 @@ export default function MathEquation({
 
                   {isVerified && isVarWrong && expectedVal !== undefined && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-100 text-emerald-800 text-xs font-mono font-semibold">
-                      <span>Answer:</span>
+                      <span>{t('exam.answerLabel')}</span>
                       <span className="text-sm font-bold">{String(expectedVal)}</span>
                     </div>
                   )}
@@ -231,7 +233,7 @@ export default function MathEquation({
 
         {/* Right pane: Virtual keyboard */}
         <div className="w-full lg:w-[280px] shrink-0 pl-6 pb-6 sm:pb-8 lg:py-6">
-          <p className="text-[13px] font-medium text-[#71717A] mb-4">Keypad</p>
+          <p className="text-[13px] font-medium text-[#71717A] mb-4">{t('exam.keypad')}</p>
           <div className={isVerified ? 'opacity-40 pointer-events-none' : ''}>
             <VirtualKeyboard onKeyPress={handleKeyPress} />
           </div>

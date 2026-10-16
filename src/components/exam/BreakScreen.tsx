@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useExamStore } from '@/lib/store/exam-store';
 import { Button } from '@/components/ui/button';
 import { Coffee, SkipForward, Timer } from 'lucide-react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface BreakScreenProps {
   onSkip: () => void;
@@ -11,6 +12,7 @@ interface BreakScreenProps {
 }
 
 export default function BreakScreen({ onSkip, onComplete }: BreakScreenProps) {
+  const { t } = useLanguage();
   const { getBreakRemainingTime, breakDuration } = useExamStore();
   const [remaining, setRemaining] = useState(getBreakRemainingTime());
   const hasCompleted = useRef(false);
@@ -51,19 +53,19 @@ export default function BreakScreen({ onSkip, onComplete }: BreakScreenProps) {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {isLongBreak ? 'Long Break' : 'Short Break'}
+          {isLongBreak ? t('exam.longBreak') : t('exam.shortBreak')}
         </h1>
         <p className="text-gray-500 mb-8">
           {isLongBreak
-            ? 'Take a 30-minute break before the module test. Relax and come back refreshed!'
-            : 'Take a quick 2-minute break before the next section.'}
+            ? t('exam.longBreakDesc')
+            : t('exam.shortBreakDesc')}
         </p>
 
         {/* Timer Display */}
         <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-gray-100">
           <div className="flex items-center justify-center gap-2 text-gray-400 mb-3">
             <Timer className="w-4 h-4" />
-            <span className="text-sm font-medium tracking-wide uppercase">Time Remaining</span>
+            <span className="text-sm font-medium tracking-wide uppercase">{t('exam.timeRemaining')}</span>
           </div>
           <div className="text-6xl font-bold tabular-nums text-gray-900">
             {String(minutes).padStart(2, '0')}
@@ -80,7 +82,7 @@ export default function BreakScreen({ onSkip, onComplete }: BreakScreenProps) {
           className="h-12 px-8 text-sm font-medium border-2 border-gray-300 text-gray-600 hover:bg-gray-50 transition-all duration-200"
         >
           <SkipForward className="w-4 h-4 mr-2" />
-          Skip Break & Continue
+          {t('exam.skipBreakAndContinue')}
         </Button>
       </div>
     </div>

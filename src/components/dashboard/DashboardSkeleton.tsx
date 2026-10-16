@@ -1,6 +1,9 @@
+'use client';
+
 import { KniShell } from "@/components/KniPrimitives";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 interface DashboardSkeletonProps {
   className?: string;
@@ -12,10 +15,11 @@ interface DashboardSkeletonProps {
  * left = hero banner + score-trend chart, right = proficiency radar.
  */
 export function DashboardSkeleton({ className }: DashboardSkeletonProps) {
+  const { t } = useLanguage();
   return (
     <div
       role="status"
-      aria-label="Loading dashboard"
+      aria-label={t('dashboard.loadingDashboard')}
       aria-busy="true"
       className={cn("mx-auto w-full animate-pulse", className)}
     >
@@ -95,7 +99,7 @@ export function DashboardSkeleton({ className }: DashboardSkeletonProps) {
           </div>
         </aside>
       </div>
-      <span className="sr-only">Loading dashboard content…</span>
+      <span className="sr-only">{t('dashboard.loadingDashboard')}</span>
     </div>
   );
 }

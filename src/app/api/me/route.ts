@@ -1,10 +1,29 @@
 import { NextResponse } from 'next/server';
-import { fetchMyProfile, updateMyProfile } from '@/lib/data/profiles';
+import { cookies } from 'next/headers';
+import { fetchMyProfile, updateMyProfile, updatePreferredLanguage } from '@/lib/data/profiles';
+import { isLang, LANG_COOKIE } from '@/lib/i18n/config';
+import { setLangCookie } from '@/lib/i18n/server';
 
 export async function GET() {
   try {
     const profile = await fetchMyProfile();
-    return NextResponse.json({ profile });
+    const cookieStore = await cookies();
+    const cookieLang = cookieStore.get(LANG_COOKIE)?.value;
+
+    if (!profile.preferred_language && cookieLang && isLang(cookieLang)) {
+      await updatePreferredLanguage(profile.id, cookieLang);
+      profile.preferred_language = cookieLang;
+    }
+
+    const response = NextResponse.json({ profile });
+
+    if (profile.preferred_language && isLang(profile.preferred_language)) {
+      if (cookieLang !== profile.preferred_language) {
+        setLangCookie(response, profile.preferred_language);
+      }
+    }
+
+    return response;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Internal error';
     if (message === 'UNAUTHORIZED') {

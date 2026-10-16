@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { ShieldAlert } from 'lucide-react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 export default function SecurityOverlay() {
   const [isBlurred, setIsBlurred] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const handleBlur = () => setIsBlurred(true);
@@ -40,9 +42,9 @@ export default function SecurityOverlay() {
           <ShieldAlert className="w-8 h-8 animate-pulse" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-white tracking-tight">Content Protected</h3>
+          <h3 className="text-lg font-bold text-white tracking-tight">{t('exam.contentProtected')}</h3>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-            To prevent question leaks, test content is hidden when you focus away.
+            {t('exam.contentProtectedDesc')}
           </p>
         </div>
         <button
@@ -53,7 +55,7 @@ export default function SecurityOverlay() {
           }}
           className="mt-2 w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs rounded-xl shadow-lg transition-colors cursor-pointer"
         >
-          Return to Test
+          {t('exam.returnToTest')}
         </button>
       </div>
     </div>

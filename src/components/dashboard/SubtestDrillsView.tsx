@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
 import type { Profile, ModuleTestType } from '@/lib/types';
 import type { ExamAttemptReview } from './ReviewView';
 import { usePracticeStore, type PracticeSection } from '@/lib/store/practice-store';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 import {
   PAPER_CORE_SUBTESTS,
   DIGITAL_CORE_SUBTESTS,
@@ -72,6 +73,7 @@ export function SubtestDrillsView({
   onReviewAttempt,
   isStarting,
 }: SubtestDrillsViewProps) {
+  const { lang, t } = useLanguage();
   const { sections, isLoaded, isLoading, fetchPracticeData } = usePracticeStore();
   const [selectedSubtestId, setSelectedSubtestId] = useState<string | null>(null);
   const [startingSectionId, setStartingSectionId] = useState<string | null>(null);
@@ -182,7 +184,7 @@ export function SubtestDrillsView({
     try {
       await onStartDrill(examId, sectionId);
     } catch {
-      toast.error('Failed to start drill. Please try again.');
+      toast.error(t('drills.failedToStart'));
     } finally {
       setStartingSectionId(null);
     }
@@ -200,17 +202,17 @@ export function SubtestDrillsView({
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold tracking-wider text-orange-700 uppercase">
                 <Timer className="size-3.5" />
-                Targeted Practice
+                {t('drills.targetedPractice')}
               </span>
               <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold tracking-wider text-slate-600 uppercase">
-                {isPaper ? 'Paper Format' : 'Digital Format'}
+                {isPaper ? t('common.paper') : t('common.digital')} {t('common.format')}
               </span>
             </div>
             <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-              Subtest Drills
+              {t('drills.title')}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Practice individual subtests under official time limits without consuming your mock exam quota.
+              {t('drills.subtitle')}
             </p>
           </div>
         </div>
@@ -221,7 +223,7 @@ export function SubtestDrillsView({
         {/* Left Subtest Category Selector */}
         <aside className="flex flex-col gap-2">
           <p className="px-1 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-            Select a Subtest
+            {t('drills.selectSubtestPrompt')}
           </p>
           <div className="flex flex-col gap-1.5">
             {applicableSubtests.map((subtest) => {
@@ -254,7 +256,7 @@ export function SubtestDrillsView({
                         {subtest.title}
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        {subtestSections.length} tests available
+                        {t('drills.testsAvailable', { count: subtestSections.length })}
                       </p>
                     </div>
                   </div>
@@ -285,9 +287,9 @@ export function SubtestDrillsView({
                   <div className="grid size-12 place-items-center rounded-2xl bg-slate-100 text-slate-400">
                     <HelpCircle className="size-6" />
                   </div>
-                  <h3 className="mt-3 text-sm font-bold text-slate-900">No test sections found</h3>
+                  <h3 className="mt-3 text-sm font-bold text-slate-900">{t('drills.noTestSectionsFound')}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    No active tests currently contain this subtest for your profile format.
+                    {t('drills.noTestSectionsDesc')}
                   </p>
                 </div>
               ) : (
@@ -314,15 +316,23 @@ export function SubtestDrillsView({
                               {examTitle}
                             </h4>
                             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span>{sec.question_count ?? 22} questions</span>
+                              <span>{t('gate.questionsCount', { count: sec.question_count ?? 22 })}</span>
                               <span>•</span>
-                              <span>{durationMins} minutes</span>
+                              <span>{t('gate.durationMinutes', { count: durationMins })}</span>
+                              {lang === 'de' && !sec.languages?.includes('de') && (
+                                <>
+                                  <span>•</span>
+                                  <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/60 rounded px-1.5 py-0.5 font-medium">
+                                    {t('drills.onlyEnglishAvailable')}
+                                  </span>
+                                </>
+                              )}
                               {stats && (
                                 <>
                                   <span>•</span>
                                   <span className="inline-flex items-center gap-1 font-bold text-emerald-600">
                                     <CheckCircle2 className="size-3" />
-                                    Best: {stats.pct}% ({stats.correct}/{stats.total})
+                                    {t('drills.bestScore', { percent: stats.pct, correct: stats.correct, total: stats.total })}
                                   </span>
                                 </>
                               )}
@@ -337,7 +347,7 @@ export function SubtestDrillsView({
                               className="h-9 gap-1.5 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white hover:bg-amber-500 cursor-pointer"
                             >
                               <RotateCcw className="size-3.5" />
-                              Resume Drill
+                              {t('drills.resumeDrill')}
                             </KniButton>
                           ) : (
                             <>
@@ -347,7 +357,7 @@ export function SubtestDrillsView({
                                   onClick={() => onReviewAttempt(completedDrill)}
                                   className="h-9 gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
                                 >
-                                  Review
+                                  {t('common.review')}
                                 </KniButton>
                               )}
                               <KniButton
@@ -356,7 +366,7 @@ export function SubtestDrillsView({
                                 className="h-9 gap-1.5 rounded-xl bg-orange-600 px-4 text-xs font-bold text-white hover:bg-orange-500 cursor-pointer disabled:opacity-50"
                               >
                                 <PlayCircle className="size-3.5" />
-                                {stats ? 'Retake Drill' : 'Start Drill'}
+                                {stats ? t('drills.retakeDrill') : t('drills.startDrill')}
                               </KniButton>
                             </>
                           )}

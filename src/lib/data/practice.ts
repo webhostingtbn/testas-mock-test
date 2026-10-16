@@ -2,6 +2,14 @@ import 'server-only';
 
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
 import { requireApprovedUser } from '@/lib/auth/guards';
+import { localizeExamData } from '@/lib/i18n/localize';
+import { resolveRequestLang } from '@/lib/i18n/server';
+import { getDeGaps } from '@/lib/data/exams';
+import { enrichPracticeQuestions } from '@/lib/exam/practice-helpers';
+import type { Lang } from '@/lib/i18n/config';
+
+const GERMAN_AND_ENGLISH: Lang[] = ['en', 'de'];
+const ENGLISH_ONLY: Lang[] = ['en'];
 
 export async function fetchPracticeData() {
   const { profile } = await requireApprovedUser();
@@ -21,12 +29,13 @@ export async function fetchPracticeData() {
 
   const examIds = (exams ?? []).map((exam) => exam.id);
   if (examIds.length === 0) {
-    return { sections: [], questions: [], userPractices: [] };
+    const lang = await resolveRequestLang(profile);
+    return { sections: [], questions: [], userPractices: [], passages: [], lang };
   }
 
   const { data: sections, error: sectionErr } = await supabase
     .from('sections')
-    .select('id, exam_id, title, description, question_type, duration_seconds, question_count, sort_order, environment_content, created_at')
+    .select('id, exam_id, title, description, question_type, duration_seconds, question_count, sort_order, environment_content, translations, created_at')
     .in('exam_id', examIds)
     .order('sort_order', { ascending: true });
 
@@ -36,19 +45,19 @@ export async function fetchPracticeData() {
   const { data: questions, error: qErr } = sectionIds.length > 0
     ? await supabase
     .from('questions')
-    .select('id, section_id, sort_order, question_type, content, passage_id, created_at')
+    .select('id, section_id, sort_order, question_type, content, translations, passage_id, created_at')
     .in('section_id', sectionIds)
     .order('sort_order', { ascending: true })
-    : { data: [], error: null };
+    : { data: null, error: null };
 
   if (qErr) throw new Error(`Failed to fetch practice questions: ${qErr.message}`);
 
   const { data: passages, error: passErr } = sectionIds.length > 0
     ? await supabase
     .from('passages')
-    .select('id, section_id, title, body_markdown, image_url')
+    .select('id, section_id, title, body_markdown, image_url, translations')
     .in('section_id', sectionIds)
-    : { data: [], error: null };
+    : { data: null, error: null };
 
   if (passErr) throw new Error(`Failed to fetch practice passages: ${passErr.message}`);
 
@@ -59,30 +68,33 @@ export async function fetchPracticeData() {
 
   if (pErr) throw new Error(`Failed to fetch practice ratings: ${pErr.message}`);
 
-  const passageMap = new Map((passages ?? []).map((p) => [p.id, p]));
+  const lang = await resolveRequestLang(profile);
 
-  const enrichedQuestions = (questions ?? []).map((q) => {
-    const passage = q.passage_id ? passageMap.get(q.passage_id) : undefined;
-    if (passage) {
-      const contentObj = typeof q.content === 'object' && q.content !== null ? q.content : {};
-      return {
-        ...q,
-        content: {
-          ...contentObj,
-          passage_title: passage.title,
-          passage_markdown: passage.body_markdown,
-          passage_image_url: passage.image_url,
-        },
-      };
-    }
-    return q;
-  });
+  const localized = localizeExamData(
+    {
+      sections: sections || [],
+      passages: passages || [],
+      questions: questions || [],
+    },
+    lang,
+  );
+
+  const localizedPassages = localized.passages;
+  const enrichedQuestions = enrichPracticeQuestions(localized.questions, localizedPassages);
+
+  const gapsBySection = await getDeGaps(sectionIds);
+
+  const sectionsWithLanguages = localized.sections.map((sec) => ({
+    ...sec,
+    languages: gapsBySection.get(sec.id) === 0 ? GERMAN_AND_ENGLISH : ENGLISH_ONLY,
+  }));
 
   return {
-    sections: sections || [],
+    sections: sectionsWithLanguages,
     questions: enrichedQuestions,
-    passages: passages || [],
+    passages: localizedPassages,
     userPractices: userPractices || [],
+    lang,
   };
 }
 

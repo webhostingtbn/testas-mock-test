@@ -19,6 +19,8 @@ import {
   preloadQuestionImages,
   type QuestionWithContent,
 } from '@/lib/exam/image-preloader';
+import { LanguageProvider } from '@/components/i18n/LanguageProvider';
+import { translate } from '@/lib/i18n/messages';
 
 interface DisplayQuestion extends QuestionWithContent {
   id: string;
@@ -54,6 +56,7 @@ export default function ExamPage() {
 
   const {
     currentExamId,
+    language: examLanguage,
     sections,
     flowSteps,
     currentFlowStepIndex,
@@ -123,7 +126,8 @@ export default function ExamPage() {
     setIsLoadingQuestions(true);
     let hasQuestions = false;
     try {
-      const res = await fetch(`/api/exams/${currentExamId}`);
+      const examLang = useExamStore.getState().language || 'en';
+      const res = await fetch(`/api/exams/${currentExamId}?lang=${examLang}`);
       if (!res.ok) throw new Error('Failed to load questions from server API');
       const examData = await res.json();
       const rawQuestions = (examData.questions || []).filter(
@@ -449,7 +453,7 @@ export default function ExamPage() {
   const answeredIndices = Object.keys(answers[currentSection.id] || {}).map((_, idx) => idx);
 
   return (
-    <>
+    <LanguageProvider initialLang={examLanguage || 'en'} disabled>
       {/* <SecurityOverlay /> */}
       <WatermarkOverlay email={userProfile?.email || session?.user?.email || ''} fullName={userProfile?.fullName || session?.user?.name || null} />
       <div className="flex flex-col h-screen bg-background text-foreground select-none">
@@ -483,7 +487,7 @@ export default function ExamPage() {
               </div>
             ) : (
               <div className="flex h-64 items-center justify-center text-muted-foreground">
-                Question type &quot;{currentSection.questionType}&quot; coming soon.
+                {translate(examLanguage || 'en', 'exam.comingSoon', { type: currentSection.questionType })}
               </div>
             )}
           </div>
@@ -506,6 +510,6 @@ export default function ExamPage() {
           onRatingChange={(rating) => handleDifficultySelect(rating)}
         />
       </div>
-    </>
+    </LanguageProvider>
   );
 }

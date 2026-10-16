@@ -2,6 +2,12 @@
 // Shared TypeScript types for the TestAS Mock Test application
 // =============================================================
 
+import type { ContentTranslations } from './i18n/localize';
+import type { Lang } from './i18n/config';
+
+export type { ContentTranslations };
+export type { Lang };
+
 export type MajorType = 'economics' | 'engineering' | 'natural_computer_science';
 
 export type ModuleTestType = 'economics' | 'engineering' | 'natural_computer_science' | 'math_computer_natural_science' | 'CS' | 'Economics' | 'Engineering';
@@ -45,6 +51,7 @@ export interface Profile {
   role?: string | null;
   status?: string | null;
   format?: string | null;
+  preferred_language?: Lang | null;
   allow_test_limit?: number | null;
   phonenumber?: string | null;
   created_at: string;
@@ -58,6 +65,7 @@ export interface ExamSectionSummary {
   duration_seconds: number;
   question_count: number;
   sort_order: number;
+  languages?: Lang[];
 }
 
 export interface Exam {
@@ -68,6 +76,7 @@ export interface Exam {
   format?: 'Digital' | 'Paper' | null;
   is_active: boolean;
   retry_number?: number | null;
+  languages?: Lang[];
   created_at: string;
   sections?: ExamSectionSummary[];
 }
@@ -90,6 +99,7 @@ export interface Section {
   question_count: number;
   sort_order: number;
   environment_content: EnvironmentContent | null;
+  translations?: ContentTranslations;
   created_at: string;
 }
 
@@ -105,6 +115,7 @@ export interface Question {
   question_type: QuestionType;
   content: FigureSequenceContent | MathEquationContent | LatinSquareContent | ModuleMCQContent | CompletingPatternsContent;
   correct_answer: unknown;
+  translations?: ContentTranslations;
   created_at: string;
 }
 
@@ -114,6 +125,7 @@ export interface UserExam {
   id: string;
   user_id: string;
   exam_id: string;
+  language: Lang;
   attempt_kind?: AttemptKind;
   section_ids?: string[] | null;
   status: ExamStatus;

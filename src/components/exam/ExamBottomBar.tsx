@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ChevronLeft, ChevronRight, Flag, Smile, Meh, Frown, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface ExamBottomBarProps {
   onBack: () => void;
@@ -45,13 +46,14 @@ export default function ExamBottomBar({
   currentRating,
   onRatingChange,
 }: ExamBottomBarProps) {
+  const { t } = useLanguage();
   const [showEndSubtestDialog, setShowEndSubtestDialog] = useState(false);
   const [showEndTestDialog, setShowEndTestDialog] = useState(false);
 
   const ratingOptions = [
-    { id: 'easy' as const, icon: Smile, title: 'Easy', activeClass: 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600' },
-    { id: 'medium' as const, icon: Meh, title: 'Medium', activeClass: 'bg-amber-500 hover:bg-amber-400 text-white border-amber-500' },
-    { id: 'hard' as const, icon: Frown, title: 'Hard', activeClass: 'bg-rose-500 hover:bg-rose-400 text-white border-rose-500' },
+    { id: 'easy' as const, icon: Smile, title: t('common.easy'), activeClass: 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-600' },
+    { id: 'medium' as const, icon: Meh, title: t('common.medium'), activeClass: 'bg-amber-500 hover:bg-amber-400 text-white border-amber-500' },
+    { id: 'hard' as const, icon: Frown, title: t('common.hard'), activeClass: 'bg-rose-500 hover:bg-rose-400 text-white border-rose-500' },
   ];
 
   // Navigation gates on the LOCAL rating only. Server sync runs in the
@@ -66,7 +68,7 @@ export default function ExamBottomBar({
         {ratingError && (
           <div className="mx-auto px-6 py-2 flex items-center gap-2 bg-rose-50 border-b border-rose-100 text-rose-700 text-xs font-medium">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-            <span className="flex-1">Rating sync failed: {ratingError}</span>
+            <span className="flex-1">{t('exam.ratingSyncFailed', { error: ratingError })}</span>
             {onRetryRatingSave && (
               <button
                 type="button"
@@ -74,7 +76,7 @@ export default function ExamBottomBar({
                 className="flex items-center gap-1 rounded-md bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-200 transition cursor-pointer"
               >
                 <RefreshCw className="w-3 h-3" />
-                Retry
+                {t('common.retry')}
               </button>
             )}
           </div>
@@ -88,17 +90,17 @@ export default function ExamBottomBar({
               disabled={isFirstQuestion || isActionDisabled}
               variant="outline"
               className="h-11 px-3 lg:px-6 text-sm font-medium border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-25 transition-all duration-150"
-              title={isActionDisabled && !isFirstQuestion ? 'Rate the current question to navigate' : undefined}
+              title={isActionDisabled && !isFirstQuestion ? t('exam.rateCurrentToNavigate') : undefined}
             >
               <ChevronLeft className="w-4 h-4 sm:mr-1" />
-              <span className="hidden lg:inline">Back</span>
+              <span className="hidden lg:inline">{t('common.back')}</span>
             </Button>
           </div>
 
           {/* Middle: Rating pills — full row on top for small screens */}
           <div className="order-first md:order-0 basis-full sm:basis-auto flex px-2 items-center md:*:justify-center sm:justify-start gap-1.5">
-            <span className="hidden lg:inline text-[13px] font-medium text-[#71717A] mr-1">Rate to proceed:</span>
-            <span className="lg:hidden text-[13px] font-medium text-[#71717A] mr-1">Rate:</span>
+            <span className="hidden lg:inline text-[13px] font-medium text-[#71717A] mr-1">{t('exam.rateToProceed')}</span>
+            <span className="lg:hidden text-[13px] font-medium text-[#71717A] mr-1">{t('practice.rate')}</span>
             {ratingOptions.map((opt) => {
               const isActive = currentRating === opt.id;
               const Icon = opt.icon;
@@ -122,7 +124,7 @@ export default function ExamBottomBar({
             })}
             {isRatingSaving && (
               <span className="text-[10px] font-medium text-slate-400 animate-pulse px-1">
-                Syncing…
+                {t('exam.syncing')}
               </span>
             )}
           </div>
@@ -135,10 +137,10 @@ export default function ExamBottomBar({
                 disabled={isActionDisabled}
                 variant="outline"
                 className="h-11 px-3 sm:px-4 text-sm font-medium border border-rose-200 text-rose-650 bg-rose-50 hover:bg-rose-100 transition-all duration-150 disabled:opacity-25"
-                title={isActionDisabled ? "Rate the current question first" : undefined}
+                title={isActionDisabled ? t('exam.rateCurrentFirst') : undefined}
               >
                 <XCircle className="w-4 h-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">End Test</span>
+                <span className="hidden sm:inline">{t('exam.endTest')}</span>
               </Button>
             )}
 
@@ -147,19 +149,19 @@ export default function ExamBottomBar({
               disabled={isActionDisabled}
               variant="outline"
               className="h-11 px-3 sm:px-4 text-sm font-medium border border-orange-200 text-orange-650 bg-orange-50 hover:bg-orange-100 transition-all duration-150 disabled:opacity-25"
-              title={isActionDisabled ? "Rate the current question first to end subtest" : undefined}
+              title={isActionDisabled ? t('exam.rateCurrentToEndSubtest') : undefined}
             >
               <Flag className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">End Subtest</span>
+              <span className="hidden sm:inline">{t('exam.endSubtest')}</span>
             </Button>
 
             <Button
               onClick={onNext}
               disabled={isLastQuestion || isActionDisabled}
               className="h-11 px-3 lg:px-8 text-sm font-medium bg-orange-600 hover:bg-orange-500 text-white shadow-md shadow-orange-500/15 disabled:opacity-25 transition-all duration-150 border-0"
-              title={isActionDisabled ? "Rate the current question first to proceed" : undefined}
+              title={isActionDisabled ? t('exam.rateCurrentFirst') : undefined}
             >
-              <span className="hidden lg:inline">Next</span>
+              <span className="hidden lg:inline">{t('common.next')}</span>
               <ChevronRight className="w-4 h-4 lg:ml-1" />
             </Button>
           </div>
@@ -170,11 +172,9 @@ export default function ExamBottomBar({
       <Dialog open={showEndSubtestDialog} onOpenChange={setShowEndSubtestDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-lg">End Subtest?</DialogTitle>
+            <DialogTitle className="text-lg">{t('exam.endSubtestTitle')}</DialogTitle>
             <DialogDescription className="text-sm">
-              Are you sure you want to end <strong>&quot;{sectionTitle}&quot;</strong>?
-              You will not be able to return to this section.
-              Any unanswered questions will be marked as blank.
+              {t('exam.endSubtestDesc', { title: sectionTitle })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex space-x-2 sm:gap-0">
@@ -183,7 +183,7 @@ export default function ExamBottomBar({
               onClick={() => setShowEndSubtestDialog(false)}
               className="flex-1 sm:flex-none"
             >
-              Continue Test
+              {t('exam.continueTest')}
             </Button>
             <Button
               onClick={() => {
@@ -192,7 +192,7 @@ export default function ExamBottomBar({
               }}
               className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white"
             >
-              End Subtest
+              {t('exam.endSubtest')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -206,14 +206,14 @@ export default function ExamBottomBar({
               <div className="grid size-9 place-items-center rounded-full bg-rose-100 text-rose-600">
                 <AlertTriangle className="size-4.5" />
               </div>
-              <DialogTitle className="text-lg text-rose-900">End Entire Test?</DialogTitle>
+              <DialogTitle className="text-lg text-rose-900">{t('exam.endTestTitle')}</DialogTitle>
             </div>
             <DialogDescription className="text-sm space-y-2">
-              <span className="block">This will end your entire mock test early. Please understand:</span>
-              <span className="block text-rose-700 font-medium">• Your attempt will be recorded as &quot;Ended Early&quot;</span>
-              <span className="block text-rose-700 font-medium">• Remaining subtests will not be attempted</span>
-              <span className="block text-rose-700 font-medium">• Only questions you&apos;ve seen and rated will appear in Practice</span>
-              <span className="block text-rose-700 font-medium">• This attempt counts toward your attempt limit</span>
+              <span className="block">{t('exam.endTestDesc')}</span>
+              <span className="block text-rose-700 font-medium">{t('exam.endTestBullet1')}</span>
+              <span className="block text-rose-700 font-medium">{t('exam.endTestBullet2')}</span>
+              <span className="block text-rose-700 font-medium">{t('exam.endTestBullet3')}</span>
+              <span className="block text-rose-700 font-medium">{t('exam.endTestBullet4')}</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex space-x-2 sm:gap-0">
@@ -222,7 +222,7 @@ export default function ExamBottomBar({
               onClick={() => setShowEndTestDialog(false)}
               className="flex-1 sm:flex-none"
             >
-              Continue Test
+              {t('exam.continueTest')}
             </Button>
             <Button
               onClick={() => {
@@ -231,7 +231,7 @@ export default function ExamBottomBar({
               }}
               className="flex-1 sm:flex-none bg-rose-600 hover:bg-rose-700 text-white"
             >
-              End Test
+              {t('exam.endTest')}
             </Button>
           </DialogFooter>
         </DialogContent>

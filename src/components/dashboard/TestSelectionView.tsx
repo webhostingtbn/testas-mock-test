@@ -20,6 +20,8 @@ import type { Exam, Profile } from '@/lib/types';
 import { isFullCompletion, isResumableAttempt } from '@/lib/types';
 import { calculateExamMetrics } from '@/lib/exam/metrics';
 import { ReviewView, type ExamAttemptReview } from './ReviewView';
+import { EnglishOnlyNotice } from './EnglishOnlyNotice';
+import { useLanguage } from '@/components/i18n/LanguageProvider';
 
 interface TestSelectionViewProps {
   profile: Profile | null;
@@ -67,6 +69,7 @@ export function TestSelectionView({
   onBackNavigation,
 }: TestSelectionViewProps) {
   const router = useRouter();
+  const { lang, t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'all' | 'completed' | 'in_progress'>('all');
   const [mobileView, setMobileView] = useState<'list' | 'dashboard'>('list');
 
@@ -75,7 +78,7 @@ export function TestSelectionView({
 
     if (mobileView === 'dashboard') {
       onBackNavigation({
-        label: 'Back to Tests',
+        label: t('mockTest.backToTests'),
         onBack: () => setMobileView('list'),
       });
     } else {
@@ -83,7 +86,7 @@ export function TestSelectionView({
     }
 
     return () => onBackNavigation(undefined);
-  }, [mobileView, onBackNavigation]);
+  }, [mobileView, onBackNavigation, t]);
 
   const activeExams = useMemo(() => {
     return exams.filter((exam) => {
@@ -199,15 +202,15 @@ export function TestSelectionView({
       <div className="h-full max-w-[1480px] mx-auto flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <KniCard className="flex flex-col items-center justify-center rounded-[22px] border border-dashed border-orange-100/50 bg-orange-50/10 p-8 py-16 text-center">
           <Clock className="mb-3 size-10 text-orange-300" />
-          <h4 className="text-base font-black text-slate-900">No active mock exams available</h4>
+          <h4 className="text-base font-black text-slate-900">{t('mockTest.noActiveMocksTitle')}</h4>
           <p className="mt-1.5 max-w-sm text-xs leading-relaxed text-slate-500">
-            There is currently no active mock test configured in the system. Please check back later or contact an administrator.
+            {t('mockTest.noActiveMocksDesc')}
           </p>
           <KniButton
             onClick={() => router.push('/dashboard')}
             className="mt-5 h-11 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white animate-fade-in"
           >
-            Go Back to Dashboard
+            {t('mockTest.backToDashboard')}
             <ChevronRight className="ml-1 size-4" />
           </KniButton>
         </KniCard>
@@ -225,14 +228,14 @@ export function TestSelectionView({
     <div className="grid min-h-0 w-full max-w-full gap-4 lg:h-full lg:grid-cols-[300px_1fr] lg:pb-0 xl:grid-cols-[360px_1fr] items-start">
         <div className={`flex min-h-0 flex-col gap-4 overflow-visible rounded-xl border border-slate-200 bg-white p-4 transition duration-200 sm:p-6 lg:sticky lg:h-[calc(100dvh-116px)] lg:top-5 lg:max-h-[calc(100dvh-116px)] lg:overflow-hidden ${mobileView === 'dashboard' ? 'hidden lg:flex' : 'flex'}`}>
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-950">Available Tests</h2>
-            <p className="mt-1 text-xs text-slate-500">Choose an active test to view details or start.</p>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950">{t('mockTest.availableTests')}</h2>
+            <p className="mt-1 text-xs text-slate-500">{t('mockTest.availableTestsDesc')}</p>
           </div>
 
           <div className="flex max-h-none flex-col gap-3 overflow-visible pr-0 lg:max-h-[calc(100dvh-250px)] lg:overflow-y-auto lg:pr-1">
             {filteredExams.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 py-10 text-center">
-                <p className="text-xs font-semibold text-slate-500">No tests match this filter</p>
+                <p className="text-xs font-semibold text-slate-500">{t('mockTest.noTestsMatch')}</p>
               </div>
             ) : (
               filteredExams.map((exam) => {
@@ -263,7 +266,7 @@ export function TestSelectionView({
 
                       <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-semibold text-slate-500">
-                          {info.duration} min<br/>{info.questions} questions
+                          {t('mockTest.durationMinutesShort', { count: info.duration })}<br/>{t('mockTest.questionsCountShort', { count: info.questions })}
                         </p>
                       </div>
 
@@ -272,17 +275,17 @@ export function TestSelectionView({
                           {info.hasCompleted ? (
                             <>
                               <span className="text-xs font-black text-emerald-600">{info.bestPct}%</span>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Completed</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.completed')}</span>
                             </>
                           ) : info.isInProgress ? (
                             <>
                               <span className="text-xs font-black text-amber-600">{info.progressPct}%</span>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">In Progress</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.inProgress')}</span>
                             </>
                           ) : (
                             <>
                               <span className="text-xs font-black text-slate-400">0%</span>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Not Started</span>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.notStarted')}</span>
                             </>
                           )}
                         </div>
@@ -308,9 +311,13 @@ export function TestSelectionView({
                 className="flex h-11 w-full items-center gap-1.5 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white shadow-sm shadow-orange-500/20 transition cursor-pointer hover:bg-orange-500 sm:w-auto"
               >
                 <PlayCircle className="size-4.5" />
-                Start Test
+                {t('mockTest.startTest')}
               </KniButton>
             </div>
+
+            {lang === 'de' && !selectedExam.languages?.includes('de') && (
+              <EnglishOnlyNotice />
+            )}
 
             {latestCompleted ? (
               <ReviewView
@@ -321,9 +328,9 @@ export function TestSelectionView({
             ) : (
               <KniCard className="flex flex-col items-center justify-center border border-dashed border-slate-200 bg-slate-50/60 px-6 py-16 text-center">
                 <Award className="mb-3 size-10 text-slate-300" />
-                <h2 className="text-lg font-black tracking-tight text-slate-950">No review available yet</h2>
+                <h2 className="text-lg font-black tracking-tight text-slate-950">{t('mockTest.noReviewAvailable')}</h2>
                 <p className="mt-2 max-w-sm text-sm leading-6 text-slate-500">
-                  Complete this mock test once to see the review breakdown here.
+                  {t('mockTest.completeMockFirst')}
                 </p>
                 {(() => {
                   const inProgress = [...attempts]
@@ -342,8 +349,10 @@ export function TestSelectionView({
                   if (formatMismatch) {
                     return (
                       <p className="mt-5 max-w-sm text-xs leading-5 text-slate-500">
-                        You have an in-progress {examFormat} attempt for this test, but your
-                        profile is set to {profileFormat}. Switch format to resume it.
+                        {t('mockTest.formatMismatchNotice', {
+                          examFormat: examFormat ?? '',
+                          profileFormat: profileFormat ?? '',
+                        })}
                       </p>
                     );
                   }
@@ -354,7 +363,7 @@ export function TestSelectionView({
                       className="mt-5 h-10 rounded-xl px-4 text-xs font-semibold"
                     >
                       <Clock className="mr-1.5 size-3.5" />
-                      Resume In-Progress Test
+                      {t('mockTest.resumeInProgress')}
                     </KniButton>
                   );
                 })()}

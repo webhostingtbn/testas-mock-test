@@ -3,6 +3,7 @@ import 'server-only';
 import { auth } from '@/auth';
 import type { Session } from 'next-auth';
 import { getAdminSupabaseClient } from '@/lib/supabase/admin';
+import type { Lang } from '@/lib/i18n/config';
 
 export interface UserProfile {
   id: string;
@@ -15,6 +16,7 @@ export interface UserProfile {
   format: string | null;
   module_test: string | null;
   phonenumber: string | null;
+  preferred_language: Lang | null;
 }
 
 export async function requireUser(): Promise<{
