@@ -73,4 +73,76 @@ describe('ImageService - image separation', () => {
     assert.strictEqual(content.passage_image_url, 'https://example.com/passage_img.webp');
     assert.strictEqual(content.resolved_image_url, undefined);
   });
+
+  it('collects question_image and question_image_2 into resolved_image_urls in order', async () => {
+    const questionContent = {
+      context_text: 'Context introductory text...',
+      question_text: 'Which of the following graphs correctly shows...',
+      question_image: 'https://example.com/graph_a.webp',
+      question_image_2: 'https://example.com/graph_b.webp',
+      options: {
+        A: 'Graph A',
+        B: 'Graph B',
+      },
+    };
+
+    const resolved = await imageService.resolveImageUrls(questionContent);
+
+    assert.strictEqual(resolved.resolved_image_url, 'https://example.com/graph_a.webp');
+    assert.deepStrictEqual(resolved.resolved_image_urls, [
+      'https://example.com/graph_a.webp',
+      'https://example.com/graph_b.webp',
+    ]);
+  });
+
+  it('supports eng_2_3d question_image_a and question_image_b', async () => {
+    const questionContent = {
+      question_text: 'Here you see the cube from the front...',
+      question_image_a: 'https://example.com/cube_front.webp',
+      question_image_b: 'https://example.com/cube_angle.webp',
+      options: { A: 'Right', B: 'Left' },
+    };
+
+    const resolved = await imageService.resolveImageUrls(questionContent);
+
+    assert.strictEqual(resolved.resolved_image_url, 'https://example.com/cube_front.webp');
+    assert.deepStrictEqual(resolved.resolved_image_urls, [
+      'https://example.com/cube_front.webp',
+      'https://example.com/cube_angle.webp',
+    ]);
+  });
+
+  it('supports eng_3 question_image and question_image_o (options graphic)', async () => {
+    const questionContent = {
+      question_text: 'The graphic below shows acceleration...',
+      question_image: 'https://example.com/accel.webp',
+      question_image_o: 'https://example.com/options_graph.webp',
+      options: { A: 'A', B: 'B' },
+    };
+
+    const resolved = await imageService.resolveImageUrls(questionContent);
+
+    assert.strictEqual(resolved.resolved_image_url, 'https://example.com/accel.webp');
+    assert.deepStrictEqual(resolved.resolved_image_urls, [
+      'https://example.com/accel.webp',
+      'https://example.com/options_graph.webp',
+    ]);
+  });
+
+  it('supports question_images array and deduplicates identical paths', async () => {
+    const questionContent = {
+      question_text: 'Multiple images array test',
+      question_image: 'https://example.com/img1.webp',
+      question_images: ['https://example.com/img1.webp', 'https://example.com/img2.webp'],
+      options: { A: 'A', B: 'B' },
+    };
+
+    const resolved = await imageService.resolveImageUrls(questionContent);
+
+    assert.strictEqual(resolved.resolved_image_url, 'https://example.com/img1.webp');
+    assert.deepStrictEqual(resolved.resolved_image_urls, [
+      'https://example.com/img1.webp',
+      'https://example.com/img2.webp',
+    ]);
+  });
 });

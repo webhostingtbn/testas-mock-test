@@ -92,9 +92,11 @@ interface ModuleQuestionData {
   id: string;
   sort_order?: number;
   content: {
+    context_text?: string;
     question_text: string;
     options: Record<string, string>;
     resolved_image_url?: string;
+    resolved_image_urls?: string[];
   };
 }
 
@@ -315,13 +317,24 @@ class ModuleMCQRenderer implements QuestionRenderer {
               qContent.resolved_image_url !== imageUrl
               ? qContent.resolved_image_url
               : undefined;
+        const childResolvedUrls = Array.isArray(qContent.resolved_image_urls)
+          ? qContent.resolved_image_urls.filter(
+              (u): u is string =>
+                typeof u === 'string' &&
+                u !== imageUrl &&
+                u !== resolvedImageUrl,
+            )
+          : undefined;
+        const childContextText = typeof qContent.context_text === 'string' ? qContent.context_text : undefined;
         return {
           id: q.id,
           sort_order: typeof qRecord.sort_order === 'number' ? qRecord.sort_order : (q.sortOrder ?? 1),
           content: {
             question_text: typeof qContent.question_text === 'string' ? qContent.question_text : '',
             options: (isRecord(qContent.options) || Array.isArray(qContent.options) ? qContent.options : {}) as unknown as Record<string, string>,
+            ...(childContextText ? { context_text: childContextText } : {}),
             ...(childResolved ? { resolved_image_url: childResolved } : {}),
+            ...(childResolvedUrls && childResolvedUrls.length > 0 ? { resolved_image_urls: childResolvedUrls } : {}),
           },
         };
       });
@@ -335,6 +348,15 @@ class ModuleMCQRenderer implements QuestionRenderer {
             content.resolved_image_url !== imageUrl
             ? content.resolved_image_url
             : undefined;
+      const singleResolvedUrls = Array.isArray(content.resolved_image_urls)
+        ? content.resolved_image_urls.filter(
+            (u): u is string =>
+              typeof u === 'string' &&
+              u !== imageUrl &&
+              u !== resolvedImageUrl,
+          )
+        : undefined;
+      const singleContextText = typeof content.context_text === 'string' ? content.context_text : undefined;
       questions = [
         {
           id: passage.id,
@@ -342,7 +364,9 @@ class ModuleMCQRenderer implements QuestionRenderer {
           content: {
             question_text: typeof content.question_text === 'string' ? content.question_text : (typeof passage.content === 'string' ? passage.content : ''),
             options: (isRecord(content.options) || Array.isArray(content.options) ? content.options : {}) as unknown as Record<string, string>,
+            ...(singleContextText ? { context_text: singleContextText } : {}),
             ...(singleResolved ? { resolved_image_url: singleResolved } : {}),
+            ...(singleResolvedUrls && singleResolvedUrls.length > 0 ? { resolved_image_urls: singleResolvedUrls } : {}),
           },
         },
       ];
@@ -416,8 +440,17 @@ class ModuleQuestionRenderer implements QuestionRenderer {
   render(props: RendererProps): React.ReactNode {
     const question = props.question as QuestionData & {
       content: {
+        context_text?: string;
         question_text?: string;
         question_image?: string;
+        question_image_2?: string;
+        question_image_3?: string;
+        question_image_a?: string;
+        question_image_b?: string;
+        question_image_o?: string;
+        question_images?: string[];
+        resolved_image_url?: string;
+        resolved_image_urls?: string[];
         image_url?: string;
         environment_text?: string;
         environment_images?: string[];

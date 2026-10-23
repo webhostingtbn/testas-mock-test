@@ -5,11 +5,14 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { CanvasImage } from './CanvasImage';
 import { ResilientImage } from './ResilientImage';
 import { RichMarkdown } from './RichMarkdown';
+import { cleanQuestionTexts } from '../../lib/exam/question-helpers';
 
 export interface ModuleQuestionContent {
+  context_text?: string;
   question_text: string;
   options: Record<string, unknown>;
   resolved_image_url?: string;
+  resolved_image_urls?: string[];
 }
 
 export interface ModuleQuestion {
@@ -236,14 +239,63 @@ export default function ModuleMCQ({
               {/* Question body */}
               {isOpen && (
                 <div className="pt-3">
-                  {question.content.resolved_image_url && (
-                    <div className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
-                      <CanvasImage src={question.content.resolved_image_url} alt="Question graphic" />
-                    </div>
-                  )}
-                  <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
-                    <RichMarkdown content={question.content.question_text} />
-                  </div>
+                  {(() => {
+                    const childImages = Array.isArray(question.content.resolved_image_urls) && question.content.resolved_image_urls.length > 0
+                      ? question.content.resolved_image_urls
+                      : question.content.resolved_image_url
+                        ? [question.content.resolved_image_url]
+                        : [];
+                    const { context: childContext, question: childQuestionText } = cleanQuestionTexts(
+                      question.content.context_text,
+                      question.content.question_text,
+                    );
+                    const primaryChildImage = childImages[0];
+                    const secondaryChildImages = childImages.slice(1);
+
+                    if (childContext) {
+                      return (
+                        <>
+                          <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+                            <RichMarkdown content={childContext} />
+                          </div>
+
+                          {primaryChildImage && (
+                            <div className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+                              <CanvasImage src={primaryChildImage} alt="Question graphic" />
+                            </div>
+                          )}
+
+                          {childQuestionText && (
+                            <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+                              <RichMarkdown content={childQuestionText} />
+                            </div>
+                          )}
+
+                          {secondaryChildImages.map((src, idx) => (
+                            <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+                              <CanvasImage src={src} alt={`Question graphic ${idx + 2}`} />
+                            </div>
+                          ))}
+                        </>
+                      );
+                    }
+
+                    return (
+                      <>
+                        {childQuestionText && (
+                          <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+                            <RichMarkdown content={childQuestionText} />
+                          </div>
+                        )}
+
+                        {childImages.map((src, idx) => (
+                          <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+                            <CanvasImage src={src} alt={`Question graphic ${idx + 1}`} />
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
 
                   <div className="flex flex-col gap-[10px]" role="radiogroup" aria-label={`Question ${questionNo} options`}>
                     {normalizeOptions(question.content.options).map((option, idx) => {

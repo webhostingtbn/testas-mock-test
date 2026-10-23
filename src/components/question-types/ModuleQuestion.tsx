@@ -4,6 +4,9 @@ import React from 'react';
 import { CanvasImage } from './CanvasImage';
 import { ResilientImage } from './ResilientImage';
 import { RichMarkdown } from './RichMarkdown';
+import { cleanQuestionTexts, extractQuestionImages } from '../../lib/exam/question-helpers';
+
+export { cleanQuestionTexts, extractQuestionImages };
 
 export interface ModuleQuestionVerification {
   isVerified: boolean;
@@ -11,17 +14,28 @@ export interface ModuleQuestionVerification {
   correctAnswer?: unknown;
 }
 
+export interface ModuleQuestionContent {
+  context_text?: string;
+  question_text: string;
+  question_image?: string;
+  question_image_2?: string;
+  question_image_3?: string;
+  question_image_a?: string;
+  question_image_b?: string;
+  question_image_o?: string;
+  question_images?: string[];
+  resolved_image_url?: string;
+  resolved_image_urls?: string[];
+  image_url?: string;
+  environment_text?: string;
+  environment_images?: string[];
+  options: Record<string, unknown> | unknown[];
+}
+
 interface ModuleQuestionProps {
   question: {
     id: string;
-    content: {
-      question_text: string;
-      question_image?: string;
-      image_url?: string;
-      environment_text?: string;
-      environment_images?: string[];
-      options: Record<string, unknown> | unknown[];
-    };
+    content: ModuleQuestionContent;
   };
   selectedAnswer: string | null;
   onAnswer: (optionId: string) => void;
@@ -37,6 +51,88 @@ interface NormalizedOption {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isImageUrl(url: string): boolean {
+  return url.startsWith('http') || url.startsWith('/') || url.startsWith('data:') || url.startsWith('blob:');
+}
+
+interface QuestionBodyProps {
+  displayContext?: string;
+  displayQuestion: string;
+  primaryImage?: string;
+  secondaryImages: string[];
+  allImages: string[];
+}
+
+function QuestionBody({
+  displayContext,
+  displayQuestion,
+  primaryImage,
+  secondaryImages,
+  allImages,
+}: QuestionBodyProps) {
+  if (displayContext) {
+    return (
+      <>
+        <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+          <RichMarkdown content={displayContext} />
+        </div>
+
+        {primaryImage && (
+          <div className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+            {isImageUrl(primaryImage) ? (
+              <CanvasImage src={primaryImage} alt="Question graphic" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-xl">
+                [Image placeholder]
+              </div>
+            )}
+          </div>
+        )}
+
+        {displayQuestion && (
+          <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+            <RichMarkdown content={displayQuestion} />
+          </div>
+        )}
+
+        {secondaryImages.map((img, idx) => (
+          <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+            {isImageUrl(img) ? (
+              <CanvasImage src={img} alt={`Question graphic ${idx + 2}`} />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-xl">
+                [Image placeholder]
+              </div>
+            )}
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {displayQuestion && (
+        <div className="prose prose-zinc max-w-none text-[15px] font-normal text-[#18181B] prose-headings:font-semibold prose-headings:text-[#18181B] prose-p:leading-[1.65] prose-li:text-[#18181B] prose-strong:text-[#18181B] mb-4">
+          <RichMarkdown content={displayQuestion} />
+        </div>
+      )}
+
+      {allImages.map((img, idx) => (
+        <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl mb-4">
+          {isImageUrl(img) ? (
+            <CanvasImage src={img} alt={`Question graphic ${idx + 1}`} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-xl">
+              [Image placeholder]
+            </div>
+          )}
+        </div>
+      ))}
+    </>
+  );
 }
 
 function normalizeOptions(options: Record<string, unknown> | unknown[]): NormalizedOption[] {
@@ -80,9 +176,15 @@ export default function ModuleQuestion({
   isSplitLayout = false,
   verification,
 }: ModuleQuestionProps) {
-  const { question_text, question_image, image_url, environment_text, environment_images, options } = question.content;
+  const { question_text, context_text, environment_text, environment_images, options } = question.content;
   const normalized = normalizeOptions(options);
-  const displayImage = question_image || image_url;
+
+  const allImages = extractQuestionImages(question.content as unknown as Record<string, unknown>);
+  const primaryImage = allImages[0];
+  const secondaryImages = allImages.slice(1);
+
+  const { context: displayContext, question: displayQuestion } = cleanQuestionTexts(context_text, question_text);
+
   const isVerified = Boolean(verification?.isVerified);
   const correctAnswer = verification?.correctAnswer;
 
@@ -92,19 +194,19 @@ export default function ModuleQuestion({
         {/* Left column: Situation/Environment + Question */}
         <div className="w-full lg:w-1/2 flex flex-col gap-6 lg:h-full lg:overflow-y-auto pr-2 custom-scrollbar box-border pb-12 lg:pb-0 min-h-0">
           {/* Environment/Scheme Section (if present) */}
-          {(environment_text || environment_images) && (
+          {(environment_text || (environment_images && environment_images.length > 0)) && (
             <div className="bg-blue-50 rounded-2xl border border-blue-200 p-6 shadow-sm flex flex-col flex-none min-h-0">
               <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3 flex-none">
                 📋 Situation / Environment
               </h3>
               {environment_images && environment_images.length > 0 && (
-                <div className="mt-2 flex flex-col gap-4 flex-1 min-h-0">
+                <div className="mt-2 flex flex-col gap-4 flex-none">
                   {environment_images.map((img, idx) => (
-                    <div key={idx} className="w-full flex-1 min-h-[300px] flex flex-col overflow-hidden">
-                      {img.startsWith('http') || img.startsWith('/') ? (
+                    <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl">
+                      {isImageUrl(img) ? (
                         <CanvasImage src={img} alt={`Environment ${idx + 1}`} />
                       ) : (
-                        <div className="w-48 h-32 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-blue-250 rounded-xl">
+                        <div className="w-full h-full flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-blue-200 rounded-xl">
                           [Image placeholder]
                         </div>
                       )}
@@ -121,28 +223,17 @@ export default function ModuleQuestion({
           )}
 
           {/* Question */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col flex-1 min-h-0 overflow-scroll">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex-none">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col min-h-0 overflow-y-auto custom-scrollbar">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex-none">
               Question
             </h3>
-            
-            {displayImage && (
-              <div className="w-full flex-1 min-h-[300px] flex flex-col overflow-hidden max-h-[40vh]">
-                {displayImage.startsWith('http') || displayImage.startsWith('/') ? (
-                  <div className="w-full h-full flex items-center justify-center overflow-hidden">
-                    <CanvasImage src={displayImage} alt="Question" />
-                  </div>
-                ) : (
-                  <div className="w-64 h-40 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-250 rounded-xl flex-none">
-                    [Image placeholder]
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <p className="text-gray-800 mt-4 text-base leading-relaxed mb-4 flex-none">
-              {question_text}
-            </p>
+            <QuestionBody
+              displayContext={displayContext}
+              displayQuestion={displayQuestion}
+              primaryImage={primaryImage}
+              secondaryImages={secondaryImages}
+              allImages={allImages}
+            />
           </div>
         </div>
 
@@ -264,7 +355,7 @@ export default function ModuleQuestion({
   return (
     <div className="space-y-6">
       {/* Environment/Scheme Section (if present) */}
-      {(environment_text || environment_images) && (
+      {(environment_text || (environment_images && environment_images.length > 0)) && (
         <div className="bg-blue-50 rounded-2xl border border-blue-200 p-6 shadow-sm">
           <h3 className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">
             📋 Situation / Environment
@@ -277,11 +368,11 @@ export default function ModuleQuestion({
           {environment_images && environment_images.length > 0 && (
             <div className="mt-4 flex flex-col gap-4">
               {environment_images.map((img, idx) => (
-                <div key={idx} className="w-full">
-                  {img.startsWith('http') || img.startsWith('/') ? (
+                <div key={idx} className="w-full h-[280px] sm:h-[320px] shrink-0 overflow-hidden rounded-xl">
+                  {isImageUrl(img) ? (
                     <CanvasImage src={img} alt={`Environment ${idx + 1}`} />
                   ) : (
-                    <div className="w-48 h-32 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-blue-250 rounded-xl">
+                    <div className="w-full h-full flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-blue-200 rounded-xl">
                       [Image placeholder]
                     </div>
                   )}
@@ -294,23 +385,16 @@ export default function ModuleQuestion({
 
       {/* Question */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
-        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
           Question
         </h3>
-        <p className="text-gray-800 text-base leading-relaxed mb-4">
-          {question_text}
-        </p>
-        {displayImage && (
-          <div className="w-full">
-            {displayImage.startsWith('http') || displayImage.startsWith('/') ? (
-              <CanvasImage src={displayImage} alt="Question" />
-            ) : (
-              <div className="w-64 h-40 flex items-center justify-center text-sm text-gray-400 bg-gray-50 border border-gray-250 rounded-xl">
-                [Image placeholder]
-              </div>
-            )}
-          </div>
-        )}
+        <QuestionBody
+          displayContext={displayContext}
+          displayQuestion={displayQuestion}
+          primaryImage={primaryImage}
+          secondaryImages={secondaryImages}
+          allImages={allImages}
+        />
       </div>
 
       {/* Answer Options */}

@@ -58,8 +58,33 @@ export function extractQuestionImageUrls(q: QuestionWithContent | null | undefin
   if (typeof content.question_image === 'string' && content.question_image) {
     urls.push(content.question_image);
   }
+  if (typeof content.question_image_2 === 'string' && content.question_image_2) {
+    urls.push(content.question_image_2);
+  }
+  if (typeof content.question_image_3 === 'string' && content.question_image_3) {
+    urls.push(content.question_image_3);
+  }
+  if (typeof content.question_image_a === 'string' && content.question_image_a) {
+    urls.push(content.question_image_a);
+  }
+  if (typeof content.question_image_b === 'string' && content.question_image_b) {
+    urls.push(content.question_image_b);
+  }
+  if (typeof content.question_image_o === 'string' && content.question_image_o) {
+    urls.push(content.question_image_o);
+  }
   if (typeof content.resolved_image_url === 'string' && content.resolved_image_url) {
     urls.push(content.resolved_image_url);
+  }
+  if (Array.isArray(content.question_images)) {
+    content.question_images.forEach((u) => {
+      if (typeof u === 'string' && u) urls.push(u);
+    });
+  }
+  if (Array.isArray(content.resolved_image_urls)) {
+    content.resolved_image_urls.forEach((u) => {
+      if (typeof u === 'string' && u) urls.push(u);
+    });
   }
 
   // options_urls (Figure Sequence array of signed URLs)

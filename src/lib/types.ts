@@ -187,10 +187,28 @@ export interface LatinSquareContent {
 }
 
 export interface ModuleMCQContent {
+  /** Optional context or introductory text preceding the question/image */
+  context_text?: string;
   /** Question text (can include HTML) */
   question_text: string;
   /** Optional question image URL */
   question_image?: string;
+  /** Optional secondary question image URL */
+  question_image_2?: string;
+  /** Optional tertiary question image URL */
+  question_image_3?: string;
+  /** Optional labeled question images (e.g. 3D views) */
+  question_image_a?: string;
+  question_image_b?: string;
+  question_image_o?: string;
+  /** Optional array of question image URLs */
+  question_images?: string[];
+  /** Alias / legacy image field */
+  image_url?: string;
+  /** Resolved signed image URL (populated by image-service) */
+  resolved_image_url?: string;
+  /** Resolved signed image URLs for all question images (populated by image-service) */
+  resolved_image_urls?: string[];
   /** Multiple choice options */
   options: MCQOption[];
 }

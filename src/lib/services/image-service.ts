@@ -266,7 +266,16 @@ export class ImageService {
     }
 
     // In-place single paths (question + embedded passage)
-    const inPlaceKeys = ['question_image', 'image_url', 'passage_image_url'] as const;
+    const inPlaceKeys = [
+      'question_image',
+      'question_image_2',
+      'question_image_3',
+      'question_image_a',
+      'question_image_b',
+      'question_image_o',
+      'image_url',
+      'passage_image_url',
+    ] as const;
     for (const key of inPlaceKeys) {
       const resolved = await this.resolveBarePath(content[key]);
       if (resolved) newContent[key] = resolved;
@@ -276,18 +285,71 @@ export class ImageService {
     const childResolved = await this.resolveBarePath(content.resolved_image_url);
     if (childResolved) newContent.resolved_image_url = childResolved;
 
+    const childResolvedList = await this.resolveStringArray(content.resolved_image_urls);
+    if (childResolvedList) newContent.resolved_image_urls = childResolvedList;
+
+    // Question images array (if present)
+    const questionImages = await this.resolveStringArray(content.question_images);
+    if (questionImages) newContent.question_images = questionImages;
+
     // ModuleQuestion environment gallery
     const environmentImages = await this.resolveStringArray(content.environment_images);
     if (environmentImages) newContent.environment_images = environmentImages;
 
     await this.resolveOptionsField(content, newContent);
 
-    // If the question has its own graphic (question_image), surface it as resolved_image_url.
-    // Passage images (passage_image_url) must NEVER be assigned to resolved_image_url,
-    // otherwise the passage graphic duplicates into every child/single question body.
-    const questionGraphic = asString(newContent.question_image);
-    if (questionGraphic && typeof newContent.resolved_image_url !== 'string') {
-      newContent.resolved_image_url = questionGraphic;
+    // If the question has its own graphic(s), surface them in resolved_image_urls and primary resolved_image_url.
+    // Order: question_image, question_image_2, question_image_3, question_image_a, question_image_b, question_image_o, question_images
+    // Passage images (passage_image_url) must NEVER be assigned to resolved_image_url.
+    const questionImagesList: string[] = [];
+    const orderedImageKeys = [
+      'question_image',
+      'question_image_2',
+      'question_image_3',
+      'question_image_a',
+      'question_image_b',
+      'question_image_o',
+    ] as const;
+
+    for (const key of orderedImageKeys) {
+      const val = asString(newContent[key]);
+      if (val && !questionImagesList.includes(val)) {
+        questionImagesList.push(val);
+      }
+    }
+
+    if (Array.isArray(newContent.question_images)) {
+      for (const item of newContent.question_images) {
+        const val = asString(item);
+        if (val && !questionImagesList.includes(val)) {
+          questionImagesList.push(val);
+        }
+      }
+    }
+
+    if (Array.isArray(newContent.resolved_image_urls)) {
+      for (const item of newContent.resolved_image_urls) {
+        const val = asString(item);
+        if (val && !questionImagesList.includes(val)) {
+          questionImagesList.push(val);
+        }
+      }
+    }
+
+    if (questionImagesList.length === 0) {
+      const fallbackImage = asString(newContent.image_url);
+      if (fallbackImage) {
+        questionImagesList.push(fallbackImage);
+      }
+    }
+
+    if (questionImagesList.length > 0) {
+      newContent.resolved_image_urls = questionImagesList;
+      if (typeof newContent.resolved_image_url !== 'string') {
+        newContent.resolved_image_url = questionImagesList[0];
+      }
+    } else if (typeof newContent.resolved_image_url === 'string') {
+      newContent.resolved_image_urls = [newContent.resolved_image_url];
     }
 
     return newContent;

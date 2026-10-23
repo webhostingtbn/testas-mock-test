@@ -368,6 +368,74 @@ describe('localizeExamData and findTranslationIssues', () => {
     assert.equal(jsonStr.includes('abc123hash'), false);
   });
 
+  it('11. splits German combined question_text when base had context_text', () => {
+    const bundle = {
+      questions: [
+        {
+          id: 'q_econ_20',
+          content: {
+            context_text: 'In the economy, more work often does not lead to linear profit.',
+            question_text: 'Which of the following graphs correctly shows the increase?',
+            question_image: 'https://cdn.example.com/20a.webp',
+            question_image_2: 'https://cdn.example.com/20b.webp',
+            options: [
+              { id: 'A', text: 'Graph A' },
+              { id: 'B', text: 'Graph B' },
+            ],
+          },
+          translations: {
+            de: {
+              question_text: 'In der Wirtschaft führt mehr Arbeit oft nicht zu linearem Gewinn.\n\nWelcher der folgenden Graphen zeigt die Steigerung korrekt?',
+              options: {
+                A: 'Graph A (DE)',
+                B: 'Graph B (DE)',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    const localized = localizeExamData(bundle, 'de');
+    const qContent = localized.questions?.[0].content as Record<string, unknown>;
+
+    assert.equal(qContent.context_text, 'In der Wirtschaft führt mehr Arbeit oft nicht zu linearem Gewinn.');
+    assert.equal(qContent.question_text, 'Welcher der folgenden Graphen zeigt die Steigerung korrekt?');
+    // question_image_2 is preserved from base
+    assert.equal(qContent.question_image_2, 'https://cdn.example.com/20b.webp');
+  });
+
+  it('12. respects explicit context_text and multi-image translation overrides', () => {
+    const bundle = {
+      questions: [
+        {
+          id: 'q_multi',
+          content: {
+            context_text: 'Base context',
+            question_text: 'Base question',
+            question_image_a: 'https://cdn.example.com/a.webp',
+            question_image_b: 'https://cdn.example.com/b.webp',
+          },
+          translations: {
+            de: {
+              context_text: 'Deutscher Kontext',
+              question_text: 'Deutsche Frage',
+              question_image_a: 'https://cdn.example.com/a_de.webp',
+            },
+          },
+        },
+      ],
+    };
+
+    const localized = localizeExamData(bundle, 'de');
+    const qContent = localized.questions?.[0].content as Record<string, unknown>;
+
+    assert.equal(qContent.context_text, 'Deutscher Kontext');
+    assert.equal(qContent.question_text, 'Deutsche Frage');
+    assert.equal(qContent.question_image_a, 'https://cdn.example.com/a_de.webp');
+    assert.equal(qContent.question_image_b, 'https://cdn.example.com/b.webp');
+  });
+
   it('10. input objects are not mutated (deep-freeze input)', () => {
     const bundle = deepFreeze({
       questions: [

@@ -1,8 +1,14 @@
 import type { Lang } from './config';
 
 export interface QuestionTranslation {
+  context_text?: string;
   question_text?: string;
   question_image?: string;
+  question_image_2?: string;
+  question_image_3?: string;
+  question_image_a?: string;
+  question_image_b?: string;
+  question_image_o?: string;
   options?: Record<string, string>;
   _source_hash?: string;
 }
@@ -78,7 +84,34 @@ function localizeQuestionRow<T>(row: T, lang: Lang): Omit<T, 'translations'> {
   if (!de) return stripped;
 
   const newContent = { ...content };
-  applyStringOverrides(newContent, de, ['question_text', 'question_image']);
+  applyStringOverrides(newContent, de, [
+    'context_text',
+    'question_text',
+    'question_image',
+    'question_image_2',
+    'question_image_3',
+    'question_image_a',
+    'question_image_b',
+    'question_image_o',
+  ]);
+
+  // If base question had context_text, but the translation did not supply context_text explicitly:
+  // Check if de.question_text bundled the context before \n\n.
+  if (
+    typeof content.context_text === 'string' &&
+    content.context_text.trim() !== '' &&
+    typeof de.context_text !== 'string' &&
+    typeof de.question_text === 'string'
+  ) {
+    if (de.question_text.includes('\n\n')) {
+      const splitIdx = de.question_text.indexOf('\n\n');
+      newContent.context_text = de.question_text.slice(0, splitIdx).trim();
+      newContent.question_text = de.question_text.slice(splitIdx + 2).trim();
+    } else {
+      // Translation did not include context_text, clear untranslated base context_text
+      delete newContent.context_text;
+    }
+  }
 
   if (isRecord(de.options)) {
     const trOpts = de.options;
@@ -161,7 +194,17 @@ export function localizeExamData<
 }
 
 const ALLOWED_KEYS = {
-  question: new Set(['question_text', 'question_image', 'options']),
+  question: new Set([
+    'context_text',
+    'question_text',
+    'question_image',
+    'question_image_2',
+    'question_image_3',
+    'question_image_a',
+    'question_image_b',
+    'question_image_o',
+    'options',
+  ]),
   passage: new Set(['title', 'body_markdown', 'image_url']),
   section: new Set(['title', 'description', 'environment_content']),
 } as const;
@@ -207,8 +250,22 @@ export function findTranslationIssues(
     const baseContent = isRecord(baseRow) && isRecord(baseRow.content) ? baseRow.content : null;
     checkString(translation, 'question_text', baseContent?.question_text, issues);
 
-    if (translation.question_image !== undefined && typeof translation.question_image !== 'string') {
-      issues.push('question_image must be a string');
+    if (translation.context_text !== undefined && typeof translation.context_text !== 'string') {
+      issues.push('context_text must be a string');
+    }
+
+    const optionalImageKeys = [
+      'question_image',
+      'question_image_2',
+      'question_image_3',
+      'question_image_a',
+      'question_image_b',
+      'question_image_o',
+    ] as const;
+    for (const key of optionalImageKeys) {
+      if (translation[key] !== undefined && typeof translation[key] !== 'string') {
+        issues.push(`${key} must be a string`);
+      }
     }
 
     const allBaseOptionIds = new Set<string>();

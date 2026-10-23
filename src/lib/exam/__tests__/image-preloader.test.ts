@@ -126,5 +126,33 @@ describe('extractQuestionImageUrls', () => {
       'https://example.com/choice.svg',
     ]);
   });
+
+  it('extracts multi-image keys: question_image_2, 3, a, b, o, and arrays', () => {
+    const q = {
+      id: 'multi-img-1',
+      question_type: 'econ_1',
+      content: {
+        question_image: 'https://example.com/graph1.webp',
+        question_image_2: 'https://example.com/graph2.webp',
+        question_image_3: 'https://example.com/graph3.webp',
+        question_image_a: 'https://example.com/cube_a.webp',
+        question_image_b: 'https://example.com/cube_b.webp',
+        question_image_o: 'https://example.com/options.webp',
+        question_images: ['https://example.com/extra.webp'],
+        resolved_image_urls: ['https://example.com/graph1.webp', 'https://example.com/graph2.webp'],
+      },
+    };
+
+    const urls = extractQuestionImageUrls(q);
+    assert.deepStrictEqual(urls, [
+      'https://example.com/graph1.webp',
+      'https://example.com/graph2.webp',
+      'https://example.com/graph3.webp',
+      'https://example.com/cube_a.webp',
+      'https://example.com/cube_b.webp',
+      'https://example.com/options.webp',
+      'https://example.com/extra.webp',
+    ]);
+  });
 });
 
