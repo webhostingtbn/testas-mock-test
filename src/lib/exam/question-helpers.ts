@@ -75,6 +75,7 @@ export function extractQuestionImages(content: Record<string, unknown>): string[
   addIfValid(content.resolved_image_url);
   addIfValid(content.image_url);
   addIfValid(content.image);
+  addIfValid(content.passage_image_url);
 
   return images;
 }

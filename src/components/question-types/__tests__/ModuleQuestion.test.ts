@@ -113,5 +113,14 @@ describe('ModuleQuestion helpers', () => {
       const images = extractQuestionImages(content);
       assert.deepStrictEqual(images, ['https://example.com/legacy.webp']);
     });
+
+    it('falls back to passage_image_url when no question_image is present', () => {
+      const content = {
+        passage_image_url: 'https://example.com/passage_fallback.webp',
+      };
+
+      const images = extractQuestionImages(content);
+      assert.deepStrictEqual(images, ['https://example.com/passage_fallback.webp']);
+    });
   });
 });

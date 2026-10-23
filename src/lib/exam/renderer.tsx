@@ -13,6 +13,7 @@ import {
   type ModulePassageData,
   type ModuleQuestionData,
   convertToModulePassage,
+  shouldRenderWithModuleMCQ,
 } from './passage-helpers';
 
 export {
@@ -20,6 +21,7 @@ export {
   type ModulePassageData,
   type ModuleQuestionData,
   convertToModulePassage,
+  shouldRenderWithModuleMCQ,
 };
 
 // ---- Types for renderer ----
@@ -76,6 +78,10 @@ export type QuestionType =
 export interface QuestionRenderer {
   canRender(question: QuestionData): boolean;
   render(props: RendererProps): React.ReactNode;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function getQuestionVerification(
@@ -238,14 +244,7 @@ class NumericalSeriesRenderer implements QuestionRenderer {
 
 class ModuleMCQRenderer implements QuestionRenderer {
   canRender(question: QuestionData): boolean {
-    if (question.isPassage) return true;
-    const moduleTypes = [
-      'module_mcq',
-      'interpreting_texts',
-      'representation_systems',
-      'linguistic_structures',
-    ];
-    return moduleTypes.includes(question.questionType);
+    return shouldRenderWithModuleMCQ(question);
   }
 
   private toModulePassage(passage: QuestionData): ModulePassageData {
@@ -336,8 +335,12 @@ class ModuleQuestionRenderer implements QuestionRenderer {
     const verification = getQuestionVerification(question.id, props.verification, props.verifications);
 
     // Ensure required fields are always defined with fallbacks
+    const contentRecord = question.content as Record<string, unknown>;
     const contentWithFallbacks = {
       ...question.content,
+      context_text:
+        question.content.context_text ||
+        (typeof contentRecord.passage_markdown === 'string' ? contentRecord.passage_markdown : undefined),
       question_text: question.content.question_text || '',
       options: question.content.options || {},
     };

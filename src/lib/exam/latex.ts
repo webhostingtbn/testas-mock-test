@@ -134,6 +134,8 @@ export function prepareLatex(text: unknown): string {
   if (typeof text !== 'string') return '';
   return (
     text
+      // Normalize depiction storage folder typo in markdown image URLs
+      .replace(/\/depiction\/([^/\s)]+)\.(webp|png|jpe?g)/gi, '/depictions/$1.webp')
       // Display chemistry `[\ce{...}]` -> single-line `$$` or aligned lines
       .replace(DISPLAY_CHEM_PATTERN, (_match: string, chem: string) => toDisplayChem(chemInner(chem)))
       // Inline chemistry `(\ce{...})` -> `($\ce{...}$)`, outer parens preserved

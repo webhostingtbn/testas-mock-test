@@ -145,4 +145,13 @@ describe('ImageService - image separation', () => {
       'https://example.com/img2.webp',
     ]);
   });
+
+  it('normalizes /depiction/ singular to /depictions/ plural', async () => {
+    const url = 'https://example.com/storage/v1/object/public/ExamDataset/depiction/p_PaperModule5_depiction_5.webp';
+    const resolved = await imageService.resolveImageUrl(url);
+    assert.strictEqual(
+      resolved,
+      'https://example.com/storage/v1/object/public/ExamDataset/depictions/p_PaperModule5_depiction_5.webp',
+    );
+  });
 });

@@ -114,14 +114,20 @@ export interface PracticePassageSource {
   image_url?: string | null;
 }
 
+export type EnrichedPracticeQuestion<Q> = Q & {
+  title?: string;
+  body_markdown?: string;
+  image_url?: string | null;
+};
+
 /**
  * Merges localized passage fields (title, body_markdown, image_url) into
- * matching child questions' content object.
+ * matching child questions' content object as well as top-level properties.
  */
 export function enrichPracticeQuestions<
   Q extends PracticeQuestionWithPassage,
   P extends PracticePassageSource,
->(questions: Q[], passages: P[]): Q[] {
+>(questions: Q[], passages: P[]): Array<EnrichedPracticeQuestion<Q>> {
   const passageMap = new Map(passages.map((p) => [p.id, p]));
   return questions.map((q) => {
     const passage = q.passage_id ? passageMap.get(q.passage_id) : undefined;
@@ -129,6 +135,9 @@ export function enrichPracticeQuestions<
       const contentObj = typeof q.content === 'object' && q.content !== null ? q.content : {};
       return {
         ...q,
+        title: passage.title,
+        body_markdown: passage.body_markdown,
+        image_url: passage.image_url,
         content: {
           ...contentObj,
           passage_title: passage.title,

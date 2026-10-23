@@ -47,6 +47,36 @@ function isUuidString(str: string): boolean {
 }
 
 /**
+ * Determines whether a question item should be rendered using ModuleMCQ.
+ * Matches:
+ * 1. Mock exam passages with `isPassage: true`
+ * 2. Dedicated digital module sections (interpreting_texts, etc.)
+ * 3. Enriched practice questions containing passage data (e.g. sc_2 depiction flowcharts)
+ */
+export function shouldRenderWithModuleMCQ(question: QuestionData): boolean {
+  if (question.isPassage) return true;
+  const moduleTypes = [
+    'module_mcq',
+    'interpreting_texts',
+    'representation_systems',
+    'linguistic_structures',
+  ];
+  if (moduleTypes.includes(question.questionType)) return true;
+
+  const content = isRecord(question.content) ? question.content : null;
+  if (
+    content &&
+    (typeof content.passage_image_url === 'string' ||
+      typeof content.passage_markdown === 'string' ||
+      typeof content.passage_title === 'string')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Converts a raw or grouped QuestionData item (mock passage, digital passage, or practice item)
  * into the ModulePassageData format required by ModuleMCQ.
  *
@@ -75,15 +105,23 @@ export function convertToModulePassage(passage: QuestionData): ModulePassageData
   // Passage graphic belongs strictly to the reference passage (left pane).
   // In mock tests, passages have top-level image_url / resolved_image_url (isPassage: true).
   // In practice mode, individual questions carry passage_image_url in their content.
-  const imageUrl =
+  let imageUrl =
     (typeof pRecord.image_url === 'string' ? pRecord.image_url : undefined) ??
-    (typeof content.image_url === 'string' ? content.image_url : undefined) ??
-    (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined);
+    (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined) ??
+    (typeof content.image_url === 'string' ? content.image_url : undefined);
+
+  if (!imageUrl && bodyMarkdown) {
+    const mdImgMatch = bodyMarkdown.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+    if (mdImgMatch) {
+      imageUrl = mdImgMatch[1];
+    }
+  }
 
   const resolvedImageUrl =
     (typeof pRecord.resolved_image_url === 'string' ? pRecord.resolved_image_url : undefined) ??
-    (typeof content.resolved_image_url === 'string' ? content.resolved_image_url : undefined) ??
     (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined) ??
+    (typeof pRecord.image_url === 'string' ? pRecord.image_url : undefined) ??
+    (typeof content.resolved_image_url === 'string' ? content.resolved_image_url : undefined) ??
     imageUrl;
 
   let questions: ModuleQuestionData[];

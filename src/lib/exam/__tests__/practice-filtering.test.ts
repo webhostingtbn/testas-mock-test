@@ -210,6 +210,9 @@ describe('enrichPracticeQuestions', () => {
 
     const result = enrichPracticeQuestions(questions, passages);
     assert.strictEqual(result.length, 2);
+    assert.strictEqual(result[0]?.title, 'Passage 1');
+    assert.strictEqual(result[0]?.body_markdown, 'Markdown 1');
+    assert.strictEqual(result[0]?.image_url, 'p1.png');
     assert.deepStrictEqual(result[0]?.content, {
       question_text: 'Q1',
       passage_title: 'Passage 1',

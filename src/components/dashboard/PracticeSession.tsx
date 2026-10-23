@@ -30,7 +30,15 @@ interface PracticeQuestion {
   passage_id?: string | null;
   isPassage?: boolean;
   questions?: PracticeQuestion[];
+  title?: string;
+  body_markdown?: string;
+  image_url?: string;
+  resolved_image_url?: string;
   [key: string]: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 interface PracticeSessionProps {
@@ -303,21 +311,50 @@ export default function PracticeSession({
   // Maps a loaded row (question or grouped passage) to renderer input,
   // preserving nested passage children — dropping them makes ModuleMCQ
   // render one repeated single-question fallback per child.
-  const toQuestionData = (item: PracticeQuestion, index: number): QuestionData => ({
-    id: item.id || `q-${index}`,
-    sectionId: item.section_id || 'practice',
-    sortOrder: index + 1,
-    questionType: item.question_type || subtestType,
-    content: item.content ?? item,
-    isPassage: item.isPassage,
-    title: typeof item.title === 'string' ? item.title : undefined,
-    body_markdown: typeof item.body_markdown === 'string' ? item.body_markdown : undefined,
-    image_url: typeof item.image_url === 'string' ? item.image_url : undefined,
-    resolved_image_url: typeof item.resolved_image_url === 'string' ? item.resolved_image_url : undefined,
-    ...(Array.isArray(item.questions)
-      ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
-      : {}),
-  });
+  const toQuestionData = (item: PracticeQuestion, index: number): QuestionData => {
+    const content = isRecord(item.content) ? item.content : {};
+    const passageTitle =
+      typeof item.title === 'string'
+        ? item.title
+        : typeof content.passage_title === 'string'
+          ? content.passage_title
+          : undefined;
+    const passageMarkdown =
+      typeof item.body_markdown === 'string'
+        ? item.body_markdown
+        : typeof content.passage_markdown === 'string'
+          ? content.passage_markdown
+          : undefined;
+    const passageImage =
+      typeof item.image_url === 'string'
+        ? item.image_url
+        : typeof content.passage_image_url === 'string'
+          ? content.passage_image_url
+          : undefined;
+    const passageResolvedImage =
+      typeof item.resolved_image_url === 'string'
+        ? item.resolved_image_url
+        : typeof content.passage_image_url === 'string'
+          ? content.passage_image_url
+          : undefined;
+    const hasPassage = Boolean(passageMarkdown || passageImage);
+
+    return {
+      id: item.id || `q-${index}`,
+      sectionId: item.section_id || 'practice',
+      sortOrder: index + 1,
+      questionType: item.question_type || subtestType,
+      content: item.content ?? item,
+      isPassage: item.isPassage ?? (hasPassage ? true : undefined),
+      title: passageTitle,
+      body_markdown: passageMarkdown,
+      image_url: passageImage,
+      resolved_image_url: passageResolvedImage,
+      ...(Array.isArray(item.questions)
+        ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
+        : {}),
+    };
+  };
 
   const resolvedCurrent = resolvedById[currentItem.id] ?? null;
   const qData: QuestionData = toQuestionData(resolvedCurrent ?? currentItem, currentIndex);

@@ -164,11 +164,18 @@ export class ImageService {
       }
     }
 
-    if (path.startsWith('http') || path.startsWith('/')) {
-      return path;
+    let normalizedPath = path;
+    if (normalizedPath.includes('/depiction/')) {
+      normalizedPath = normalizedPath.replace(/\/depiction\//g, '/depictions/');
+    } else if (normalizedPath.startsWith('depiction/')) {
+      normalizedPath = normalizedPath.replace(/^depiction\//, 'depictions/');
     }
 
-    return signStoragePath(path);
+    if (normalizedPath.startsWith('http') || normalizedPath.startsWith('/')) {
+      return normalizedPath;
+    }
+
+    return signStoragePath(normalizedPath);
   }
 
   private async resolveBarePath(value: unknown): Promise<string | undefined> {
