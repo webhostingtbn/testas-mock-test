@@ -4,6 +4,10 @@ export interface QuestionWithContent {
   content?: unknown;
   isPassage?: boolean;
   questions?: QuestionWithContent[];
+  title?: string;
+  body_markdown?: string;
+  image_url?: string;
+  resolved_image_url?: string;
 }
 
 function isLikelyImageUrl(val: string): boolean {

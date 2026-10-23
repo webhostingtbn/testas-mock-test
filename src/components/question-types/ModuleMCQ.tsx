@@ -149,9 +149,9 @@ export default function ModuleMCQ({
               No additional reference text for this question.
             </p>
           )}
-          {passage.resolved_image_url && (
+          {(passage.resolved_image_url || passage.image_url) && (
             <div className="w-full h-[320px] sm:h-[380px] shrink-0 overflow-hidden rounded-xl">
-              <CanvasImage src={passage.resolved_image_url} alt="Passage graphic" />
+              <CanvasImage src={(passage.resolved_image_url || passage.image_url)!} alt="Passage graphic" />
             </div>
           )}
         </div>

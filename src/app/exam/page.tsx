@@ -31,6 +31,10 @@ interface DisplayQuestion extends QuestionWithContent {
   isPassage?: boolean;
   questions?: DisplayQuestion[];
   passage_id?: string;
+  title?: string;
+  body_markdown?: string;
+  image_url?: string;
+  resolved_image_url?: string;
 }
 
 export default function ExamPage() {
@@ -394,6 +398,10 @@ export default function ExamPage() {
     questionType: item.question_type || currentSection.questionType,
     content: item.content ?? item,
     isPassage: item.isPassage,
+    title: item.title,
+    body_markdown: item.body_markdown,
+    image_url: item.image_url,
+    resolved_image_url: item.resolved_image_url,
     ...(Array.isArray(item.questions)
       ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
       : {}),
@@ -445,7 +453,18 @@ export default function ExamPage() {
     return getRating(currentSection.id, currentQuestion.id);
   })();
 
-  const answeredIndices = Object.keys(answers[currentSection.id] || {}).map((_, idx) => idx);
+  const answeredIndices = sectionQuestions
+    .map((item, idx) => {
+      const sectionAnswers = answers[currentSection.id] || {};
+      if (item.isPassage && item.questions && item.questions.length > 0) {
+        const isAllAnswered = item.questions.every(
+          (child) => sectionAnswers[child.id] !== undefined && sectionAnswers[child.id] !== null,
+        );
+        return isAllAnswered ? idx : -1;
+      }
+      return sectionAnswers[item.id] !== undefined && sectionAnswers[item.id] !== null ? idx : -1;
+    })
+    .filter((idx) => idx !== -1);
 
   return (
     <LanguageProvider initialLang={examLanguage || 'en'} disabled>

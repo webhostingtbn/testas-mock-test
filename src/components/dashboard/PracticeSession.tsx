@@ -310,6 +310,10 @@ export default function PracticeSession({
     questionType: item.question_type || subtestType,
     content: item.content ?? item,
     isPassage: item.isPassage,
+    title: typeof item.title === 'string' ? item.title : undefined,
+    body_markdown: typeof item.body_markdown === 'string' ? item.body_markdown : undefined,
+    image_url: typeof item.image_url === 'string' ? item.image_url : undefined,
+    resolved_image_url: typeof item.resolved_image_url === 'string' ? item.resolved_image_url : undefined,
     ...(Array.isArray(item.questions)
       ? { questions: item.questions.map((child, childIndex) => toQuestionData(child, childIndex)) }
       : {}),

@@ -8,18 +8,21 @@ import CompletingPatterns from '@/components/question-types/CompletingPatterns';
 import ModuleMCQ from '@/components/question-types/ModuleMCQ';
 import NumericalSeries from '@/components/question-types/NumericalSeries';
 import ModuleQuestion from '@/components/question-types/ModuleQuestion';
+import {
+  type QuestionData,
+  type ModulePassageData,
+  type ModuleQuestionData,
+  convertToModulePassage,
+} from './passage-helpers';
+
+export {
+  type QuestionData,
+  type ModulePassageData,
+  type ModuleQuestionData,
+  convertToModulePassage,
+};
 
 // ---- Types for renderer ----
-
-export interface QuestionData {
-  id: string;
-  sectionId: string;
-  sortOrder: number;
-  questionType: string;
-  content: unknown;
-  isPassage?: boolean;
-  questions?: QuestionData[];
-}
 
 export interface QuestionVerification {
   isVerified: boolean;
@@ -84,29 +87,6 @@ function getQuestionVerification(
     return verifications[questionId];
   }
   return verification;
-}
-
-// ---- Module Question Types for proper conversion ----
-
-interface ModuleQuestionData {
-  id: string;
-  sort_order?: number;
-  content: {
-    context_text?: string;
-    question_text: string;
-    options: Record<string, string>;
-    resolved_image_url?: string;
-    resolved_image_urls?: string[];
-  };
-}
-
-interface ModulePassageData {
-  id: string;
-  title: string;
-  body_markdown: string;
-  image_url?: string;
-  resolved_image_url?: string;
-  questions: ModuleQuestionData[];
 }
 
 // ---- Individual Renderers ----
@@ -256,14 +236,6 @@ class NumericalSeriesRenderer implements QuestionRenderer {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isUuidString(str: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-}
-
 class ModuleMCQRenderer implements QuestionRenderer {
   canRender(question: QuestionData): boolean {
     if (question.isPassage) return true;
@@ -276,111 +248,8 @@ class ModuleMCQRenderer implements QuestionRenderer {
     return moduleTypes.includes(question.questionType);
   }
 
-  // Convert QuestionData to ModulePassageData format expected by ModuleMCQ
   private toModulePassage(passage: QuestionData): ModulePassageData {
-    const content = isRecord(passage.content) ? passage.content : {};
-    const pRecord = passage as unknown as Record<string, unknown>;
-
-    let rawTitle = typeof pRecord.title === 'string' ? pRecord.title : (typeof content.title === 'string' ? content.title : (typeof content.passage_title === 'string' ? content.passage_title : undefined));
-    if (!rawTitle && passage.sectionId && !isUuidString(passage.sectionId)) {
-      rawTitle = passage.sectionId;
-    }
-    const title = rawTitle || 'Reference Information';
-
-    const bodyMarkdown = typeof pRecord.body_markdown === 'string' ? pRecord.body_markdown : (typeof content.body_markdown === 'string' ? content.body_markdown : (typeof content.passage_markdown === 'string' ? content.passage_markdown : (typeof content.passage_text === 'string' ? content.passage_text : '')));
-
-    // Passage graphic belongs strictly to the reference passage (left pane).
-    // In mock tests, passages have top-level image_url / resolved_image_url (isPassage: true).
-    // In practice mode, individual questions carry passage_image_url in their content.
-    const isMockPassage = Boolean(pRecord.isPassage);
-    const imageUrl = isMockPassage && typeof pRecord.image_url === 'string'
-      ? pRecord.image_url
-      : typeof content.passage_image_url === 'string'
-        ? content.passage_image_url
-        : undefined;
-    const resolvedImageUrl = isMockPassage && typeof pRecord.resolved_image_url === 'string'
-      ? pRecord.resolved_image_url
-      : typeof content.passage_image_url === 'string'
-        ? content.passage_image_url
-        : imageUrl;
-
-    let questions: ModuleQuestionData[];
-
-    if (passage.questions && passage.questions.length > 0) {
-      questions = passage.questions.map((q) => {
-        const qContent = isRecord(q.content) ? q.content : {};
-        const qRecord = q as unknown as Record<string, unknown>;
-        const childResolved =
-          typeof qContent.question_image === 'string'
-            ? qContent.question_image
-            : typeof qContent.resolved_image_url === 'string' &&
-              qContent.resolved_image_url !== resolvedImageUrl &&
-              qContent.resolved_image_url !== imageUrl
-              ? qContent.resolved_image_url
-              : undefined;
-        const childResolvedUrls = Array.isArray(qContent.resolved_image_urls)
-          ? qContent.resolved_image_urls.filter(
-              (u): u is string =>
-                typeof u === 'string' &&
-                u !== imageUrl &&
-                u !== resolvedImageUrl,
-            )
-          : undefined;
-        const childContextText = typeof qContent.context_text === 'string' ? qContent.context_text : undefined;
-        return {
-          id: q.id,
-          sort_order: typeof qRecord.sort_order === 'number' ? qRecord.sort_order : (q.sortOrder ?? 1),
-          content: {
-            question_text: typeof qContent.question_text === 'string' ? qContent.question_text : '',
-            options: (isRecord(qContent.options) || Array.isArray(qContent.options) ? qContent.options : {}) as unknown as Record<string, string>,
-            ...(childContextText ? { context_text: childContextText } : {}),
-            ...(childResolved ? { resolved_image_url: childResolved } : {}),
-            ...(childResolvedUrls && childResolvedUrls.length > 0 ? { resolved_image_urls: childResolvedUrls } : {}),
-          },
-        };
-      });
-    } else {
-      // Single question passed directly (e.g. Practice Mode)
-      const singleResolved =
-        typeof content.question_image === 'string'
-          ? content.question_image
-          : typeof content.resolved_image_url === 'string' &&
-            content.resolved_image_url !== resolvedImageUrl &&
-            content.resolved_image_url !== imageUrl
-            ? content.resolved_image_url
-            : undefined;
-      const singleResolvedUrls = Array.isArray(content.resolved_image_urls)
-        ? content.resolved_image_urls.filter(
-            (u): u is string =>
-              typeof u === 'string' &&
-              u !== imageUrl &&
-              u !== resolvedImageUrl,
-          )
-        : undefined;
-      const singleContextText = typeof content.context_text === 'string' ? content.context_text : undefined;
-      questions = [
-        {
-          id: passage.id,
-          sort_order: typeof pRecord.sort_order === 'number' ? pRecord.sort_order : (passage.sortOrder ?? 1),
-          content: {
-            question_text: typeof content.question_text === 'string' ? content.question_text : (typeof passage.content === 'string' ? passage.content : ''),
-            options: (isRecord(content.options) || Array.isArray(content.options) ? content.options : {}) as unknown as Record<string, string>,
-            ...(singleContextText ? { context_text: singleContextText } : {}),
-            ...(singleResolved ? { resolved_image_url: singleResolved } : {}),
-            ...(singleResolvedUrls && singleResolvedUrls.length > 0 ? { resolved_image_urls: singleResolvedUrls } : {}),
-          },
-        },
-      ];
-    }
-
-    return {
-      id: passage.id,
-      title,
-      body_markdown: bodyMarkdown,
-      image_url: imageUrl,
-      resolved_image_url: resolvedImageUrl,
-      questions,
-    };
+    return convertToModulePassage(passage);
   }
 
   render(props: RendererProps): React.ReactNode {
