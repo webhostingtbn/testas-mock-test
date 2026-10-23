@@ -75,15 +75,12 @@ export function convertToModulePassage(passage: QuestionData): ModulePassageData
   // Passage graphic belongs strictly to the reference passage (left pane).
   // In mock tests, passages have top-level image_url / resolved_image_url (isPassage: true).
   // In practice mode, individual questions carry passage_image_url in their content.
-  const isMockPassage = Boolean(pRecord.isPassage);
   const imageUrl =
-    (isMockPassage && typeof pRecord.image_url === 'string' ? pRecord.image_url : undefined) ??
     (typeof pRecord.image_url === 'string' ? pRecord.image_url : undefined) ??
     (typeof content.image_url === 'string' ? content.image_url : undefined) ??
     (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined);
 
   const resolvedImageUrl =
-    (isMockPassage && typeof pRecord.resolved_image_url === 'string' ? pRecord.resolved_image_url : undefined) ??
     (typeof pRecord.resolved_image_url === 'string' ? pRecord.resolved_image_url : undefined) ??
     (typeof content.resolved_image_url === 'string' ? content.resolved_image_url : undefined) ??
     (typeof content.passage_image_url === 'string' ? content.passage_image_url : undefined) ??

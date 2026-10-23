@@ -31,6 +31,17 @@ const PLACEMENT_CYCLE: Record<ZoomControlPlacement, ZoomControlPlacement> = {
   'top-right': 'bottom-right',
 };
 
+function computeQuadrant(clientX: number, clientY: number, containerRect: DOMRect): ZoomControlPlacement {
+  const midX = containerRect.left + containerRect.width / 2;
+  const midY = containerRect.top + containerRect.height / 2;
+  const isLeft = clientX < midX;
+  const isTop = clientY < midY;
+  if (isTop && isLeft) return 'top-left';
+  if (isTop && !isLeft) return 'top-right';
+  if (!isTop && isLeft) return 'bottom-left';
+  return 'bottom-right';
+}
+
 export function CanvasImage({
   src,
   alt,
@@ -50,7 +61,7 @@ export function CanvasImage({
   const [isControlsOpen, setIsControlsOpen] = useState(defaultControlsOpen);
   const [isDraggingControls, setIsDraggingControls] = useState(false);
   const [showWheelHint, setShowWheelHint] = useState(false);
-  const wheelHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const wheelHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; moved: boolean } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -206,20 +217,7 @@ export function CanvasImage({
     setIsDraggingControls(false);
 
     if (wasMoved && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const midY = rect.top + rect.height / 2;
-      const isLeft = e.clientX < midX;
-      const isTop = e.clientY < midY;
-      const targetPlacement: ZoomControlPlacement =
-        isTop && isLeft
-          ? 'top-left'
-          : isTop && !isLeft
-            ? 'top-right'
-            : !isTop && isLeft
-              ? 'bottom-left'
-              : 'bottom-right';
-      setPlacement(targetPlacement);
+      setPlacement(computeQuadrant(e.clientX, e.clientY, containerRef.current.getBoundingClientRect()));
     } else {
       setPlacement((prev) => PLACEMENT_CYCLE[prev]);
     }
@@ -264,20 +262,7 @@ export function CanvasImage({
     setIsDraggingControls(false);
 
     if (wasMoved && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const midX = rect.left + rect.width / 2;
-      const midY = rect.top + rect.height / 2;
-      const isLeft = e.clientX < midX;
-      const isTop = e.clientY < midY;
-      const targetPlacement: ZoomControlPlacement =
-        isTop && isLeft
-          ? 'top-left'
-          : isTop && !isLeft
-            ? 'top-right'
-            : !isTop && isLeft
-              ? 'bottom-left'
-              : 'bottom-right';
-      setPlacement(targetPlacement);
+      setPlacement(computeQuadrant(e.clientX, e.clientY, containerRef.current.getBoundingClientRect()));
     } else {
       setIsControlsOpen(true);
     }
