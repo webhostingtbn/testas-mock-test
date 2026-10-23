@@ -266,6 +266,7 @@ function isUuidString(str: string): boolean {
 
 class ModuleMCQRenderer implements QuestionRenderer {
   canRender(question: QuestionData): boolean {
+    if (question.isPassage) return true;
     const moduleTypes = [
       'module_mcq',
       'interpreting_texts',

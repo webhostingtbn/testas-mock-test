@@ -24,6 +24,15 @@ function isLikelyImageUrl(val: string): boolean {
 export function extractQuestionImageUrls(q: QuestionWithContent | null | undefined): string[] {
   if (!q) return [];
   const urls: string[] = [];
+
+  // Top-level passage graphic (passages carry image_url / resolved_image_url at root)
+  const qRecord = q as Record<string, unknown>;
+  if (typeof qRecord.resolved_image_url === 'string' && qRecord.resolved_image_url) {
+    urls.push(qRecord.resolved_image_url);
+  } else if (typeof qRecord.image_url === 'string' && qRecord.image_url) {
+    urls.push(qRecord.image_url);
+  }
+
   const content: Record<string, unknown> =
     q.content && typeof q.content === 'object' && !Array.isArray(q.content)
       ? (q.content as Record<string, unknown>)

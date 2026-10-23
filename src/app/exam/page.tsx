@@ -134,16 +134,11 @@ export default function ExamPage() {
         (question: { section_id?: string }) => question.section_id === section.id,
       );
 
-      const isModuleSection = [
-        'module_mcq',
-        'interpreting_texts',
-        'representation_systems',
-        'linguistic_structures',
-      ].includes(section.questionType);
       const sectionPassages = (examData.passages || []).filter(
         (passage: { section_id?: string }) => passage.section_id === section.id,
       );
-      const displayQuestions: DisplayQuestion[] = isModuleSection
+      const hasPassages = sectionPassages.length > 0;
+      const displayQuestions: DisplayQuestion[] = hasPassages
         ? [
             ...sectionPassages
               .map((passage: { id: string; section_id?: string }) => ({

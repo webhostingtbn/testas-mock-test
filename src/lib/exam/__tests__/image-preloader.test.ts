@@ -154,5 +154,28 @@ describe('extractQuestionImageUrls', () => {
       'https://example.com/extra.webp',
     ]);
   });
+
+  it('extracts top-level image_url and resolved_image_url from mock exam passages', () => {
+    const passage = {
+      id: 'mock-passage-1',
+      isPassage: true,
+      image_url: 'https://example.com/depictions/flowchart.webp',
+      resolved_image_url: 'https://example.com/signed/flowchart.webp',
+      questions: [
+        {
+          id: 'sc2-child-1',
+          content: {
+            question_text: 'Question 1',
+            options: [{ id: 'A', text: 'Option A' }],
+          },
+        },
+      ],
+    };
+
+    const urls = extractQuestionImageUrls(passage);
+    assert.deepStrictEqual(urls, [
+      'https://example.com/signed/flowchart.webp',
+    ]);
+  });
 });
 

@@ -60,32 +60,33 @@ export async function createAttempt(
   const requested = profile.preferred_language ?? 'en';
   let language: Lang = 'en';
 
-  if (requested === 'de') {
-    let scope: string[] = [];
-    if (sectionIds && sectionIds.length > 0) {
-      scope = sectionIds;
-    } else {
-      const { data: examSections } = await supabase
-        .from('sections')
-        .select('id, question_type, title, sort_order')
-        .eq('exam_id', examId);
+  let scope: string[] = [];
+  if (sectionIds && sectionIds.length > 0) {
+    scope = sectionIds;
+  } else {
+    const { data: examSections } = await supabase
+      .from('sections')
+      .select('id, question_type, title, sort_order')
+      .eq('exam_id', examId);
 
-      const rawSections = examSections ?? [];
-      const isPaper = exam.format?.toLowerCase() === 'paper';
-      let applicable = rawSections;
-      if (profile.module_test) {
-        const { coreSections, moduleSections } = filterSections(
-          rawSections,
-          isPaper,
-          profile.module_test,
-        );
-        const scoped = [...coreSections, ...moduleSections];
-        if (scoped.length > 0) {
-          applicable = scoped;
-        }
+    const rawSections = examSections ?? [];
+    const isPaper = exam.format?.toLowerCase() === 'paper';
+    let applicable = rawSections;
+    if (profile.module_test) {
+      const { coreSections, moduleSections } = filterSections(
+        rawSections,
+        isPaper,
+        profile.module_test,
+      );
+      const scoped = [...coreSections, ...moduleSections];
+      if (scoped.length > 0) {
+        applicable = scoped;
       }
-      scope = applicable.map((s) => s.id);
     }
+    scope = applicable.map((s) => s.id);
+  }
+
+  if (requested === 'de') {
     const isGerman = await germanAvailable(scope);
     if (isGerman) language = 'de';
   }
@@ -94,7 +95,7 @@ export async function createAttempt(
     p_exam_id: examId,
     p_user_id: profile.id,
     p_attempt_limit: attemptLimit,
-    p_section_ids: sectionIds && sectionIds.length > 0 ? sectionIds : null,
+    p_section_ids: sectionIds && sectionIds.length > 0 ? sectionIds : (scope.length > 0 ? scope : null),
     p_attempt_kind: attemptKind,
   });
 
