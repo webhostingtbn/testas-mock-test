@@ -5,6 +5,8 @@ export const de: Messages = {
     accuracy: 'Genauigkeit',
     all: 'Alle',
     back: 'Zurück',
+    changePlacement: 'Position ändern',
+    close: 'Schließen',
     collapse: 'Einklappen',
     completed: 'Abgeschlossen',
     coreSubtest: 'Kern-Untertest',
@@ -40,6 +42,8 @@ export const de: Messages = {
     scoreSummary: 'Ergebnisübersicht',
     scrollToZoom: 'Zum Zoomen scrollen',
     zoom: 'Zoom',
+    zoomIn: 'Vergrößern',
+    zoomOut: 'Verkleinern',
   },
   auth: {
     accessDeniedError: 'Zugriff verweigert. Bitte stellen Sie sicher, dass Sie über die entsprechenden Berechtigungen verfügen.',

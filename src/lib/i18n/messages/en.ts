@@ -3,6 +3,8 @@ export const en = {
     accuracy: 'Accuracy',
     all: 'All',
     back: 'Back',
+    changePlacement: 'Change placement',
+    close: 'Close',
     collapse: 'Collapse',
     completed: 'Completed',
     coreSubtest: 'Core Subtest',
@@ -38,6 +40,8 @@ export const en = {
     scoreSummary: 'Score Summary',
     scrollToZoom: 'Scroll to zoom',
     zoom: 'Zoom',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
   },
   auth: {
     accessDeniedError: 'Access was denied. Please make sure you have the right permissions.',
