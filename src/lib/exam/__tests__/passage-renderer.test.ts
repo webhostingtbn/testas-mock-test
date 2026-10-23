@@ -153,6 +153,25 @@ describe('convertToModulePassage', () => {
     assert.strictEqual(modulePassage.image_url, 'https://example.com/storage/depictions/p_depiction_5.webp');
     assert.strictEqual(modulePassage.resolved_image_url, 'https://example.com/storage/depictions/p_depiction_5.webp');
   });
+
+  it('extracts root-relative image from body_markdown when image_url is missing', () => {
+    const questionWithRootRelImg: QuestionData = {
+      id: 'practice-root-rel-img',
+      sectionId: 'sc_2',
+      sortOrder: 1,
+      questionType: 'sc_2',
+      content: {
+        passage_title: 'Root Relative Passage',
+        passage_markdown: 'Text before\n\n![Original](/storage/depictions/p_depiction_6.webp)\n\nText after',
+        question_text: 'Question text',
+        options: { A: 'A' },
+      },
+    };
+
+    const modulePassage = convertToModulePassage(questionWithRootRelImg);
+    assert.strictEqual(modulePassage.image_url, '/storage/depictions/p_depiction_6.webp');
+    assert.strictEqual(modulePassage.resolved_image_url, '/storage/depictions/p_depiction_6.webp');
+  });
 });
 
 describe('shouldRenderWithModuleMCQ routing for practice and exam modes', () => {

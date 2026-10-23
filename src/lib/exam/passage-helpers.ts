@@ -111,7 +111,7 @@ export function convertToModulePassage(passage: QuestionData): ModulePassageData
     (typeof content.image_url === 'string' ? content.image_url : undefined);
 
   if (!imageUrl && bodyMarkdown) {
-    const mdImgMatch = bodyMarkdown.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+    const mdImgMatch = bodyMarkdown.match(/!\[.*?\]\(((?:https?:\/\/|\/)[^\s)]+)\)/);
     if (mdImgMatch) {
       imageUrl = mdImgMatch[1];
     }
